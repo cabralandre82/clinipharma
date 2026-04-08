@@ -1,0 +1,494 @@
+'use client'
+
+import Link from 'next/link'
+import { formatCurrency, formatDateTime, formatDate } from '@/lib/utils'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { Button } from '@/components/ui/button'
+import { ButtonLink } from '@/components/ui/button-link'
+import {
+  ChevronLeft,
+  Building2,
+  UserCheck,
+  Pill,
+  Package,
+  FileText,
+  CreditCard,
+  Activity,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+} from 'lucide-react'
+import type { ProfileWithRoles } from '@/types'
+
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'Rascunho',
+  AWAITING_DOCUMENTS: 'Aguardando Documentação',
+  READY_FOR_REVIEW: 'Pronto para Revisão',
+  AWAITING_PAYMENT: 'Aguardando Pagamento',
+  PAYMENT_UNDER_REVIEW: 'Pagamento em Análise',
+  PAYMENT_CONFIRMED: 'Pagamento Confirmado',
+  COMMISSION_CALCULATED: 'Comissão Calculada',
+  TRANSFER_PENDING: 'Repasse Pendente',
+  TRANSFER_COMPLETED: 'Repasse Concluído',
+  RELEASED_FOR_EXECUTION: 'Liberado para Execução',
+  RECEIVED_BY_PHARMACY: 'Recebido pela Farmácia',
+  IN_EXECUTION: 'Em Execução',
+  READY: 'Pronto',
+  SHIPPED: 'Enviado',
+  DELIVERED: 'Entregue',
+  COMPLETED: 'Concluído',
+  CANCELED: 'Cancelado',
+  WITH_ISSUE: 'Com Problema',
+}
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Pendente',
+  UNDER_REVIEW: 'Em análise',
+  CONFIRMED: 'Confirmado',
+  FAILED: 'Falhou',
+  REFUNDED: 'Estornado',
+}
+
+interface OrderDetailProps {
+  order: Record<string, unknown>
+  currentUser: ProfileWithRoles
+}
+
+export function OrderDetail({ order, currentUser }: OrderDetailProps) {
+  const isAdmin = currentUser.roles.some((r) => ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(r))
+
+  const statusHistory =
+    (
+      order.order_status_history as Array<{
+        id: string
+        old_status: string | null
+        new_status: string
+        reason: string | null
+        created_at: string
+        profiles: { full_name: string } | null
+      }>
+    )?.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) ?? []
+
+  const documents =
+    (order.order_documents as Array<{
+      id: string
+      document_type: string
+      original_filename: string
+      mime_type: string
+      file_size: number
+      created_at: string
+    }>) ?? []
+
+  const payment =
+    (
+      order.payments as Array<{
+        id: string
+        gross_amount: number
+        status: string
+        payment_method: string
+        reference_code: string | null
+        confirmed_at: string | null
+        notes: string | null
+      }>
+    )?.[0] ?? null
+
+  const commission =
+    (
+      order.commissions as Array<{
+        id: string
+        commission_type: string
+        commission_percentage: number | null
+        commission_total_amount: number
+      }>
+    )?.[0] ?? null
+
+  const transfer =
+    (
+      order.transfers as Array<{
+        id: string
+        gross_amount: number
+        commission_amount: number
+        net_amount: number
+        status: string
+        transfer_reference: string | null
+        processed_at: string | null
+      }>
+    )?.[0] ?? null
+
+  const operationalUpdates =
+    (order.order_operational_updates as Array<{
+      id: string
+      status: string
+      description: string
+      created_at: string
+    }>) ?? []
+
+  const clinic = order.clinics as { trade_name: string; city: string; state: string } | null
+  const doctor = order.doctors as {
+    full_name: string
+    crm: string
+    crm_state: string
+    specialty: string | null
+  } | null
+  const pharmacy = order.pharmacies as { trade_name: string; city: string; state: string } | null
+  const product = order.products as {
+    name: string
+    concentration: string
+    presentation: string
+  } | null
+
+  return (
+    <div className="max-w-5xl space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <Link
+            href="/orders"
+            className="mb-2 flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Pedidos
+          </Link>
+          <h1 className="font-mono text-2xl font-bold text-gray-900">{String(order.code)}</h1>
+          <p className="mt-0.5 text-sm text-gray-500">
+            Criado em {formatDateTime(String(order.created_at))}
+          </p>
+        </div>
+        <div>
+          <span className="inline-block rounded-full bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-800">
+            {ORDER_STATUS_LABELS[String(order.order_status)] ?? String(order.order_status)}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-5">
+        {/* Main content */}
+        <div className="col-span-2 space-y-5">
+          {/* Order summary */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Package className="h-4 w-4" />
+                Produto
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="font-semibold text-gray-900">{product?.name}</p>
+                <p className="text-sm text-gray-500">
+                  {product?.concentration} · {product?.presentation}
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div>
+                  <p className="text-xs tracking-wide text-gray-400 uppercase">Quantidade</p>
+                  <p className="font-semibold">{String(order.quantity)}</p>
+                </div>
+                <div>
+                  <p className="text-xs tracking-wide text-gray-400 uppercase">Preço unit.</p>
+                  <p className="font-semibold">{formatCurrency(Number(order.unit_price))}</p>
+                </div>
+                <div>
+                  <p className="text-xs tracking-wide text-gray-400 uppercase">Total</p>
+                  <p className="font-bold text-[hsl(213,75%,24%)]">
+                    {formatCurrency(Number(order.total_price))}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Documents */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FileText className="h-4 w-4" />
+                Documentação ({documents.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {documents.length === 0 ? (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-700">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <p>Nenhum documento anexado. O pedido não avançará sem documentação.</p>
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {documents.map((doc) => (
+                    <li
+                      key={doc.id}
+                      className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5"
+                    >
+                      <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm text-gray-800">{doc.original_filename}</p>
+                        <p className="text-xs text-gray-400">
+                          {(doc.file_size / 1024).toFixed(0)} KB · {formatDate(doc.created_at)}
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {doc.document_type}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Financial (admin only) */}
+          {isAdmin && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CreditCard className="h-4 w-4" />
+                  Financeiro
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Payment */}
+                <div>
+                  <p className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                    Pagamento
+                  </p>
+                  {payment ? (
+                    <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Valor</span>
+                        <span className="font-semibold">
+                          {formatCurrency(payment.gross_amount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Status</span>
+                        <span
+                          className={`font-medium ${payment.status === 'CONFIRMED' ? 'text-green-700' : 'text-amber-700'}`}
+                        >
+                          {PAYMENT_STATUS_LABELS[payment.status] ?? payment.status}
+                        </span>
+                      </div>
+                      {payment.reference_code && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Referência</span>
+                          <span className="font-mono text-xs">{payment.reference_code}</span>
+                        </div>
+                      )}
+                      {payment.confirmed_at && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Confirmado em</span>
+                          <span>{formatDate(payment.confirmed_at)}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">Sem dados de pagamento</p>
+                  )}
+                  {isAdmin && payment?.status === 'PENDING' && (
+                    <ButtonLink href={`/payments?order=${order.id}`} size="sm" className="mt-2">
+                      Confirmar pagamento
+                    </ButtonLink>
+                  )}
+                </div>
+
+                {/* Commission */}
+                {commission && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                      Comissão
+                    </p>
+                    <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Percentual</span>
+                        <span className="font-semibold">
+                          {commission.commission_percentage ?? '—'}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Valor</span>
+                        <span className="font-semibold">
+                          {formatCurrency(commission.commission_total_amount)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Transfer */}
+                {transfer && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                      Repasse para farmácia
+                    </p>
+                    <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Bruto</span>
+                        <span>{formatCurrency(transfer.gross_amount)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Comissão</span>
+                        <span className="text-red-600">
+                          - {formatCurrency(transfer.commission_amount)}
+                        </span>
+                      </div>
+                      <Separator />
+                      <div className="flex justify-between text-sm font-semibold">
+                        <span>Líquido</span>
+                        <span className="text-green-700">
+                          {formatCurrency(transfer.net_amount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Status</span>
+                        <span
+                          className={`font-medium ${transfer.status === 'COMPLETED' ? 'text-green-700' : 'text-amber-700'}`}
+                        >
+                          {transfer.status === 'COMPLETED' ? 'Concluído' : 'Pendente'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Operational Updates */}
+          {operationalUpdates.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Activity className="h-4 w-4" />
+                  Updates operacionais ({operationalUpdates.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {operationalUpdates.map((update) => (
+                    <div
+                      key={update.id}
+                      className="rounded-lg border border-gray-100 bg-gray-50 p-3"
+                    >
+                      <div className="mb-1 flex items-center justify-between">
+                        <Badge variant="outline" className="text-xs">
+                          {update.status}
+                        </Badge>
+                        <span className="text-xs text-gray-400">
+                          {formatDate(update.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700">{update.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-5">
+          {/* Entities */}
+          <Card>
+            <CardContent className="space-y-4 p-4">
+              {clinic && (
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100">
+                    <Building2 className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs tracking-wide text-gray-400 uppercase">Clínica</p>
+                    <p className="text-sm font-medium text-gray-900">{clinic.trade_name}</p>
+                    <p className="text-xs text-gray-400">
+                      {clinic.city}, {clinic.state}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {doctor && (
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-teal-100">
+                    <UserCheck className="h-4 w-4 text-teal-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs tracking-wide text-gray-400 uppercase">Médico</p>
+                    <p className="text-sm font-medium text-gray-900">{doctor.full_name}</p>
+                    <p className="text-xs text-gray-400">
+                      CRM {doctor.crm}/{doctor.crm_state}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {pharmacy && (
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-cyan-100">
+                    <Pill className="h-4 w-4 text-cyan-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs tracking-wide text-gray-400 uppercase">Farmácia</p>
+                    <p className="text-sm font-medium text-gray-900">{pharmacy.trade_name}</p>
+                    <p className="text-xs text-gray-400">
+                      {pharmacy.city}, {pharmacy.state}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Timeline */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Clock className="h-4 w-4" />
+                Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {statusHistory.map((entry, idx) => (
+                  <div key={entry.id} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${
+                          idx === statusHistory.length - 1
+                            ? 'bg-[hsl(213,75%,24%)] text-white'
+                            : 'bg-gray-100 text-gray-400'
+                        }`}
+                      >
+                        {entry.new_status === 'CANCELED' ? (
+                          <XCircle className="h-3.5 w-3.5" />
+                        ) : entry.new_status === 'COMPLETED' ? (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <Activity className="h-3.5 w-3.5" />
+                        )}
+                      </div>
+                      {idx < statusHistory.length - 1 && (
+                        <div className="my-1 w-px flex-1 bg-gray-200" />
+                      )}
+                    </div>
+                    <div className="pb-3">
+                      <p className="text-xs font-semibold text-gray-800">
+                        {ORDER_STATUS_LABELS[entry.new_status] ?? entry.new_status}
+                      </p>
+                      {entry.reason && (
+                        <p className="mt-0.5 text-xs text-gray-500">{entry.reason}</p>
+                      )}
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        {formatDateTime(entry.created_at)}
+                        {entry.profiles?.full_name && ` · ${entry.profiles.full_name}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}
