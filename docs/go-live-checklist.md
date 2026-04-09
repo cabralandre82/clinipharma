@@ -13,9 +13,10 @@
 ## Autenticação
 
 - [x] Email/senha funcionando
-- [x] Site URL configurada no Supabase Auth (`https://clinipharma-three.vercel.app`)
+- [x] Site URL configurada no Supabase Auth
 - [x] Redirect URLs configuradas no Supabase Auth
-- [ ] SMTP personalizado configurado (Sendgrid, Resend, etc.) — _pendente para produção real_
+- [ ] Site URL atualizada no Supabase Auth para `https://clinipharma.com.br` — _após domínio ativo_
+- [ ] SMTP Resend configurado no Supabase Auth — _ver `docs/setup-email.md` Parte 2_
 - [ ] Email de recuperação de senha testado em produção
 
 ## Variáveis de Ambiente (Vercel)
@@ -23,16 +24,21 @@
 - [x] `NEXT_PUBLIC_SUPABASE_URL` configurada
 - [x] `NEXT_PUBLIC_SUPABASE_ANON_KEY` configurada
 - [x] `SUPABASE_SERVICE_ROLE_KEY` configurada
-- [x] `NEXT_PUBLIC_APP_URL` com URL de produção
 - [x] `NEXT_PUBLIC_APP_NAME` = Clinipharma
+- [ ] `RESEND_API_KEY` adicionada no Vercel
+- [ ] `EMAIL_FROM` = `Clinipharma <noreply@clinipharma.com.br>` adicionada no Vercel
+- [ ] `NEXT_PUBLIC_APP_URL` atualizada para `https://clinipharma.com.br` — _após domínio ativo_
 
 ## Build e Deploy
 
 - [x] `npm run build` passa sem erros
 - [x] `npm run lint` passa sem warnings críticos
 - [x] Deploy na Vercel bem-sucedido
-- [x] URL de produção acessível (https://clinipharma-three.vercel.app)
+- [x] URL de produção acessível (`https://clinipharma-three.vercel.app`)
 - [x] Repositório GitHub conectado (auto-deploy no push para `main`)
+- [ ] Domínio `clinipharma.com.br` apontando para Vercel (DNS pendente)
+- [ ] HTTPS ativo em `https://clinipharma.com.br`
+- [ ] Repositório GitHub renomeado de `MedAxis` para `Clinipharma`
 
 ## Funcionalidades críticas
 
@@ -58,9 +64,12 @@
 
 ## Email transacional
 
-- [ ] Provedor SMTP real configurado no Supabase Auth (Resend, SendGrid, Postmark)
-- [ ] Email de recuperação de senha testado em produção
-- [ ] Emails automáticos de eventos críticos implementados (opcional no dia 1)
+- [x] Resend integrado no código (`lib/email/`) com 5 templates
+- [x] `RESEND_API_KEY` configurada em `.env.local`
+- [ ] `RESEND_API_KEY` e `EMAIL_FROM` adicionadas no Vercel
+- [ ] Domínio `clinipharma.com.br` verificado no Resend — _necessário para envio em produção_
+- [ ] SMTP do Resend configurado no Supabase Auth — _ver `docs/setup-email.md` Parte 2_
+- [ ] Email de recuperação de senha testado end-to-end
 
 ## Onboarding comercial (pós-deploy)
 
@@ -72,7 +81,7 @@
 - [ ] Médicos vinculados às clínicas
 - [ ] Consultores de vendas cadastrados e vinculados às clínicas (se aplicável)
 - [ ] Primeiro pedido de teste realizado de ponta a ponta
-- [ ] Domínio personalizado configurado (opcional)
+- [ ] Domínio `clinipharma.com.br` ativo e HTTPS configurado na Vercel
 
 ---
 

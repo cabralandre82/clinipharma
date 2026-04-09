@@ -2,6 +2,24 @@
 
 ---
 
+## [0.5.0] — 2026-04-09
+
+### Alterado
+
+- **Renomeação da plataforma: MedAxis → Clinipharma**
+  - Substituição global em todo o codebase (58 arquivos): nome, URLs, emails, metadados
+  - Prefixo dos códigos de pedido: `MED-` → `CP-` (ex: `CP-2026-000001`)
+  - Migration 006: atualiza `app_settings` (platform_name, support_email) e recria trigger `generate_order_code()` com prefixo `CP-`
+  - Emails atualizados: `noreply@clinipharma.com.br`, `suporte@clinipharma.com.br`
+  - Repositório GitHub: `cabralandre82/MedAxis` (pendente renomear)
+  - Domínio: `clinipharma.com.br` (configuração de DNS em andamento)
+
+- **Email transacional ativado com Resend**
+  - `RESEND_API_KEY` configurada em `.env.local` e pendente no Vercel
+  - 5 templates ativos: novo pedido, pagamento confirmado, repasse à farmácia, status atualizado, repasse a consultor
+
+---
+
 ## [0.4.0] — 2026-04-08
 
 ### Adicionado

@@ -23,9 +23,10 @@ Não existe paciente final no fluxo. Tudo é B2B. A entrega é sempre para a cl�
 
 | Serviço  | URL / Referência                                      |
 | -------- | ----------------------------------------------------- |
-| Frontend | https://clinipharma-three.vercel.app                  |
+| Frontend | https://clinipharma.com.br (DNS em configuração)      |
+| Vercel   | https://clinipharma-three.vercel.app                  |
 | Supabase | https://app.supabase.com/project/jomdntqlgrupvhrqoyai |
-| GitHub   | https://github.com/cabralandre82/Clinipharma          |
+| GitHub   | https://github.com/cabralandre82/MedAxis              |
 
 ---
 
@@ -151,4 +152,4 @@ npx tsx scripts/setup-production.ts   # Setup inicial de produção
 
 ## Versão
 
-`0.4.0` — Comissão por produto com pharmacy_cost e análise de margem
+`0.5.0` — Renomeação para Clinipharma + email transacional com Resend
