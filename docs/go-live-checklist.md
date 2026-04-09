@@ -61,6 +61,9 @@
 - [x] Busca global (⌘K) em pedidos, clínicas, médicos e produtos
 - [x] Exportação CSV/Excel em pedidos, pagamentos, repasses e comissões
 - [x] Dashboard de relatórios com KPIs, gráfico e alertas
+- [x] Produto indisponível exibido no catálogo com botão "Tenho interesse"
+- [x] Modal de interesse coleta nome e WhatsApp e notifica SUPER_ADMIN (in-app + email)
+- [x] Painel `/interests` lista todos os registros de interesse com link direto para WhatsApp
 
 ## Segurança
 

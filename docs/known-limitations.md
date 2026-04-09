@@ -16,6 +16,7 @@
 
 - **Farmácia não altera produtos diretamente**: toda atualização de catálogo passa pela plataforma
 - **Sem variações de produto**: cada SKU é um produto separado
+- **Produto indisponível sem estoque real**: o status `unavailable` é gerenciado manualmente pelo SUPER_ADMIN; não há integração com estoque de farmácias
 
 ## Pedidos
 

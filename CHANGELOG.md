@@ -2,6 +2,29 @@
 
 ---
 
+## [0.9.0] — 2026-04-09
+
+### Added
+
+- **Status `unavailable` nos produtos:** terceiro estado além de `active` e `inactive`. No formulário de produto, o toggle virou um select de 3 opções (✅ Ativo / ⚠️ Indisponível / 🚫 Inativo).
+- **Botão "Tenho interesse" no catálogo:** produtos indisponíveis aparecem com imagem em grayscale, overlay "Indisponível" e botão âmbar no lugar de "Ver detalhes".
+- **Modal de interesse:** formulário com nome e WhatsApp (sempre em branco), confirmação visual após envio.
+- **API `POST /api/products/interest`:** valida dados, salva na tabela `product_interests`, dispara notificação in-app e email ao SUPER_ADMIN com link clicável para WhatsApp.
+- **Painel `/interests`:** exclusivo para SUPER_ADMIN. Lista todos os interesses registrados (produto, interessado, WhatsApp clicável, email, data) com paginação. Card de resumo dos produtos com mais interesse no topo. Adicionado à sidebar.
+- **Notificação in-app (`PRODUCT_INTEREST`):** novo tipo no `NotificationType`, envia para todos os usuários com papel `SUPER_ADMIN`.
+- **Email ao SUPER_ADMIN:** HTML com tabela de dados do interessado + botão "Ver todos os interesses" linkando para `/interests`.
+- **Migration `010_product_status_interests.sql`:** adiciona coluna `status` em `products` com constraint `CHECK (status IN ('active','unavailable','inactive'))`; cria tabela `product_interests` com RLS.
+
+### Changed
+
+- Catálogo (`/catalog`) agora filtra por `status IN ('active', 'unavailable')` em vez de `active = true`, exibindo produtos indisponíveis com visual diferenciado.
+- `ProductCard` no `CatalogGrid` virou Client Component para suportar abertura do modal de interesse.
+- `services/products.ts`: na criação/atualização, o campo `active` é derivado automaticamente do `status` (`status !== 'inactive'`).
+- `types/index.ts`: campo `status` adicionado em `Product`; novo tipo `ProductInterest`.
+- `lib/validators`: novo schema `productInterestSchema`; campo `status` adicionado em `productSchema`.
+
+---
+
 ## [0.8.0] — 2026-04-09
 
 ### Added

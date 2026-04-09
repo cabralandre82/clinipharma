@@ -12,7 +12,7 @@ O banco é organizado em 5 schemas lógicos:
 | `public.catalog`   | `product_categories`, `products`, `product_images`, `product_price_history`, `pharmacy_products` |
 | `public.orders`    | `orders`, `order_items`, `order_documents`, `order_status_history`, `order_operational_updates`  |
 | `public.financial` | `payments`, `commissions`, `transfers`                                                           |
-| `public.system`    | `audit_logs`, `app_settings`, `notifications`                                                    |
+| `public.system`    | `audit_logs`, `app_settings`, `notifications`, `product_interests`                               |
 | `public.sales`     | `sales_consultants`, `consultant_commissions`, `consultant_transfers`                            |
 
 > Na prática, todas as tabelas ficam no schema `public` do Supabase. Os agrupamentos acima são lógicos.
@@ -170,13 +170,40 @@ price_current          numeric(12,2) NOT NULL
 pharmacy_cost          numeric(12,2) NOT NULL DEFAULT 0.00  -- repasse fixo à farmácia por unidade
 currency               text NOT NULL DEFAULT 'BRL'
 estimated_deadline_days int NOT NULL
-active                 boolean DEFAULT true
+active                 boolean DEFAULT true  -- derivado de status (status != 'inactive')
+status                 text NOT NULL DEFAULT 'active' CHECK (status IN ('active','unavailable','inactive'))
 featured               boolean DEFAULT false
 created_at             timestamptz DEFAULT now()
 updated_at             timestamptz DEFAULT now()
 ```
 
+**Status possíveis:**
+| Valor | Descrição |
+|---|---|
+| `active` | Disponível no catálogo para pedido |
+| `unavailable` | Aparece no catálogo com visual de indisponível + botão "Tenho interesse" |
+| `inactive` | Oculto do catálogo |
+
 **Margem bruta por unidade** = `price_current − pharmacy_cost`
+
+## Tabela: product_interests
+
+Registros de interesse de clínicas/médicos em produtos com `status = 'unavailable'`.
+
+```sql
+id          uuid        PRIMARY KEY DEFAULT gen_random_uuid()
+product_id  uuid        NOT NULL REFERENCES products(id) ON DELETE CASCADE
+user_id     uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE
+name        text        NOT NULL   -- nome fornecido pelo interessado
+whatsapp    text        NOT NULL   -- WhatsApp fornecido pelo interessado
+created_at  timestamptz NOT NULL DEFAULT now()
+```
+
+**RLS:**
+
+- Usuário autenticado pode inserir e ver seus próprios interesses
+- `SUPER_ADMIN` e `PLATFORM_ADMIN` veem todos
+- `service_role` acesso total
 
 ## Tabela: product_images
 
