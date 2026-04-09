@@ -2,6 +2,42 @@
 
 ---
 
+## [0.4.0] — 2026-04-08
+
+### Adicionado
+
+- **Custo de repasse por produto (`pharmacy_cost`)**
+  - Campo `pharmacy_cost` obrigatório em `products` — valor fixo que a plataforma deve repassar à farmácia por unidade vendida
+  - Campos `pharmacy_cost_per_unit` e `platform_commission_per_unit` em `orders` — congelados no `INSERT` via trigger junto com `unit_price`
+  - Migration 005 aplica todas as alterações de schema
+
+- **Painel de análise de margem no formulário de produto**
+  - Preview em tempo real: preço ao cliente → repasse farmácia → margem bruta → comissão do consultor → lucro líquido (com e sem consultor)
+  - Aviso em vermelho quando `pharmacy_cost` é tão alto que a margem bruta não cobre a comissão global dos consultores
+
+- **Seção "Análise de margem" no detalhe do produto**
+  - Breakdown estático completo: margem bruta em R$ e %, comissão de consultor, lucro líquido nos dois cenários
+
+### Alterado
+
+- **Comissão de consultores: de individual para global**
+  - `sales_consultants.commission_rate` removido — taxa não é mais por consultor
+  - Nova chave `consultant_commission_rate` em `app_settings` — percentual único aplicado a todos os consultores sobre o valor total de cada pedido
+  - Página de Configurações atualizada com label, hint descritivo e unidade (%)
+  - Formulário, listagem e detalhe de consultores: campo `commission_rate` removido; informativo sobre taxa global adicionado
+
+- **`services/payments.ts` — cálculo financeiro na confirmação de pagamento**
+  - Usa `pharmacy_cost_per_unit` e `platform_commission_per_unit` congelados no pedido (fallback para produto atual em pedidos antigos)
+  - Busca `consultant_commission_rate` de `app_settings` em vez de `commission_rate` do consultor
+
+- **`app_settings`**: `default_commission_percentage` substituído por `consultant_commission_rate` (padrão: 5%)
+
+### Regras de negócio acrescentadas
+
+- RN-16 a RN-19: custo de farmácia por produto, congelamento no pedido, margem da plataforma e regra de não-prejuízo para consultores (ver `BUSINESS_RULES.md`)
+
+---
+
 ## [0.3.0] — 2026-04-09
 
 ### Adicionado

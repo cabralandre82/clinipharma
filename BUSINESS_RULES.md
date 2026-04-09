@@ -95,3 +95,34 @@ Cada pedido recebe um código legível único no formato `MED-YYYY-NNNNNN` (ex: 
 ## RN-15: Farmácia não altera produto no MVP
 
 `PHARMACY_ADMIN` não pode criar, editar ou excluir produtos ou preços no MVP. Isso é responsabilidade exclusiva de `PLATFORM_ADMIN` e `SUPER_ADMIN`.
+
+## RN-16: Custo de repasse à farmácia é obrigatório por produto
+
+Todo produto deve ter um `pharmacy_cost` definido. Esse valor representa o montante fixo que a plataforma deve repassar à farmácia por unidade vendida, independente do preço ao cliente.
+
+## RN-17: Congelamento completo dos valores financeiros no pedido
+
+No momento da criação do pedido, o trigger `freeze_order_price` copia e congela em `orders`:
+
+- `unit_price` ← `products.price_current`
+- `total_price` ← `unit_price × quantity`
+- `pharmacy_cost_per_unit` ← `products.pharmacy_cost`
+- `platform_commission_per_unit` ← `price_current − pharmacy_cost`
+
+Alterações futuras no produto não afetam pedidos já criados.
+
+## RN-18: Margem da plataforma é derivada do custo de farmácia
+
+A margem bruta da plataforma sobre qualquer pedido é:
+
+```
+margem_bruta = (price_current − pharmacy_cost) × quantity
+```
+
+O valor `pharmacy_cost` nunca é reduzido — a farmácia sempre recebe o que foi acordado no cadastro do produto.
+
+## RN-19: Taxa de comissão dos consultores é global e única
+
+A comissão dos consultores de vendas é definida como um único percentual global em `app_settings.consultant_commission_rate`, aplicado sobre o `total_price` do pedido. Se a taxa mudar, todos os consultores são afetados a partir dos próximos pedidos; pedidos já criados usam os valores congelados.
+
+A plataforma deve avisar o operador quando `pharmacy_cost` de um produto for tão alto que `platform_commission_per_unit` seja menor que `consultant_commission_rate × price_current`, pois nesse caso a plataforma absorve o custo do consultor sem lucro no produto. O sistema **não bloqueia** o cadastro, apenas exibe aviso.

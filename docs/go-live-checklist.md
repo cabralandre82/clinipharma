@@ -56,14 +56,21 @@
 - [x] Rotas privadas redirecionam para login se não autenticado
 - [x] Server Actions validam papéis no lado do servidor
 
+## Email transacional
+
+- [ ] Provedor SMTP real configurado no Supabase Auth (Resend, SendGrid, Postmark)
+- [ ] Email de recuperação de senha testado em produção
+- [ ] Emails automáticos de eventos críticos implementados (opcional no dia 1)
+
 ## Onboarding comercial (pós-deploy)
 
 - [x] Usuário super admin criado em produção
 - [ ] Farmácias reais cadastradas e ativas
-- [ ] Catálogo real de produtos cadastrado (com preços reais)
+- [ ] Catálogo real de produtos cadastrado — com `price_current`, `pharmacy_cost` e prazo por SKU
+- [ ] Taxa de comissão dos consultores configurada em **Configurações → Taxa de comissão dos consultores**
 - [ ] Clínicas clientes onboardadas
 - [ ] Médicos vinculados às clínicas
-- [ ] Comissão default configurada em **Configurações** (padrão: 15%)
+- [ ] Consultores de vendas cadastrados e vinculados às clínicas (se aplicável)
 - [ ] Primeiro pedido de teste realizado de ponta a ponta
 - [ ] Domínio personalizado configurado (opcional)
 

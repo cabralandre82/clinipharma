@@ -62,7 +62,7 @@ Não existe paciente final no fluxo. Tudo é B2B. A entrega é sempre para a cl�
 | Área da Farmácia       | Atualização de status operacional do pedido                              |
 | Auditoria              | Log automático de todas as ações críticas                                |
 | Relatórios             | KPIs financeiros e operacionais                                          |
-| Configurações          | Comissão padrão e parâmetros globais (SUPER_ADMIN)                       |
+| Configurações          | Taxa de comissão dos consultores e parâmetros globais (SUPER_ADMIN)      |
 | Perfil                 | Edição de dados pessoais por qualquer usuário                            |
 | Dashboard              | Visão específica por papel (admin, clínica, médico, farmácia, consultor) |
 | Consultores de Vendas  | Cadastro, vinculação a clínicas, comissões automáticas por pedido        |
@@ -150,4 +150,4 @@ npx tsx scripts/setup-production.ts   # Setup inicial de produção
 
 ## Versão
 
-`0.3.0` — Módulo de consultores de vendas
+`0.4.0` — Comissão por produto com pharmacy_cost e análise de margem

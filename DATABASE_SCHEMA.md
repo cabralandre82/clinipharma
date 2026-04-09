@@ -13,6 +13,7 @@ O banco é organizado em 5 schemas lógicos:
 | `public.orders`    | `orders`, `order_documents`, `order_status_history`, `order_operational_updates`                 |
 | `public.financial` | `payments`, `commissions`, `transfers`                                                           |
 | `public.system`    | `audit_logs`, `app_settings`                                                                     |
+| `public.sales`     | `sales_consultants`, `consultant_commissions`, `consultant_transfers`                            |
 
 > Na prática, todas as tabelas ficam no schema `public` do Supabase. Os agrupamentos acima são lógicos.
 
@@ -38,7 +39,7 @@ updated_at  timestamptz DEFAULT now()
 ```sql
 id         uuid PRIMARY KEY DEFAULT gen_random_uuid()
 user_id    uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE
-role       text NOT NULL CHECK (role IN ('SUPER_ADMIN','PLATFORM_ADMIN','CLINIC_ADMIN','DOCTOR','PHARMACY_ADMIN'))
+role       text NOT NULL CHECK (role IN ('SUPER_ADMIN','PLATFORM_ADMIN','CLINIC_ADMIN','DOCTOR','PHARMACY_ADMIN','SALES_CONSULTANT'))
 created_at timestamptz DEFAULT now()
 UNIQUE(user_id, role)
 ```
@@ -165,7 +166,8 @@ presentation           text NOT NULL
 short_description      text NOT NULL
 long_description       text
 characteristics_json   jsonb DEFAULT '{}'
-price_current          numeric(10,2) NOT NULL
+price_current          numeric(12,2) NOT NULL
+pharmacy_cost          numeric(12,2) NOT NULL DEFAULT 0.00  -- repasse fixo à farmácia por unidade
 currency               text NOT NULL DEFAULT 'BRL'
 estimated_deadline_days int NOT NULL
 active                 boolean DEFAULT true
@@ -173,6 +175,8 @@ featured               boolean DEFAULT false
 created_at             timestamptz DEFAULT now()
 updated_at             timestamptz DEFAULT now()
 ```
+
+**Margem bruta por unidade** = `price_current − pharmacy_cost`
 
 ## Tabela: product_images
 
@@ -214,23 +218,27 @@ UNIQUE(pharmacy_id, product_id)
 ## Tabela: orders
 
 ```sql
-id                   uuid PRIMARY KEY DEFAULT gen_random_uuid()
-code                 text NOT NULL UNIQUE
-clinic_id            uuid NOT NULL REFERENCES clinics(id)
-doctor_id            uuid NOT NULL REFERENCES doctors(id)
-pharmacy_id          uuid NOT NULL REFERENCES pharmacies(id)
-product_id           uuid NOT NULL REFERENCES products(id)
-quantity             int NOT NULL DEFAULT 1 CHECK (quantity > 0)
-unit_price           numeric(10,2) NOT NULL
-total_price          numeric(10,2) NOT NULL
-payment_status       text NOT NULL DEFAULT 'PENDING'
-transfer_status      text NOT NULL DEFAULT 'NOT_READY'
-order_status         text NOT NULL DEFAULT 'DRAFT'
-notes                text
-created_by_user_id   uuid NOT NULL REFERENCES profiles(id)
-created_at           timestamptz DEFAULT now()
-updated_at           timestamptz DEFAULT now()
+id                            uuid PRIMARY KEY DEFAULT gen_random_uuid()
+code                          text NOT NULL UNIQUE
+clinic_id                     uuid NOT NULL REFERENCES clinics(id)
+doctor_id                     uuid NOT NULL REFERENCES doctors(id)
+pharmacy_id                   uuid NOT NULL REFERENCES pharmacies(id)
+product_id                    uuid NOT NULL REFERENCES products(id)
+quantity                      int NOT NULL DEFAULT 1 CHECK (quantity > 0)
+unit_price                    numeric(12,2) NOT NULL   -- congelado no INSERT
+total_price                   numeric(12,2) NOT NULL   -- congelado no INSERT
+pharmacy_cost_per_unit        numeric(12,2)            -- congelado no INSERT (products.pharmacy_cost)
+platform_commission_per_unit  numeric(12,2)            -- congelado no INSERT (price_current − pharmacy_cost)
+payment_status                text NOT NULL DEFAULT 'PENDING'
+transfer_status               text NOT NULL DEFAULT 'NOT_READY'
+order_status                  text NOT NULL DEFAULT 'DRAFT'
+notes                         text
+created_by_user_id            uuid NOT NULL REFERENCES profiles(id)
+created_at                    timestamptz DEFAULT now()
+updated_at                    timestamptz DEFAULT now()
 ```
+
+> Todos os campos financeiros são populados pelo trigger `freeze_order_price` no `BEFORE INSERT`. Alterações posteriores no produto não afetam o pedido.
 
 **Valores válidos de order_status:**
 `DRAFT, AWAITING_DOCUMENTS, READY_FOR_REVIEW, AWAITING_PAYMENT, PAYMENT_UNDER_REVIEW, PAYMENT_CONFIRMED, COMMISSION_CALCULATED, TRANSFER_PENDING, TRANSFER_COMPLETED, RELEASED_FOR_EXECUTION, RECEIVED_BY_PHARMACY, IN_EXECUTION, READY, SHIPPED, DELIVERED, COMPLETED, CANCELED, WITH_ISSUE`
@@ -340,6 +348,66 @@ user_agent      text
 created_at      timestamptz DEFAULT now()
 ```
 
+## Tabela: sales_consultants
+
+```sql
+id           uuid PRIMARY KEY DEFAULT gen_random_uuid()
+user_id      uuid REFERENCES auth.users(id) ON DELETE SET NULL  -- login do consultor
+full_name    text NOT NULL
+email        text NOT NULL UNIQUE
+cnpj         text NOT NULL UNIQUE
+phone        text
+bank_name    text
+bank_agency  text
+bank_account text
+pix_key      text
+status       text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','INACTIVE','SUSPENDED'))
+notes        text
+created_at   timestamptz DEFAULT now()
+updated_at   timestamptz DEFAULT now()
+```
+
+> `commission_rate` foi removido na migration 005. A taxa é agora global em `app_settings.consultant_commission_rate`.
+
+## Tabela: clinics (campo adicionado)
+
+```sql
+consultant_id  uuid REFERENCES sales_consultants(id) ON DELETE SET NULL  -- migration 004
+```
+
+## Tabela: consultant_commissions
+
+Comissão gerada automaticamente na confirmação de pagamento de cada pedido.
+
+```sql
+id                uuid PRIMARY KEY DEFAULT gen_random_uuid()
+order_id          uuid NOT NULL REFERENCES orders(id)
+consultant_id     uuid NOT NULL REFERENCES sales_consultants(id)
+order_total       numeric(12,2) NOT NULL
+commission_rate   numeric(5,2) NOT NULL   -- taxa vigente no momento da geração
+commission_amount numeric(12,2) NOT NULL
+status            text NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','PAID','CANCELLED'))
+transfer_id       uuid REFERENCES consultant_transfers(id) ON DELETE SET NULL
+created_at        timestamptz DEFAULT now()
+updated_at        timestamptz DEFAULT now()
+```
+
+## Tabela: consultant_transfers
+
+Registro de repasse em batch para um consultor.
+
+```sql
+id                 uuid PRIMARY KEY DEFAULT gen_random_uuid()
+consultant_id      uuid NOT NULL REFERENCES sales_consultants(id)
+total_amount       numeric(12,2) NOT NULL
+transfer_reference text NOT NULL
+notes              text
+processed_by_user_id uuid REFERENCES profiles(id)
+processed_at       timestamptz DEFAULT now()
+created_at         timestamptz DEFAULT now()
+updated_at         timestamptz DEFAULT now()
+```
+
 ## Tabela: app_settings
 
 ```sql
@@ -350,3 +418,11 @@ description         text
 updated_by_user_id  uuid REFERENCES profiles(id)
 updated_at          timestamptz DEFAULT now()
 ```
+
+**Chaves de configuração em produção:**
+
+| key                          | tipo    | descrição                                                         |
+| ---------------------------- | ------- | ----------------------------------------------------------------- |
+| `consultant_commission_rate` | numeric | Percentual global de comissão para todos os consultores (ex: `5`) |
+| `platform_name`              | string  | Nome exibido na plataforma                                        |
+| `platform_support_email`     | string  | Email de suporte exibido ao usuário                               |
