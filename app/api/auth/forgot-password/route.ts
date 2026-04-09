@@ -25,16 +25,19 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    if (error) {
-      console.error('[forgot-password] generateLink error:', error.message)
-    }
-
-    if (error || !data?.properties?.action_link) {
+    if (error || !data?.properties?.hashed_token) {
+      console.error('[forgot-password] generateLink error:', error?.message)
       // Retornamos sucesso mesmo quando o email não existe — evita user enumeration
       return NextResponse.json({ success: true })
     }
 
-    const actionLink = data.properties.action_link
+    // Construímos o link apontando direto para nosso callback com token_hash
+    // para evitar dependência de PKCE code exchange do Supabase
+    const params = new URLSearchParams({
+      token_hash: data.properties.hashed_token,
+      type: 'recovery',
+    })
+    const actionLink = `${origin}/auth/callback?${params}`
 
     console.log('[forgot-password] sending email to', email, 'via Resend')
     const sendResult = await resend.emails.send({
