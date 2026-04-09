@@ -5,6 +5,7 @@ import { createAuditLog, AuditAction, AuditEntity } from '@/lib/audit'
 import { requireRole } from '@/lib/rbac'
 import { sendEmail } from '@/lib/email'
 import { paymentConfirmedEmail, transferRegisteredEmail } from '@/lib/email/templates'
+import { createNotification } from '@/lib/notifications'
 import { formatCurrency } from '@/lib/utils'
 
 interface ConfirmPaymentInput {
@@ -173,6 +174,22 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ erro
       await sendEmail({ to: clinicData.email, ...tmpl })
     }
 
+    // In-app notification for the user who created the order
+    const { data: orderCreator } = await adminClient
+      .from('orders')
+      .select('created_by_user_id, code')
+      .eq('id', payment.order_id)
+      .single()
+    if (orderCreator?.created_by_user_id) {
+      await createNotification({
+        userId: orderCreator.created_by_user_id,
+        type: 'PAYMENT_CONFIRMED',
+        title: `Pagamento confirmado — ${orderCreator.code ?? payment.order_id}`,
+        body: `Valor: ${formatCurrency(Number(orderData.total_price))}`,
+        link: `/orders/${payment.order_id}`,
+      })
+    }
+
     return {}
   } catch (err) {
     console.error('confirmPayment error:', err)
@@ -259,6 +276,21 @@ export async function completeTransfer(
         reference,
       })
       await sendEmail({ to: pharmacyData.email, ...tmpl })
+
+      // In-app notification for pharmacy members
+      const { data: pharmacyMembers } = await adminClient
+        .from('pharmacy_members')
+        .select('user_id')
+        .eq('pharmacy_id', transfer.pharmacy_id)
+      for (const m of pharmacyMembers ?? []) {
+        await createNotification({
+          userId: m.user_id,
+          type: 'TRANSFER_REGISTERED',
+          title: `Repasse registrado`,
+          body: `${pharmacyData.trade_name} · ${formatCurrency(Number(transfer.net_amount))}`,
+          link: `/transfers`,
+        })
+      }
     }
 
     return {}

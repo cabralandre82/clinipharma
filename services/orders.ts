@@ -6,6 +6,7 @@ import { createAuditLog, AuditAction, AuditEntity } from '@/lib/audit'
 import { requireAuth } from '@/lib/auth/session'
 import { sendEmail } from '@/lib/email'
 import { newOrderEmail, orderStatusUpdatedEmail } from '@/lib/email/templates'
+import { createNotification, createNotificationForRole } from '@/lib/notifications'
 import { formatCurrency } from '@/lib/utils'
 import { z } from 'zod'
 
@@ -216,8 +217,22 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
         })
         await sendEmail({ to: pharmacy.email, ...tmpl })
       }
+
+      // In-app notification for admins
+      await createNotificationForRole('SUPER_ADMIN', {
+        type: 'ORDER_CREATED',
+        title: `Novo pedido ${order.code}`,
+        body: `${clinic?.trade_name ?? '—'} · ${productNames} · ${formatCurrency(finalTotal)}`,
+        link: `/orders/${order.id}`,
+      })
+      await createNotificationForRole('PLATFORM_ADMIN', {
+        type: 'ORDER_CREATED',
+        title: `Novo pedido ${order.code}`,
+        body: `${clinic?.trade_name ?? '—'} · ${productNames}`,
+        link: `/orders/${order.id}`,
+      })
     } catch {
-      // email failure must not affect order creation
+      // email/notification failure must not affect order creation
     }
 
     return { orderId: order.id }
@@ -317,8 +332,17 @@ export async function updateOrderStatus(
           })
           await sendEmail({ to: clinicEmail, ...tmpl })
         }
+
+        // In-app notification for order creator
+        await createNotification({
+          userId: order.created_by_user_id,
+          type: 'ORDER_STATUS',
+          title: `Pedido ${fullOrder?.code ?? orderId}: ${NOTIFY_STATUSES[newStatus]}`,
+          body: productNames,
+          link: `/orders/${orderId}`,
+        })
       } catch {
-        // email failure must not affect status update
+        // email/notification failure must not affect status update
       }
     }
 
