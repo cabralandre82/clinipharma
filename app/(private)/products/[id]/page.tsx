@@ -5,6 +5,7 @@ import { createServerClient } from '@/lib/db/server'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ButtonLink } from '@/components/ui/button-link'
 import { PriceUpdateForm } from '@/components/products/price-update-form'
+import { PharmacyCostUpdateForm } from '@/components/products/pharmacy-cost-update-form'
 import { Badge } from '@/components/ui/badge'
 import { Package } from 'lucide-react'
 import type { ProductWithRelations, ProductCategory, Pharmacy, ProductPriceHistory } from '@/types'
@@ -111,6 +112,22 @@ export default async function ProductDetailAdminPage({ params }: PageProps) {
     ProductPriceHistory & { profiles: { full_name: string } | null }
   >
 
+  const { data: costHistoryRaw } = await supabase
+    .from('product_pharmacy_cost_history')
+    .select('*, profiles(full_name)')
+    .eq('product_id', id)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  const costHistory = (costHistoryRaw ?? []) as unknown as Array<{
+    id: string
+    old_cost: number
+    new_cost: number
+    reason: string
+    created_at: string
+    profiles: { full_name: string } | null
+  }>
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -195,8 +212,9 @@ export default async function ProductDetailAdminPage({ params }: PageProps) {
               {product.featured && <Badge className="bg-amber-100 text-amber-800">Destaque</Badge>}
             </div>
             {isSuperAdmin && (
-              <div className="pt-2">
+              <div className="flex flex-wrap gap-2 pt-2">
                 <PriceUpdateForm productId={id} currentPrice={product.price_current} />
+                <PharmacyCostUpdateForm productId={id} currentCost={product.pharmacy_cost ?? 0} />
               </div>
             )}
           </div>
@@ -234,6 +252,36 @@ export default async function ProductDetailAdminPage({ params }: PageProps) {
                     <td className="py-3 font-medium">{formatCurrency(entry.price)}</td>
                     <td className="py-3">{entry.profiles?.full_name ?? '—'}</td>
                     <td className="py-3 text-gray-600">{entry.reason ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {costHistory.length > 0 && (
+        <div className="space-y-4 rounded-lg border bg-white p-6">
+          <h2 className="font-semibold text-gray-900">Histórico de Repasse à Farmácia</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-gray-500">
+                  <th className="pb-3 font-medium">Data</th>
+                  <th className="pb-3 font-medium">Valor anterior</th>
+                  <th className="pb-3 font-medium">Novo valor</th>
+                  <th className="pb-3 font-medium">Alterado por</th>
+                  <th className="pb-3 font-medium">Motivo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {costHistory.map((entry) => (
+                  <tr key={entry.id}>
+                    <td className="py-3 text-gray-500">{formatDate(entry.created_at)}</td>
+                    <td className="py-3 text-slate-500">{formatCurrency(entry.old_cost)}</td>
+                    <td className="py-3 font-medium">{formatCurrency(entry.new_cost)}</td>
+                    <td className="py-3">{entry.profiles?.full_name ?? '—'}</td>
+                    <td className="py-3 text-gray-600">{entry.reason}</td>
                   </tr>
                 ))}
               </tbody>

@@ -139,6 +139,59 @@ export async function updateProductPrice(
   }
 }
 
+export async function updatePharmacyCost(
+  productId: string,
+  newCost: number,
+  reason: string
+): Promise<{ error?: string }> {
+  try {
+    const user = await requireRole(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
+    if (!reason?.trim()) return { error: 'Motivo é obrigatório' }
+    if (newCost < 0) return { error: 'Custo deve ser maior ou igual a zero' }
+
+    const adminClient = createAdminClient()
+
+    const { data: product } = await adminClient
+      .from('products')
+      .select('pharmacy_cost')
+      .eq('id', productId)
+      .single()
+
+    if (!product) return { error: 'Produto não encontrado' }
+
+    await adminClient.from('product_pharmacy_cost_history').insert({
+      product_id: productId,
+      old_cost: product.pharmacy_cost,
+      new_cost: newCost,
+      changed_by_user_id: user.id,
+      reason,
+    })
+
+    const { error } = await adminClient
+      .from('products')
+      .update({ pharmacy_cost: newCost, updated_at: new Date().toISOString() })
+      .eq('id', productId)
+
+    if (error) return { error: 'Erro ao atualizar custo de farmácia' }
+
+    await createAuditLog({
+      actorUserId: user.id,
+      actorRole: user.roles[0],
+      entityType: AuditEntity.PRODUCT,
+      entityId: productId,
+      action: AuditAction.UPDATE,
+      oldValues: { pharmacy_cost: product.pharmacy_cost },
+      newValues: { pharmacy_cost: newCost, reason },
+    })
+
+    revalidatePath(`/products/${productId}`)
+    revalidatePath('/products')
+    return {}
+  } catch {
+    return { error: 'Erro interno' }
+  }
+}
+
 export async function toggleProductActive(
   id: string,
   active: boolean
