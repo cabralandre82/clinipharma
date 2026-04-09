@@ -3,7 +3,7 @@
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, X } from 'lucide-react'
+import { Search, X, SlidersHorizontal } from 'lucide-react'
 import { useCallback, useState } from 'react'
 
 interface CatalogFiltersProps {
@@ -12,7 +12,16 @@ interface CatalogFiltersProps {
   currentCategory?: string
   currentPharmacy?: string
   currentSearch?: string
+  currentSort?: string
 }
+
+const SORT_OPTIONS = [
+  { value: 'featured', label: 'Destaques primeiro' },
+  { value: 'name_asc', label: 'Nome A–Z' },
+  { value: 'price_asc', label: 'Menor preço' },
+  { value: 'price_desc', label: 'Maior preço' },
+  { value: 'newest', label: 'Mais recentes' },
+]
 
 export function CatalogFilters({
   categories,
@@ -20,6 +29,7 @@ export function CatalogFilters({
   currentCategory,
   currentPharmacy,
   currentSearch,
+  currentSort = 'featured',
 }: CatalogFiltersProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -27,12 +37,15 @@ export function CatalogFilters({
   const [search, setSearch] = useState(currentSearch ?? '')
 
   const updateFilter = useCallback(
-    (key: string, value: string | undefined) => {
+    (updates: Record<string, string | undefined>) => {
       const params = new URLSearchParams(searchParams.toString())
-      if (value) {
-        params.set(key, value)
-      } else {
-        params.delete(key)
+      params.delete('page') // reset to page 1 when filtering
+      for (const [key, value] of Object.entries(updates)) {
+        if (value !== undefined) {
+          params.set(key, value)
+        } else {
+          params.delete(key)
+        }
       }
       router.push(`${pathname}?${params.toString()}`)
     },
@@ -41,7 +54,7 @@ export function CatalogFilters({
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    updateFilter('search', search || undefined)
+    updateFilter({ search: search || undefined })
   }
 
   const clearAll = () => {
@@ -53,39 +66,57 @@ export function CatalogFilters({
 
   return (
     <div className="space-y-3">
-      {/* Search bar */}
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Buscar por nome, concentração..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Button type="submit" variant="outline">
-          Buscar
-        </Button>
-        {hasFilters && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={clearAll}
-            title="Limpar filtros"
-          >
-            <X className="h-4 w-4" />
+      {/* Search + Sort row */}
+      <div className="flex gap-2">
+        <form onSubmit={handleSearch} className="flex flex-1 gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Buscar por nome, concentração..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Button type="submit" variant="outline">
+            Buscar
           </Button>
-        )}
-      </form>
+          {hasFilters && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={clearAll}
+              title="Limpar filtros"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </form>
+
+        {/* Sort */}
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="h-4 w-4 flex-shrink-0 text-gray-400" />
+          <select
+            value={currentSort}
+            onChange={(e) => updateFilter({ sort: e.target.value })}
+            className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {/* Category filters */}
       <div className="flex flex-wrap gap-2">
         <span className="mr-1 self-center text-xs text-gray-500">Categoria:</span>
         <button
-          onClick={() => updateFilter('category', undefined)}
+          onClick={() => updateFilter({ category: undefined })}
           className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
             !currentCategory
               ? 'border-[hsl(213,75%,24%)] bg-[hsl(213,75%,24%)] text-white'
@@ -98,7 +129,7 @@ export function CatalogFilters({
           <button
             key={cat.id}
             onClick={() =>
-              updateFilter('category', cat.slug === currentCategory ? undefined : cat.slug)
+              updateFilter({ category: cat.slug === currentCategory ? undefined : cat.slug })
             }
             className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
               currentCategory === cat.slug
@@ -116,7 +147,7 @@ export function CatalogFilters({
         <div className="flex flex-wrap gap-2">
           <span className="mr-1 self-center text-xs text-gray-500">Farmácia:</span>
           <button
-            onClick={() => updateFilter('pharmacy', undefined)}
+            onClick={() => updateFilter({ pharmacy: undefined })}
             className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
               !currentPharmacy
                 ? 'border-[hsl(196,91%,36%)] bg-[hsl(196,91%,36%)] text-white'
@@ -129,7 +160,7 @@ export function CatalogFilters({
             <button
               key={ph.id}
               onClick={() =>
-                updateFilter('pharmacy', ph.id === currentPharmacy ? undefined : ph.id)
+                updateFilter({ pharmacy: ph.id === currentPharmacy ? undefined : ph.id })
               }
               className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
                 currentPharmacy === ph.id
