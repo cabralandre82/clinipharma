@@ -25,7 +25,11 @@ export default async function OrderPage({ params }: OrderPageProps) {
       clinics (id, trade_name, corporate_name, city, state),
       doctors (id, full_name, crm, crm_state, specialty),
       pharmacies (id, trade_name, city, state),
-      products (id, name, concentration, presentation, price_current),
+      order_items (
+        id, product_id, quantity, unit_price, total_price,
+        pharmacy_cost_per_unit, platform_commission_per_unit,
+        products (id, name, concentration, presentation)
+      ),
       order_documents (id, document_type, original_filename, mime_type, file_size, created_at),
       order_status_history (
         id, old_status, new_status, reason, created_at,

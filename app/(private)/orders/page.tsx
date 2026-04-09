@@ -20,11 +20,11 @@ export default async function OrdersPage() {
     .select(
       `
       id, code, order_status, payment_status, transfer_status,
-      total_price, quantity, created_at,
+      total_price, created_at,
       clinics (trade_name),
       doctors (full_name),
       pharmacies (trade_name),
-      products (name)
+      order_items (product_id, products (name))
     `
     )
     .order('created_at', { ascending: false })

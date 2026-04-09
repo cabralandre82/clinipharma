@@ -135,11 +135,14 @@ export function OrderDetail({ order, currentUser }: OrderDetailProps) {
     specialty: string | null
   } | null
   const pharmacy = order.pharmacies as { trade_name: string; city: string; state: string } | null
-  const product = order.products as {
-    name: string
-    concentration: string
-    presentation: string
-  } | null
+  const orderItems = (order.order_items ?? []) as Array<{
+    id: string
+    product_id: string
+    quantity: number
+    unit_price: number
+    total_price: number
+    products: { name: string; concentration: string; presentation: string } | null
+  }>
 
   return (
     <div className="max-w-5xl space-y-5">
@@ -179,32 +182,49 @@ export function OrderDetail({ order, currentUser }: OrderDetailProps) {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Package className="h-4 w-4" />
-                Produto
+                Produtos ({orderItems.length})
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <p className="font-semibold text-gray-900">{product?.name}</p>
-                <p className="text-sm text-gray-500">
-                  {product?.concentration} · {product?.presentation}
-                </p>
-              </div>
-              <div className="grid grid-cols-3 gap-3 text-sm">
-                <div>
-                  <p className="text-xs tracking-wide text-gray-400 uppercase">Quantidade</p>
-                  <p className="font-semibold">{String(order.quantity)}</p>
-                </div>
-                <div>
-                  <p className="text-xs tracking-wide text-gray-400 uppercase">Preço unit.</p>
-                  <p className="font-semibold">{formatCurrency(Number(order.unit_price))}</p>
-                </div>
-                <div>
-                  <p className="text-xs tracking-wide text-gray-400 uppercase">Total</p>
-                  <p className="font-bold text-[hsl(213,75%,24%)]">
-                    {formatCurrency(Number(order.total_price))}
-                  </p>
-                </div>
-              </div>
+            <CardContent className="space-y-0">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-gray-400">
+                    <th className="pb-2 font-medium">Produto</th>
+                    <th className="w-16 pb-2 text-center font-medium">Qtd</th>
+                    <th className="w-28 pb-2 text-right font-medium">Unit.</th>
+                    <th className="w-28 pb-2 text-right font-medium">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {orderItems.map((item) => (
+                    <tr key={item.id}>
+                      <td className="py-2.5">
+                        <p className="font-medium text-gray-900">{item.products?.name ?? '—'}</p>
+                        <p className="text-xs text-gray-400">
+                          {item.products?.concentration} · {item.products?.presentation}
+                        </p>
+                      </td>
+                      <td className="py-2.5 text-center text-gray-700">{item.quantity}</td>
+                      <td className="py-2.5 text-right text-gray-700">
+                        {formatCurrency(Number(item.unit_price))}
+                      </td>
+                      <td className="py-2.5 text-right font-semibold text-gray-900">
+                        {formatCurrency(Number(item.total_price))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t">
+                    <td colSpan={3} className="pt-3 text-sm font-semibold text-gray-700">
+                      Total do pedido
+                    </td>
+                    <td className="pt-3 text-right text-base font-bold text-[hsl(213,75%,24%)]">
+                      {formatCurrency(Number(order.total_price))}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </CardContent>
           </Card>
 

@@ -119,12 +119,16 @@ export type PriceUpdateFormData = z.infer<typeof priceUpdateSchema>
 
 // --- Order ---
 
-export const orderSchema = z.object({
+export const orderItemSchema = z.object({
   product_id: z.string().uuid('Produto inválido'),
+  quantity: z.number().int().positive('Quantidade deve ser positiva'),
+})
+
+export const orderSchema = z.object({
   clinic_id: z.string().uuid('Clínica inválida'),
   doctor_id: z.string().uuid('Médico inválido'),
-  quantity: z.number().int().positive('Quantidade deve ser positiva'),
   notes: z.string().optional(),
+  items: z.array(orderItemSchema).min(1, 'Adicione ao menos um produto'),
 })
 
 export type OrderFormData = z.infer<typeof orderSchema>

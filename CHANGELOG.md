@@ -2,6 +2,26 @@
 
 ---
 
+## [0.6.0] — 2026-04-09
+
+### Added
+
+- **Múltiplos produtos por pedido:** nova tabela `order_items` com campos congelados (`unit_price`, `pharmacy_cost_per_unit`, `platform_commission_per_unit`) por item. A tabela `orders` passa a ser cabeçalho do pedido.
+- Formulário de criação de pedido virou um **carrinho**: permite adicionar N produtos da mesma farmácia com quantidade individual e resumo em tempo real.
+- Página de detalhe do pedido exibe tabela de itens com subtotal por linha.
+- Trigger `freeze_order_item_price` congela preço e custos no INSERT de cada `order_item`.
+- Trigger `recalc_order_total` recalcula `orders.total_price` automaticamente após qualquer alteração em `order_items`.
+- RLS para `order_items` espelhando as políticas de `orders`.
+
+### Changed
+
+- `orders` não possui mais as colunas `product_id`, `quantity`, `unit_price`, `pharmacy_cost_per_unit`, `platform_commission_per_unit` (migradas para `order_items`).
+- `services/payments.ts` agora soma os custos de todos os itens para calcular repasse e comissão.
+- `services/orders.ts` aceita array de itens na criação.
+- `types/index.ts` — novo tipo `OrderItem`; `Order` atualizado.
+
+---
+
 ## [0.5.0] — 2026-04-09
 
 ### Alterado

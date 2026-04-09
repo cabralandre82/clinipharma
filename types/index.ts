@@ -235,18 +235,26 @@ export interface ProductPriceHistory {
   created_at: string
 }
 
-export interface Order {
+export interface OrderItem {
   id: string
-  code: string
-  clinic_id: string
-  doctor_id: string
-  pharmacy_id: string
+  order_id: string
   product_id: string
   quantity: number
   unit_price: number
   total_price: number
   pharmacy_cost_per_unit?: number | null
   platform_commission_per_unit?: number | null
+  created_at: string
+  product?: Product
+}
+
+export interface Order {
+  id: string
+  code: string
+  clinic_id: string
+  doctor_id: string
+  pharmacy_id: string
+  total_price: number
   payment_status: PaymentStatus
   transfer_status: TransferStatus
   order_status: OrderStatus
@@ -254,6 +262,7 @@ export interface Order {
   created_by_user_id: string
   created_at: string
   updated_at: string
+  order_items?: OrderItem[]
 }
 
 export interface OrderWithRelations extends Order {

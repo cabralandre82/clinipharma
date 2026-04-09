@@ -4,13 +4,26 @@ import { createClient } from '@/lib/db/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { createAuditLog, AuditAction, AuditEntity } from '@/lib/audit'
 import { requireAuth } from '@/lib/auth/session'
-import { orderSchema } from '@/lib/validators'
-import type { OrderFormData } from '@/lib/validators'
 import { sendEmail } from '@/lib/email'
 import { newOrderEmail, orderStatusUpdatedEmail } from '@/lib/email/templates'
 import { formatCurrency } from '@/lib/utils'
+import { z } from 'zod'
 
-interface CreateOrderInput extends OrderFormData {
+const createOrderSchema = z.object({
+  clinic_id: z.string().uuid(),
+  doctor_id: z.string().uuid(),
+  notes: z.string().optional(),
+  items: z
+    .array(
+      z.object({
+        product_id: z.string().uuid(),
+        quantity: z.number().int().positive(),
+      })
+    )
+    .min(1, 'Adicione ao menos um produto'),
+})
+
+export type CreateOrderInput = z.infer<typeof createOrderSchema> & {
   documents?: File[]
 }
 
@@ -23,46 +36,47 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   try {
     const user = await requireAuth()
 
-    const parsed = orderSchema.safeParse(input)
-    if (!parsed.success) {
-      return { error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
-    }
+    const parsed = createOrderSchema.safeParse(input)
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
 
-    const data = parsed.data
+    const { clinic_id, doctor_id, notes, items } = parsed.data
     const supabase = await createClient()
     const adminClient = createAdminClient()
 
-    // Get product with pharmacy info (price will be frozen by trigger)
-    const { data: product, error: productError } = await supabase
+    // Validate all products and get pharmacy (all items must be from same pharmacy)
+    const productIds = items.map((i) => i.product_id)
+    const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id, pharmacy_id, price_current, active')
-      .eq('id', data.product_id)
-      .single()
+      .select('id, pharmacy_id, price_current, name, estimated_deadline_days, active')
+      .in('id', productIds)
 
-    if (productError || !product) {
-      return { error: 'Produto não encontrado ou inativo' }
-    }
+    if (productsError || !products?.length) return { error: 'Produtos não encontrados' }
+    if (products.some((p) => !p.active)) return { error: 'Um ou mais produtos estão inativos' }
 
-    if (!product.active) {
-      return { error: 'Este produto não está disponível no momento' }
-    }
+    const pharmacyIds = [...new Set(products.map((p) => p.pharmacy_id))]
+    if (pharmacyIds.length > 1) return { error: 'Todos os produtos devem ser da mesma farmácia' }
 
-    // Create the order (price frozen by DB trigger)
+    const pharmacy_id = pharmacyIds[0]
+
+    // Calculate initial total (will be recalculated by trigger)
+    const productMap = Object.fromEntries(products.map((p) => [p.id, p]))
+    const estimatedTotal = items.reduce((sum, item) => {
+      const p = productMap[item.product_id]
+      return sum + (p?.price_current ?? 0) * item.quantity
+    }, 0)
+
+    // Create order header
     const { data: order, error: orderError } = await adminClient
       .from('orders')
       .insert({
-        clinic_id: data.clinic_id,
-        doctor_id: data.doctor_id,
-        pharmacy_id: product.pharmacy_id,
-        product_id: data.product_id,
-        quantity: data.quantity,
-        unit_price: product.price_current,
-        total_price: product.price_current * data.quantity,
-        order_status:
-          (input.documents?.length ?? 0) > 0 ? 'AWAITING_DOCUMENTS' : 'AWAITING_DOCUMENTS',
+        clinic_id,
+        doctor_id,
+        pharmacy_id,
+        total_price: estimatedTotal,
+        order_status: 'AWAITING_DOCUMENTS',
         payment_status: 'PENDING',
         transfer_status: 'NOT_READY',
-        notes: data.notes ?? null,
+        notes: notes ?? null,
         created_by_user_id: user.id,
         code: '',
       })
@@ -74,6 +88,23 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       return { error: 'Erro ao criar pedido. Tente novamente.' }
     }
 
+    // Insert items (trigger freezes prices)
+    const { error: itemsError } = await adminClient.from('order_items').insert(
+      items.map((item) => ({
+        order_id: order.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: productMap[item.product_id]?.price_current ?? 0,
+        total_price: (productMap[item.product_id]?.price_current ?? 0) * item.quantity,
+      }))
+    )
+
+    if (itemsError) {
+      console.error('Order items error:', itemsError)
+      await adminClient.from('orders').delete().eq('id', order.id)
+      return { error: 'Erro ao registrar itens do pedido.' }
+    }
+
     // Record initial status history
     await adminClient.from('order_status_history').insert({
       order_id: order.id,
@@ -83,11 +114,20 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       reason: 'Pedido criado',
     })
 
+    // Fetch updated total (after trigger recalc)
+    const { data: updatedOrder } = await adminClient
+      .from('orders')
+      .select('total_price')
+      .eq('id', order.id)
+      .single()
+
+    const finalTotal = updatedOrder?.total_price ?? estimatedTotal
+
     // Create payment record
     await adminClient.from('payments').insert({
       order_id: order.id,
       payer_profile_id: user.id,
-      gross_amount: product.price_current * data.quantity,
+      gross_amount: finalTotal,
       status: 'PENDING',
       payment_method: 'MANUAL',
     })
@@ -99,11 +139,9 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
           const fileName = `${order.id}/${Date.now()}-${file.name}`
           const arrayBuffer = await file.arrayBuffer()
           const buffer = new Uint8Array(arrayBuffer)
-
           const { data: uploadData } = await adminClient.storage
             .from('order-documents')
             .upload(fileName, buffer, { contentType: file.type })
-
           if (uploadData) {
             await adminClient.from('order_documents').insert({
               order_id: order.id,
@@ -117,12 +155,10 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
           }
         } catch (uploadErr) {
           console.error('Document upload error:', uploadErr)
-          // Don't fail the whole order for upload errors
         }
       }
     }
 
-    // Audit log
     await createAuditLog({
       actorUserId: user.id,
       actorRole: user.roles[0],
@@ -131,50 +167,52 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       action: AuditAction.CREATE,
       newValues: {
         code: order.code,
-        product_id: data.product_id,
-        clinic_id: data.clinic_id,
-        doctor_id: data.doctor_id,
-        quantity: data.quantity,
-        total_price: product.price_current * data.quantity,
+        clinic_id,
+        doctor_id,
+        pharmacy_id,
+        item_count: items.length,
+        total_price: finalTotal,
       },
     })
 
-    // Notify pharmacy about new order
+    // Notify pharmacy
     try {
       const { data: pharmacy } = await adminClient
         .from('pharmacies')
         .select('email, trade_name')
-        .eq('id', product.pharmacy_id)
+        .eq('id', pharmacy_id)
         .single()
 
       const { data: clinic } = await adminClient
         .from('clinics')
         .select('trade_name')
-        .eq('id', data.clinic_id)
+        .eq('id', clinic_id)
         .single()
 
       const { data: doctor } = await adminClient
         .from('doctors')
         .select('full_name')
-        .eq('id', data.doctor_id)
+        .eq('id', doctor_id)
         .single()
 
-      const { data: productInfo } = await adminClient
-        .from('products')
-        .select('name, estimated_deadline_days')
-        .eq('id', data.product_id)
-        .single()
+      const productNames = items
+        .map((i) => `${productMap[i.product_id]?.name ?? '—'} (×${i.quantity})`)
+        .join(', ')
+
+      const maxDeadline = Math.max(
+        ...items.map((i) => productMap[i.product_id]?.estimated_deadline_days ?? 0)
+      )
 
       if (pharmacy?.email) {
         const tmpl = newOrderEmail({
           orderCode: order.code,
           orderId: order.id,
-          productName: productInfo?.name ?? '—',
-          quantity: data.quantity,
-          totalPrice: formatCurrency(product.price_current * data.quantity),
+          productName: productNames,
+          quantity: items.reduce((s, i) => s + i.quantity, 0),
+          totalPrice: formatCurrency(finalTotal),
           clinicName: clinic?.trade_name ?? '—',
           doctorName: doctor?.full_name ?? '—',
-          deadline: `${productInfo?.estimated_deadline_days ?? '—'} dias`,
+          deadline: `${maxDeadline} dias`,
         })
         await sendEmail({ to: pharmacy.email, ...tmpl })
       }
@@ -185,9 +223,8 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     return { orderId: order.id }
   } catch (err) {
     console.error('createOrder error:', err)
-    if (err instanceof Error && err.message === 'UNAUTHORIZED') {
+    if (err instanceof Error && err.message === 'UNAUTHORIZED')
       return { error: 'Sessão expirada. Faça login novamente.' }
-    }
     return { error: 'Erro interno. Tente novamente.' }
   }
 }
@@ -207,27 +244,20 @@ export async function updateOrderStatus(
       .eq('id', orderId)
       .single()
 
-    if (fetchError || !order) {
-      return { error: 'Pedido não encontrado' }
-    }
+    if (fetchError || !order) return { error: 'Pedido não encontrado' }
 
     const isAdmin = user.roles.some((r) => ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(r))
     const isPharmacy = user.roles.includes('PHARMACY_ADMIN')
 
-    if (!isAdmin && !isPharmacy) {
-      return { error: 'Sem permissão para alterar status do pedido' }
-    }
+    if (!isAdmin && !isPharmacy) return { error: 'Sem permissão para alterar status do pedido' }
 
     const { error: updateError } = await adminClient
       .from('orders')
       .update({ order_status: newStatus, updated_at: new Date().toISOString() })
       .eq('id', orderId)
 
-    if (updateError) {
-      return { error: 'Erro ao atualizar status' }
-    }
+    if (updateError) return { error: 'Erro ao atualizar status' }
 
-    // Manual history record (trigger also records this, but we add the reason)
     await adminClient.from('order_status_history').insert({
       order_id: orderId,
       old_status: order.order_status,
@@ -246,7 +276,6 @@ export async function updateOrderStatus(
       newValues: { status: newStatus, reason },
     })
 
-    // Notify clinic about status updates relevant to them
     const NOTIFY_STATUSES: Record<string, string> = {
       READY: 'Pronto para envio',
       SHIPPED: 'Enviado',
@@ -260,18 +289,31 @@ export async function updateOrderStatus(
       try {
         const { data: fullOrder } = await adminClient
           .from('orders')
-          .select('code, clinic_id, clinics(email), products(name)')
+          .select('code, clinic_id, clinics(email), order_items(products(name))')
           .eq('id', orderId)
           .single()
 
         const clinicEmail = (fullOrder?.clinics as { email?: string } | null)?.email
+        const itemsRaw = fullOrder?.order_items as Array<{
+          products: { name: string }[] | null
+        }> | null
+        const productNames =
+          itemsRaw
+            ?.map(
+              (i) =>
+                (Array.isArray(i.products)
+                  ? i.products[0]?.name
+                  : (i.products as { name: string } | null)?.name) ?? '—'
+            )
+            .join(', ') ?? '—'
+
         if (clinicEmail) {
           const tmpl = orderStatusUpdatedEmail({
             orderCode: fullOrder?.code ?? orderId,
             orderId,
             newStatus,
             statusLabel: NOTIFY_STATUSES[newStatus],
-            productName: (fullOrder?.products as { name?: string } | null)?.name ?? '—',
+            productName: productNames,
           })
           await sendEmail({ to: clinicEmail, ...tmpl })
         }

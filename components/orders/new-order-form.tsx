@@ -2,11 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { createOrder } from '@/services/orders'
-import { orderSchema, type OrderFormData } from '@/lib/validators'
 import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, Package, Upload, X, FileText } from 'lucide-react'
+import { Loader2, Package, Upload, X, FileText, Plus, Trash2 } from 'lucide-react'
 
 export interface NewOrderFormProduct {
   id: string
@@ -23,36 +20,73 @@ export interface NewOrderFormProduct {
   presentation: string
   price_current: number
   estimated_deadline_days: number
+  pharmacy_id: string
   pharmacies: { id: string; trade_name: string } | null
   product_images: { id: string; public_url: string | null; sort_order: number }[]
 }
 
-interface NewOrderFormProps {
+interface CartItem {
   product: NewOrderFormProduct
+  quantity: number
+}
+
+interface NewOrderFormProps {
+  initialProduct?: NewOrderFormProduct
+  availableProducts: NewOrderFormProduct[]
   clinics: { id: string; trade_name: string }[]
   doctors: { id: string; full_name: string; crm: string; crm_state: string }[]
 }
 
-export function NewOrderForm({ product, clinics, doctors }: NewOrderFormProps) {
+export function NewOrderForm({
+  initialProduct,
+  availableProducts,
+  clinics,
+  doctors,
+}: NewOrderFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [documents, setDocuments] = useState<File[]>([])
+  const [clinicId, setClinicId] = useState('')
+  const [doctorId, setDoctorId] = useState('')
+  const [notes, setNotes] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors },
-  } = useForm<OrderFormData>({
-    resolver: zodResolver(orderSchema),
-    defaultValues: {
-      product_id: product.id,
-      quantity: 1,
-    },
-  })
+  // Cart
+  const [cart, setCart] = useState<CartItem[]>(
+    initialProduct ? [{ product: initialProduct, quantity: 1 }] : []
+  )
+  const [selectedProductId, setSelectedProductId] = useState('')
+  const [addQty, setAddQty] = useState(1)
 
-  const watchQuantity = watch('quantity')
-  const total = product.price_current * (watchQuantity || 1)
+  // Products not yet in cart (same pharmacy if cart not empty)
+  const cartPharmacyId = cart[0]?.product.pharmacy_id
+  const eligibleProducts = availableProducts.filter(
+    (p) =>
+      !cart.some((c) => c.product.id === p.id) &&
+      (!cartPharmacyId || p.pharmacy_id === cartPharmacyId)
+  )
+
+  function addToCart() {
+    const product = availableProducts.find((p) => p.id === selectedProductId)
+    if (!product) return
+    if (addQty < 1) return
+    setCart((prev) => [...prev, { product, quantity: addQty }])
+    setSelectedProductId('')
+    setAddQty(1)
+  }
+
+  function removeFromCart(productId: string) {
+    setCart((prev) => prev.filter((c) => c.product.id !== productId))
+  }
+
+  function updateQty(productId: string, qty: number) {
+    if (qty < 1) return
+    setCart((prev) => prev.map((c) => (c.product.id === productId ? { ...c, quantity: qty } : c)))
+  }
+
+  const total = cart.reduce((sum, c) => sum + c.product.price_current * c.quantity, 0)
+  const maxDeadline = Math.max(0, ...cart.map((c) => c.product.estimated_deadline_days))
+  const pharmacyName = cart[0]?.product.pharmacies?.trade_name ?? '—'
 
   const handleFileAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
@@ -60,20 +94,32 @@ export function NewOrderForm({ product, clinics, doctors }: NewOrderFormProps) {
     e.target.value = ''
   }
 
-  const removeDocument = (index: number) => {
-    setDocuments((prev) => prev.filter((_, i) => i !== index))
-  }
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const newErrors: Record<string, string> = {}
+    if (!clinicId) newErrors.clinic_id = 'Selecione a clínica'
+    if (!doctorId) newErrors.doctor_id = 'Selecione o médico'
+    if (cart.length === 0) newErrors.items = 'Adicione ao menos um produto'
+    if (Object.keys(newErrors).length) {
+      setErrors(newErrors)
+      return
+    }
+    setErrors({})
 
-  async function onSubmit(data: OrderFormData) {
     setLoading(true)
     try {
-      const result = await createOrder({ ...data, documents })
+      const result = await createOrder({
+        clinic_id: clinicId,
+        doctor_id: doctorId,
+        notes: notes || undefined,
+        items: cart.map((c) => ({ product_id: c.product.id, quantity: c.quantity })),
+        documents,
+      })
 
       if (result.error) {
         toast.error(result.error)
         return
       }
-
       toast.success('Pedido criado com sucesso!')
       router.push(`/orders/${result.orderId}`)
     } catch {
@@ -84,38 +130,104 @@ export function NewOrderForm({ product, clinics, doctors }: NewOrderFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      {/* Product summary */}
-      <Card className="border-blue-100 bg-blue-50/50">
-        <CardContent className="p-5">
-          <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg border border-blue-100 bg-white">
-              <Package className="h-7 w-7 text-blue-500" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-gray-900">{product.name}</p>
-              <p className="text-sm text-gray-500">
-                {product.concentration} · {product.presentation}
-              </p>
-              {product.pharmacies && (
-                <p className="mt-0.5 text-xs text-gray-400">
-                  Farmácia: {product.pharmacies.trade_name}
+    <form onSubmit={onSubmit} className="space-y-5">
+      {/* Cart */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Produtos do pedido</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {cart.length === 0 && (
+            <p className="text-sm text-gray-400">Nenhum produto adicionado ainda.</p>
+          )}
+
+          {cart.map((item) => (
+            <div
+              key={item.product.id}
+              className="flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50/40 p-3"
+            >
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border bg-white">
+                <Package className="h-5 w-5 text-blue-400" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-gray-900">{item.product.name}</p>
+                <p className="text-xs text-gray-500">
+                  {item.product.concentration} · {formatCurrency(item.product.price_current)}/un
                 </p>
-              )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  value={item.quantity}
+                  onChange={(e) => updateQty(item.product.id, parseInt(e.target.value))}
+                  className="w-20 text-center"
+                />
+                <span className="w-24 text-right text-sm font-semibold text-slate-700">
+                  {formatCurrency(item.product.price_current * item.quantity)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeFromCart(item.product.id)}
+                  className="text-gray-300 transition-colors hover:text-red-500"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            <div className="flex-shrink-0 text-right">
-              <p className="text-lg font-bold text-[hsl(213,75%,24%)]">
-                {formatCurrency(product.price_current)}
-              </p>
-              <p className="text-xs text-gray-400">por unidade</p>
+          ))}
+
+          {errors.items && <p className="text-xs text-red-500">{errors.items}</p>}
+
+          {/* Add product row */}
+          {eligibleProducts.length > 0 && (
+            <div className="flex items-end gap-2 border-t pt-3">
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-gray-500">Adicionar produto</Label>
+                <select
+                  value={selectedProductId}
+                  onChange={(e) => setSelectedProductId(e.target.value)}
+                  className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                >
+                  <option value="">Selecione...</option>
+                  {eligibleProducts.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} — {formatCurrency(p.price_current)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500">Qtd</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={addQty}
+                  onChange={(e) => setAddQty(parseInt(e.target.value))}
+                  className="w-20 text-center"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addToCart}
+                disabled={!selectedProductId}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
-          </div>
+          )}
+
+          {cartPharmacyId && (
+            <p className="text-xs text-slate-400">
+              Farmácia: <span className="font-medium text-slate-600">{pharmacyName}</span>
+              {' · '}Todos os produtos devem ser da mesma farmácia
+            </p>
+          )}
         </CardContent>
       </Card>
 
-      <input type="hidden" {...register('product_id')} />
-
-      {/* Clinic and Doctor */}
+      {/* Order data */}
       <Card>
         <CardHeader className="pb-4">
           <CardTitle className="text-base">Dados do pedido</CardTitle>
@@ -125,8 +237,9 @@ export function NewOrderForm({ product, clinics, doctors }: NewOrderFormProps) {
             <Label htmlFor="clinic_id">Clínica *</Label>
             <select
               id="clinic_id"
-              {...register('clinic_id')}
-              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-[hsl(196,91%,36%)] focus:outline-none"
+              value={clinicId}
+              onChange={(e) => setClinicId(e.target.value)}
+              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
             >
               <option value="">Selecione a clínica...</option>
               {clinics.map((c) => (
@@ -135,15 +248,16 @@ export function NewOrderForm({ product, clinics, doctors }: NewOrderFormProps) {
                 </option>
               ))}
             </select>
-            {errors.clinic_id && <p className="text-xs text-red-500">{errors.clinic_id.message}</p>}
+            {errors.clinic_id && <p className="text-xs text-red-500">{errors.clinic_id}</p>}
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="doctor_id">Médico solicitante *</Label>
             <select
               id="doctor_id"
-              {...register('doctor_id')}
-              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-[hsl(196,91%,36%)] focus:outline-none"
+              value={doctorId}
+              onChange={(e) => setDoctorId(e.target.value)}
+              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
             >
               <option value="">Selecione o médico...</option>
               {doctors.map((d) => (
@@ -152,19 +266,7 @@ export function NewOrderForm({ product, clinics, doctors }: NewOrderFormProps) {
                 </option>
               ))}
             </select>
-            {errors.doctor_id && <p className="text-xs text-red-500">{errors.doctor_id.message}</p>}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="quantity">Quantidade *</Label>
-            <Input
-              id="quantity"
-              type="number"
-              min={1}
-              {...register('quantity', { valueAsNumber: true })}
-              className={`w-32 ${errors.quantity ? 'border-red-500' : ''}`}
-            />
-            {errors.quantity && <p className="text-xs text-red-500">{errors.quantity.message}</p>}
+            {errors.doctor_id && <p className="text-xs text-red-500">{errors.doctor_id}</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -172,8 +274,9 @@ export function NewOrderForm({ product, clinics, doctors }: NewOrderFormProps) {
             <Textarea
               id="notes"
               placeholder="Informações adicionais para o pedido (opcional)"
-              rows={3}
-              {...register('notes')}
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
             />
           </div>
         </CardContent>
@@ -186,15 +289,11 @@ export function NewOrderForm({ product, clinics, doctors }: NewOrderFormProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-gray-500">
-            Anexe a prescrição médica e demais documentos obrigatórios. O pedido só avançará após
-            análise documental.
+            Anexe a prescrição médica e demais documentos obrigatórios.
           </p>
-
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 p-6 transition-colors hover:border-[hsl(196,91%,36%)] hover:bg-blue-50/50">
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 p-5 transition-colors hover:border-blue-400 hover:bg-blue-50/50">
             <Upload className="h-5 w-5 text-gray-400" />
-            <span className="text-sm text-gray-500">
-              Clique para anexar documentos (PDF, JPG, PNG)
-            </span>
+            <span className="text-sm text-gray-500">Clique para anexar (PDF, JPG, PNG)</span>
             <input
               type="file"
               className="hidden"
@@ -203,7 +302,6 @@ export function NewOrderForm({ product, clinics, doctors }: NewOrderFormProps) {
               onChange={handleFileAdd}
             />
           </label>
-
           {documents.length > 0 && (
             <ul className="space-y-2">
               {documents.map((file, i) => (
@@ -216,8 +314,8 @@ export function NewOrderForm({ product, clinics, doctors }: NewOrderFormProps) {
                   <span className="text-xs text-gray-400">{(file.size / 1024).toFixed(0)} KB</span>
                   <button
                     type="button"
-                    onClick={() => removeDocument(i)}
-                    className="text-gray-400 transition-colors hover:text-red-500"
+                    onClick={() => setDocuments((p) => p.filter((_, j) => j !== i))}
+                    className="text-gray-400 hover:text-red-500"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -228,43 +326,43 @@ export function NewOrderForm({ product, clinics, doctors }: NewOrderFormProps) {
         </CardContent>
       </Card>
 
-      {/* Order summary */}
-      <Card className="border-gray-200 bg-gray-50">
-        <CardContent className="p-5">
-          <h3 className="mb-3 font-semibold text-gray-900">Resumo do pedido</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Produto</span>
-              <span className="ml-4 max-w-[200px] truncate text-gray-900">{product.name}</span>
+      {/* Summary */}
+      {cart.length > 0 && (
+        <Card className="border-gray-200 bg-gray-50">
+          <CardContent className="p-5">
+            <h3 className="mb-3 font-semibold text-gray-900">Resumo do pedido</h3>
+            <div className="space-y-2 text-sm">
+              {cart.map((item) => (
+                <div key={item.product.id} className="flex justify-between">
+                  <span className="max-w-[200px] truncate text-gray-500">
+                    {item.product.name} ×{item.quantity}
+                  </span>
+                  <span className="ml-4 text-gray-900">
+                    {formatCurrency(item.product.price_current * item.quantity)}
+                  </span>
+                </div>
+              ))}
+              <Separator />
+              <div className="flex justify-between text-base font-semibold">
+                <span>Total</span>
+                <span className="text-[hsl(213,75%,24%)]">{formatCurrency(total)}</span>
+              </div>
+              <p className="mt-1 text-xs text-gray-400">
+                Prazo estimado: {maxDeadline} dias úteis após liberação
+              </p>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Preço unitário</span>
-              <span className="text-gray-900">{formatCurrency(product.price_current)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Quantidade</span>
-              <span className="text-gray-900">{watchQuantity || 1}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between text-base font-semibold">
-              <span>Total</span>
-              <span className="text-[hsl(213,75%,24%)]">{formatCurrency(total)}</span>
-            </div>
-            <p className="mt-1 text-xs text-gray-400">
-              Prazo estimado: {product.estimated_deadline_days} dias úteis após liberação
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      <Button type="submit" size="lg" className="w-full" disabled={loading}>
+      <Button type="submit" size="lg" className="w-full" disabled={loading || cart.length === 0}>
         {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Criando pedido...
           </>
         ) : (
-          'Confirmar pedido'
+          `Confirmar pedido${cart.length > 1 ? ` (${cart.length} produtos)` : ''}`
         )}
       </Button>
     </form>

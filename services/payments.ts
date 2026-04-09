@@ -28,44 +28,37 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ erro
     if (fetchError || !payment) return { error: 'Pagamento não encontrado' }
     if (payment.status !== 'PENDING') return { error: 'Pagamento já processado' }
 
-    // Fetch order with frozen cost fields + clinic consultant
+    // Fetch order with items (frozen cost fields) + clinic consultant
     const { data: orderData } = await adminClient
       .from('orders')
       .select(
-        'id, pharmacy_id, clinic_id, total_price, quantity, pharmacy_cost_per_unit, platform_commission_per_unit, clinics(consultant_id)'
+        'id, pharmacy_id, clinic_id, total_price, clinics(consultant_id), order_items(quantity, pharmacy_cost_per_unit, platform_commission_per_unit)'
       )
       .eq('id', payment.order_id)
       .single()
 
     if (!orderData) return { error: 'Pedido não encontrado' }
 
-    const qty = Number(orderData.quantity)
-
-    // Financial breakdown — uses frozen values when available, falls back to product current
-    let pharmacyTransfer: number
-    let platformCommission: number
-
-    if (
-      orderData.pharmacy_cost_per_unit != null &&
-      orderData.platform_commission_per_unit != null
-    ) {
-      // Frozen at order creation (normal path)
-      pharmacyTransfer = Math.round(Number(orderData.pharmacy_cost_per_unit) * qty * 100) / 100
-      platformCommission =
-        Math.round(Number(orderData.platform_commission_per_unit) * qty * 100) / 100
-    } else {
-      // Fallback for orders created before migration 005
-      const { data: product } = await adminClient
-        .from('products')
-        .select('price_current, pharmacy_cost')
-        .eq('id', (orderData as Record<string, unknown>).product_id as string)
-        .single()
-
-      const pCost = Number(product?.pharmacy_cost ?? 0)
-      const pPrice = Number(product?.price_current ?? payment.gross_amount / qty)
-      pharmacyTransfer = Math.round(pCost * qty * 100) / 100
-      platformCommission = Math.round((pPrice - pCost) * qty * 100) / 100
+    type OrderItemRow = {
+      quantity: number
+      pharmacy_cost_per_unit: number | null
+      platform_commission_per_unit: number | null
     }
+    const items = (orderData.order_items ?? []) as OrderItemRow[]
+
+    // Sum frozen cost values across all items
+    const pharmacyTransfer =
+      Math.round(
+        items.reduce((sum, i) => sum + Number(i.pharmacy_cost_per_unit ?? 0) * i.quantity, 0) * 100
+      ) / 100
+
+    const platformCommission =
+      Math.round(
+        items.reduce(
+          (sum, i) => sum + Number(i.platform_commission_per_unit ?? 0) * i.quantity,
+          0
+        ) * 100
+      ) / 100
 
     // Confirm payment
     await adminClient

@@ -21,12 +21,11 @@ export interface OrderRow {
   payment_status: string
   transfer_status: string
   total_price: number
-  quantity: number
   created_at: string
   clinics: { trade_name: string } | null
   doctors: { full_name: string } | null
   pharmacies: { trade_name: string } | null
-  products: { name: string } | null
+  order_items: Array<{ product_id: string; products: { name: string } | null }> | null
 }
 
 const ORDER_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
@@ -63,7 +62,7 @@ export function OrdersTable({ orders, isAdmin }: OrdersTableProps) {
     const matchSearch =
       !search ||
       o.code.toLowerCase().includes(search.toLowerCase()) ||
-      o.products?.name.toLowerCase().includes(search.toLowerCase()) ||
+      o.order_items?.some((i) => i.products?.name.toLowerCase().includes(search.toLowerCase())) ||
       o.clinics?.trade_name.toLowerCase().includes(search.toLowerCase())
 
     const matchStatus = !statusFilter || o.order_status === statusFilter
@@ -135,10 +134,20 @@ export function OrdersTable({ orders, isAdmin }: OrdersTableProps) {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <span className="block max-w-[180px] truncate text-sm text-gray-900">
-                        {order.products?.name ?? '—'}
-                      </span>
-                      <span className="text-xs text-gray-400">Qty: {order.quantity}</span>
+                      {order.order_items && order.order_items.length > 0 ? (
+                        <>
+                          <span className="block max-w-[180px] truncate text-sm text-gray-900">
+                            {order.order_items[0]?.products?.name ?? '—'}
+                          </span>
+                          {order.order_items.length > 1 && (
+                            <span className="text-xs text-gray-400">
+                              +{order.order_items.length - 1} produto(s)
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-sm text-gray-400">—</span>
+                      )}
                     </TableCell>
                     {isAdmin && (
                       <TableCell className="text-sm text-gray-600">
