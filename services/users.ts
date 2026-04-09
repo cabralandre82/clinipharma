@@ -11,9 +11,17 @@ const createUserSchema = z.object({
   full_name: z.string().min(2, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
   password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
-  role: z.enum(['SUPER_ADMIN', 'PLATFORM_ADMIN', 'CLINIC_ADMIN', 'DOCTOR', 'PHARMACY_ADMIN']),
+  role: z.enum([
+    'SUPER_ADMIN',
+    'PLATFORM_ADMIN',
+    'CLINIC_ADMIN',
+    'DOCTOR',
+    'PHARMACY_ADMIN',
+    'SALES_CONSULTANT',
+  ]),
   clinic_id: z.string().uuid().optional(),
   pharmacy_id: z.string().uuid().optional(),
+  consultant_id: z.string().uuid().optional(),
   membership_role: z.enum(['ADMIN', 'STAFF']).optional(),
 })
 
@@ -99,13 +107,19 @@ export async function createUser(
         .from('pharmacies')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', parsed.data.pharmacy_id)
-      // Store pharmacy link in user metadata for RLS
       await adminClient.auth.admin.updateUserById(userId, {
         user_metadata: {
           full_name: parsed.data.full_name,
           pharmacy_id: parsed.data.pharmacy_id,
         },
       })
+    }
+
+    if (parsed.data.role === 'SALES_CONSULTANT' && parsed.data.consultant_id) {
+      await adminClient
+        .from('sales_consultants')
+        .update({ user_id: userId, updated_at: new Date().toISOString() })
+        .eq('id', parsed.data.consultant_id)
     }
 
     await createAuditLog({

@@ -26,6 +26,15 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ erro
     if (fetchError || !payment) return { error: 'Pagamento não encontrado' }
     if (payment.status !== 'PENDING') return { error: 'Pagamento já processado' }
 
+    // Fetch order + clinic consultant info upfront
+    const { data: orderData } = await adminClient
+      .from('orders')
+      .select(
+        'id, pharmacy_id, clinic_id, total_price, clinics(consultant_id, sales_consultants(id, commission_rate))'
+      )
+      .eq('id', payment.order_id)
+      .single()
+
     // Confirm payment
     await adminClient
       .from('payments')
@@ -60,14 +69,34 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ erro
     })
 
     // Create transfer record
+    const pharmacyId =
+      orderData?.pharmacy_id ?? (await getOrderPharmacyId(adminClient, payment.order_id))
     await adminClient.from('transfers').insert({
       order_id: payment.order_id,
-      pharmacy_id: await getOrderPharmacyId(adminClient, payment.order_id),
+      pharmacy_id: pharmacyId,
       gross_amount: commission.grossAmount,
       commission_amount: commission.commissionAmount,
       net_amount: commission.netAmount,
       status: 'PENDING',
     })
+
+    // Auto-create consultant commission if clinic has a consultant linked
+    const clinic = orderData?.clinics as {
+      consultant_id?: string | null
+      sales_consultants?: { id: string; commission_rate: number } | null
+    } | null
+    if (clinic?.consultant_id && clinic?.sales_consultants) {
+      const consultantRate = Number(clinic.sales_consultants.commission_rate ?? 0)
+      const consultantCommission = Math.round(payment.gross_amount * consultantRate) / 100
+      await adminClient.from('consultant_commissions').insert({
+        order_id: payment.order_id,
+        consultant_id: clinic.consultant_id,
+        order_total: payment.gross_amount,
+        commission_rate: consultantRate,
+        commission_amount: Math.round(consultantCommission * 100) / 100,
+        status: 'PENDING',
+      })
+    }
 
     // Update order status
     await adminClient

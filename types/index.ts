@@ -4,6 +4,7 @@ export type UserRole =
   | 'CLINIC_ADMIN'
   | 'DOCTOR'
   | 'PHARMACY_ADMIN'
+  | 'SALES_CONSULTANT'
 
 export type EntityStatus = 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'BLOCKED'
 
@@ -57,6 +58,54 @@ export interface ProfileWithRoles extends Profile {
   roles: UserRole[]
 }
 
+export interface SalesConsultant {
+  id: string
+  user_id?: string | null
+  full_name: string
+  email: string
+  cnpj: string
+  phone?: string | null
+  commission_rate: number
+  bank_name?: string | null
+  bank_agency?: string | null
+  bank_account?: string | null
+  pix_key?: string | null
+  status: EntityStatus
+  notes?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ConsultantCommissionStatus = 'PENDING' | 'TRANSFER_PENDING' | 'PAID'
+export type ConsultantTransferStatus = 'PENDING' | 'COMPLETED'
+
+export interface ConsultantCommission {
+  id: string
+  order_id: string
+  consultant_id: string
+  order_total: number
+  commission_rate: number
+  commission_amount: number
+  status: ConsultantCommissionStatus
+  transfer_id?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ConsultantTransfer {
+  id: string
+  consultant_id: string
+  gross_amount: number
+  transfer_reference?: string | null
+  transfer_date?: string | null
+  notes?: string | null
+  status: ConsultantTransferStatus
+  confirmed_by?: string | null
+  confirmed_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Clinic {
   id: string
   corporate_name: string
@@ -70,6 +119,7 @@ export interface Clinic {
   city: string
   state: string
   zip_code: string
+  consultant_id?: string | null
   status: EntityStatus
   notes?: string | null
   created_at: string

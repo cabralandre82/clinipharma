@@ -18,6 +18,8 @@ import {
   Settings,
   ScrollText,
   Users,
+  Handshake,
+  Wallet,
 } from 'lucide-react'
 
 interface NavItem {
@@ -32,7 +34,14 @@ const NAV_ITEMS: NavItem[] = [
     href: '/dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
-    roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN', 'CLINIC_ADMIN', 'DOCTOR', 'PHARMACY_ADMIN'],
+    roles: [
+      'SUPER_ADMIN',
+      'PLATFORM_ADMIN',
+      'CLINIC_ADMIN',
+      'DOCTOR',
+      'PHARMACY_ADMIN',
+      'SALES_CONSULTANT',
+    ],
   },
   {
     href: '/catalog',
@@ -78,9 +87,21 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: '/transfers',
-    label: 'Repasses',
+    label: 'Repasses Farmácias',
     icon: ArrowLeftRight,
     roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN', 'PHARMACY_ADMIN'],
+  },
+  {
+    href: '/consultants',
+    label: 'Consultores',
+    icon: Handshake,
+    roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN'],
+  },
+  {
+    href: '/consultant-transfers',
+    label: 'Repasses Consultores',
+    icon: Wallet,
+    roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN'],
   },
   {
     href: '/reports',
@@ -163,7 +184,7 @@ export function Sidebar({ userRoles }: SidebarProps) {
 
       {/* Footer */}
       <div className="border-t border-white/10 p-3">
-        <p className="text-center text-xs text-blue-200/50">MedAxis v0.1.0</p>
+        <p className="text-center text-xs text-blue-200/50">MedAxis v0.2.0</p>
       </div>
     </aside>
   )

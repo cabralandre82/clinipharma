@@ -16,16 +16,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import Link from 'next/link'
 import { createUser } from '@/services/users'
-import type { Clinic, Pharmacy } from '@/types'
+import type { Clinic, Pharmacy, SalesConsultant } from '@/types'
 
 const schema = z.object({
   full_name: z.string().min(2, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
   password: z.string().min(8, 'Mínimo 8 caracteres'),
-  role: z.enum(['SUPER_ADMIN', 'PLATFORM_ADMIN', 'CLINIC_ADMIN', 'DOCTOR', 'PHARMACY_ADMIN']),
+  role: z.enum([
+    'SUPER_ADMIN',
+    'PLATFORM_ADMIN',
+    'CLINIC_ADMIN',
+    'DOCTOR',
+    'PHARMACY_ADMIN',
+    'SALES_CONSULTANT',
+  ]),
   clinic_id: z.string().optional(),
   pharmacy_id: z.string().optional(),
+  consultant_id: z.string().optional(),
   membership_role: z.enum(['ADMIN', 'STAFF']).optional(),
 })
 
@@ -37,15 +46,17 @@ const ROLE_LABELS: Record<string, string> = {
   CLINIC_ADMIN: 'Admin de Clínica',
   DOCTOR: 'Médico',
   PHARMACY_ADMIN: 'Admin de Farmácia',
+  SALES_CONSULTANT: 'Consultor de Vendas',
 }
 
 interface UserFormProps {
   clinics: Clinic[]
   pharmacies: Pharmacy[]
+  consultants: SalesConsultant[]
   isSuperAdmin: boolean
 }
 
-export function UserForm({ clinics, pharmacies, isSuperAdmin }: UserFormProps) {
+export function UserForm({ clinics, pharmacies, consultants, isSuperAdmin }: UserFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
@@ -63,6 +74,7 @@ export function UserForm({ clinics, pharmacies, isSuperAdmin }: UserFormProps) {
   const selectedRole = watch('role')
   const needsClinic = selectedRole === 'CLINIC_ADMIN' || selectedRole === 'DOCTOR'
   const needsPharmacy = selectedRole === 'PHARMACY_ADMIN'
+  const needsConsultant = selectedRole === 'SALES_CONSULTANT'
 
   async function onSubmit(data: FormData) {
     setLoading(true)
@@ -70,6 +82,7 @@ export function UserForm({ clinics, pharmacies, isSuperAdmin }: UserFormProps) {
       ...data,
       clinic_id: data.clinic_id || undefined,
       pharmacy_id: data.pharmacy_id || undefined,
+      consultant_id: data.consultant_id || undefined,
     })
     if (result.error) {
       toast.error(result.error)
@@ -122,6 +135,7 @@ export function UserForm({ clinics, pharmacies, isSuperAdmin }: UserFormProps) {
               <SelectItem value="CLINIC_ADMIN">{ROLE_LABELS.CLINIC_ADMIN}</SelectItem>
               <SelectItem value="DOCTOR">{ROLE_LABELS.DOCTOR}</SelectItem>
               <SelectItem value="PHARMACY_ADMIN">{ROLE_LABELS.PHARMACY_ADMIN}</SelectItem>
+              <SelectItem value="SALES_CONSULTANT">{ROLE_LABELS.SALES_CONSULTANT}</SelectItem>
             </SelectContent>
           </Select>
           {errors.role && <p className="text-sm text-red-500">{errors.role.message}</p>}
@@ -160,6 +174,31 @@ export function UserForm({ clinics, pharmacies, isSuperAdmin }: UserFormProps) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        )}
+
+        {needsConsultant && (
+          <div className="space-y-2 md:col-span-2">
+            <Label>Consultor cadastrado para vincular *</Label>
+            <Select onValueChange={(v) => setValue('consultant_id', v as string)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o registro de consultor..." />
+              </SelectTrigger>
+              <SelectContent>
+                {consultants.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.full_name} — {c.commission_rate}%
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-slate-500">
+              O consultor deve estar cadastrado em{' '}
+              <Link href="/consultants/new" className="underline">
+                Consultores
+              </Link>{' '}
+              antes de criar o usuário.
+            </p>
           </div>
         )}
       </div>

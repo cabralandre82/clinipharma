@@ -156,3 +156,28 @@ export const commissionSchema = z.object({
 })
 
 export type CommissionFormData = z.infer<typeof commissionSchema>
+
+// --- Sales Consultant ---
+
+export const salesConsultantSchema = z.object({
+  full_name: z.string().min(2, 'Nome completo é obrigatório'),
+  email: z.string().email('Email inválido'),
+  cnpj: brazilianCNPJ,
+  phone: brazilianPhone.optional(),
+  commission_rate: z
+    .number()
+    .min(0, 'Taxa deve ser 0% ou mais')
+    .max(100, 'Taxa não pode ultrapassar 100%'),
+  bank_name: z.string().optional(),
+  bank_agency: z.string().optional(),
+  bank_account: z.string().optional(),
+  pix_key: z.string().optional(),
+  notes: z.string().optional(),
+})
+
+export type SalesConsultantFormData = z.infer<typeof salesConsultantSchema>
+
+export const consultantTransferSchema = z.object({
+  transfer_reference: z.string().min(1, 'Referência da transferência é obrigatória'),
+  notes: z.string().optional(),
+})

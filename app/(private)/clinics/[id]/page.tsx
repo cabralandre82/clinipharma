@@ -6,7 +6,8 @@ import { formatCNPJ, formatPhone, formatDate } from '@/lib/utils'
 import { EntityStatusBadge } from '@/components/shared/status-badge'
 import { ButtonLink } from '@/components/ui/button-link'
 import { ClinicStatusActions } from '@/components/clinics/clinic-status-actions'
-import type { Clinic, EntityStatus } from '@/types'
+import { AssignConsultantDialog } from '@/components/consultants/assign-consultant-dialog'
+import type { Clinic, EntityStatus, SalesConsultant } from '@/types'
 
 export const metadata = { title: 'Detalhe da Clínica | MedAxis' }
 
@@ -19,11 +20,25 @@ export default async function ClinicDetailPage({ params }: PageProps) {
   await requireRolePage(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
 
   const supabase = await createServerClient()
-  const { data: clinic } = await supabase.from('clinics').select('*').eq('id', id).single()
+  const { data: clinic } = await supabase
+    .from('clinics')
+    .select('*, sales_consultants(id, full_name, commission_rate, status)')
+    .eq('id', id)
+    .single()
 
   if (!clinic) notFound()
 
-  const typedClinic = clinic as unknown as Clinic
+  const typedClinic = clinic as unknown as Clinic & {
+    sales_consultants: Pick<
+      SalesConsultant,
+      'id' | 'full_name' | 'commission_rate' | 'status'
+    > | null
+  }
+
+  const { data: allConsultants } = await supabase
+    .from('sales_consultants')
+    .select('id, full_name, commission_rate, status')
+    .order('full_name')
 
   const { data: membersRaw } = await supabase
     .from('clinic_members')
@@ -139,6 +154,40 @@ export default async function ClinicDetailPage({ params }: PageProps) {
             </div>
           </div>
         )}
+
+        {/* Consultor de vendas */}
+        <div className="space-y-3 rounded-lg border bg-white p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-gray-900">Consultor de vendas</h2>
+            <AssignConsultantDialog
+              clinicId={id}
+              currentConsultantId={typedClinic.consultant_id}
+              consultants={(allConsultants ?? []) as unknown as SalesConsultant[]}
+            />
+          </div>
+          {typedClinic.sales_consultants ? (
+            <div className="flex items-center justify-between rounded-lg bg-blue-50 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-blue-900">
+                  {typedClinic.sales_consultants.full_name}
+                </p>
+                <p className="text-xs text-blue-700">
+                  Comissão: {typedClinic.sales_consultants.commission_rate}% sobre cada pedido
+                </p>
+              </div>
+              <Link
+                href={`/consultants/${typedClinic.sales_consultants.id}`}
+                className="text-xs text-blue-600 hover:underline"
+              >
+                Ver perfil
+              </Link>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">
+              Nenhum consultor vinculado — comissão integral para a plataforma.
+            </p>
+          )}
+        </div>
 
         {typedClinic.notes && (
           <div className="space-y-2 rounded-lg border bg-white p-6 md:col-span-2">

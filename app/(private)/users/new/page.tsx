@@ -2,7 +2,7 @@ import { requireRolePage } from '@/lib/rbac'
 import { getCurrentUser } from '@/lib/auth/session'
 import { createServerClient } from '@/lib/db/server'
 import { UserForm } from '@/components/users/user-form'
-import type { Clinic, Pharmacy } from '@/types'
+import type { Clinic, Pharmacy, SalesConsultant } from '@/types'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Novo Usuário | MedAxis' }
@@ -15,21 +15,28 @@ export default async function NewUserPage() {
 
   const supabase = await createServerClient()
 
-  const [{ data: clinicsRaw }, { data: pharmaciesRaw }] = await Promise.all([
-    supabase
-      .from('clinics')
-      .select('id, trade_name, status')
-      .eq('status', 'ACTIVE')
-      .order('trade_name'),
-    supabase
-      .from('pharmacies')
-      .select('id, trade_name, status')
-      .eq('status', 'ACTIVE')
-      .order('trade_name'),
-  ])
+  const [{ data: clinicsRaw }, { data: pharmaciesRaw }, { data: consultantsRaw }] =
+    await Promise.all([
+      supabase
+        .from('clinics')
+        .select('id, trade_name, status')
+        .eq('status', 'ACTIVE')
+        .order('trade_name'),
+      supabase
+        .from('pharmacies')
+        .select('id, trade_name, status')
+        .eq('status', 'ACTIVE')
+        .order('trade_name'),
+      supabase
+        .from('sales_consultants')
+        .select('id, full_name, commission_rate, status')
+        .eq('status', 'ACTIVE')
+        .order('full_name'),
+    ])
 
   const clinics = (clinicsRaw ?? []) as unknown as Clinic[]
   const pharmacies = (pharmaciesRaw ?? []) as unknown as Pharmacy[]
+  const consultants = (consultantsRaw ?? []) as unknown as SalesConsultant[]
 
   return (
     <div className="space-y-6">
@@ -40,7 +47,12 @@ export default async function NewUserPage() {
         </p>
       </div>
       <div className="rounded-lg border bg-white p-6">
-        <UserForm clinics={clinics} pharmacies={pharmacies} isSuperAdmin={isSuperAdmin} />
+        <UserForm
+          clinics={clinics}
+          pharmacies={pharmacies}
+          consultants={consultants}
+          isSuperAdmin={isSuperAdmin}
+        />
       </div>
     </div>
   )

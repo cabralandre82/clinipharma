@@ -18,6 +18,10 @@ export function isSuperAdmin(user: ProfileWithRoles): boolean {
   return hasRole(user, 'SUPER_ADMIN')
 }
 
+export function isSalesConsultant(user: ProfileWithRoles): boolean {
+  return hasRole(user, 'SALES_CONSULTANT')
+}
+
 /**
  * Server-side guard. Throws error if user doesn't have required role.
  * Use in Server Actions and Route Handlers.
