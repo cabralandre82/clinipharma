@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ButtonLink } from '@/components/ui/button-link'
 import { PharmacyOrderActions } from '@/components/orders/pharmacy-order-actions'
+import { DocumentManager } from '@/components/orders/document-manager'
 import {
   ChevronLeft,
   Building2,
@@ -237,32 +238,11 @@ export function OrderDetail({ order, currentUser }: OrderDetailProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {documents.length === 0 ? (
-                <div className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-700">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                  <p>Nenhum documento anexado. O pedido não avançará sem documentação.</p>
-                </div>
-              ) : (
-                <ul className="space-y-2">
-                  {documents.map((doc) => (
-                    <li
-                      key={doc.id}
-                      className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5"
-                    >
-                      <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm text-gray-800">{doc.original_filename}</p>
-                        <p className="text-xs text-gray-400">
-                          {(doc.file_size / 1024).toFixed(0)} KB · {formatDate(doc.created_at)}
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        {doc.document_type}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <DocumentManager
+                orderId={String(order.id)}
+                documents={documents}
+                canUpload={!['COMPLETED', 'CANCELED'].includes(String(order.order_status))}
+              />
             </CardContent>
           </Card>
 
