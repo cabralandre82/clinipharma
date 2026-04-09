@@ -3,6 +3,7 @@ import { requireRolePage } from '@/lib/rbac'
 import { formatCurrency, formatDateTime, parsePage, paginationRange } from '@/lib/utils'
 import { ConsultantTransferDialog } from '@/components/consultants/consultant-transfer-dialog'
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper'
+import { ExportButton } from '@/components/shared/export-button'
 import type { SalesConsultant, ConsultantCommission } from '@/types'
 
 export const metadata = { title: 'Repasses a Consultores — Clinipharma' }
@@ -81,11 +82,14 @@ export default async function ConsultantTransfersPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Repasses a Consultores</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Registre pagamentos de comissões aos consultores de vendas
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Repasses a Consultores</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Registre pagamentos de comissões aos consultores de vendas
+          </p>
+        </div>
+        <ExportButton type="commissions" label="Exportar comissões" />
       </div>
 
       {/* A pagar */}

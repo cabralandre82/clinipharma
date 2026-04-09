@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/session'
 import { OrdersTable, type OrderRow } from '@/components/orders/orders-table'
 import { ButtonLink } from '@/components/ui/button-link'
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper'
+import { ExportButton } from '@/components/shared/export-button'
 import { parsePage, paginationRange } from '@/lib/utils'
 import { Plus } from 'lucide-react'
 
@@ -43,12 +44,15 @@ export default async function OrdersPage({ searchParams }: Props) {
           <h1 className="text-2xl font-bold text-gray-900">Pedidos</h1>
           <p className="mt-0.5 text-sm text-gray-500">{count ?? 0} pedido(s) no total</p>
         </div>
-        {!isAdmin && (
-          <ButtonLink href="/catalog">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo pedido
-          </ButtonLink>
-        )}
+        <div className="flex items-center gap-2">
+          {isAdmin && <ExportButton type="orders" />}
+          {!isAdmin && (
+            <ButtonLink href="/catalog">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo pedido
+            </ButtonLink>
+          )}
+        </div>
       </div>
 
       <OrdersTable orders={(orders ?? []) as unknown as OrderRow[]} isAdmin={!!isAdmin} />

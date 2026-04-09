@@ -4,6 +4,7 @@ import { requireRolePage } from '@/lib/rbac'
 import { formatCurrency, formatDate, parsePage, paginationRange } from '@/lib/utils'
 import { PaymentConfirmDialog } from '@/components/shared/payment-confirm-dialog'
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper'
+import { ExportButton } from '@/components/shared/export-button'
 import {
   Table,
   TableBody,
@@ -58,9 +59,12 @@ export default async function PaymentsPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Pagamentos</h1>
-        <p className="mt-0.5 text-sm text-gray-500">{count ?? 0} pagamento(s) no total</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Pagamentos</h1>
+          <p className="mt-0.5 text-sm text-gray-500">{count ?? 0} pagamento(s) no total</p>
+        </div>
+        <ExportButton type="payments" />
       </div>
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
