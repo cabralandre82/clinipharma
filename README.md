@@ -21,12 +21,12 @@ Não existe paciente final no fluxo. Tudo é B2B. A entrega é sempre para a cl�
 
 ## Infraestrutura de Produção
 
-| Serviço  | URL / Referência                                      |
-| -------- | ----------------------------------------------------- |
-| Frontend | https://clinipharma.com.br (DNS em configuração)      |
-| Vercel   | https://clinipharma-three.vercel.app                  |
-| Supabase | https://app.supabase.com/project/jomdntqlgrupvhrqoyai |
-| GitHub   | https://github.com/cabralandre82/MedAxis              |
+| Serviço  | URL / Referência                                                    |
+| -------- | ------------------------------------------------------------------- |
+| Frontend | https://clinipharma.com.br (DNS propagando)                         |
+| Vercel   | https://clinipharma-5x0yoajyw-cabralandre-3009s-projects.vercel.app |
+| Supabase | https://app.supabase.com/project/jomdntqlgrupvhrqoyai               |
+| GitHub   | https://github.com/cabralandre82/clinipharma                        |
 
 ---
 
