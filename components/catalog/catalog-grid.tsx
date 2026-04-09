@@ -1,8 +1,13 @@
+'use client'
+
 import Image from 'next/image'
+import { useState } from 'react'
 import { formatCurrency } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { ButtonLink } from '@/components/ui/button-link'
-import { Clock, Package, Star } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Clock, Package, Star, Bell } from 'lucide-react'
+import { InterestModal } from './interest-modal'
 
 export interface ProductCard {
   id: string
@@ -14,6 +19,7 @@ export interface ProductCard {
   price_current: number
   estimated_deadline_days: number
   featured: boolean
+  status: 'active' | 'unavailable' | 'inactive'
   product_categories: { id: string; name: string; slug: string } | null
   pharmacies: { id: string; trade_name: string } | null
   product_images: {
@@ -49,83 +55,125 @@ export function CatalogGrid({ products }: CatalogGridProps) {
 }
 
 function ProductCard({ product }: { product: ProductCard }) {
+  const [interestOpen, setInterestOpen] = useState(false)
+  const unavailable = product.status === 'unavailable'
+
   const primaryImage = product.product_images
     ?.sort((a, b) => a.sort_order - b.sort_order)
     .find((img) => img.public_url)
 
   return (
-    <div className="group flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white transition-all hover:border-gray-300 hover:shadow-lg">
-      {/* Image */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-gray-50">
-        {primaryImage?.public_url ? (
-          <Image
-            src={primaryImage.public_url}
-            alt={primaryImage.alt_text ?? product.name}
-            fill
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Package className="h-14 w-14 text-gray-300" />
-          </div>
-        )}
-        {product.featured && (
-          <div className="absolute top-2 left-2">
-            <Badge className="gap-1 border-0 bg-amber-500 text-xs text-white">
-              <Star className="h-3 w-3 fill-current" />
-              Destaque
-            </Badge>
-          </div>
-        )}
-        {product.product_categories && (
-          <div className="absolute top-2 right-2">
-            <Badge variant="secondary" className="text-xs">
-              {product.product_categories.name}
-            </Badge>
-          </div>
-        )}
-      </div>
+    <>
+      <div
+        className={`group flex flex-col overflow-hidden rounded-xl border bg-white transition-all ${
+          unavailable
+            ? 'border-gray-200 opacity-80'
+            : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
+        }`}
+      >
+        {/* Image */}
+        <div className="relative aspect-[4/3] overflow-hidden bg-gray-50">
+          {primaryImage?.public_url ? (
+            <Image
+              src={primaryImage.public_url}
+              alt={primaryImage.alt_text ?? product.name}
+              fill
+              className={`object-cover transition-transform duration-300 ${unavailable ? 'grayscale' : 'group-hover:scale-105'}`}
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <Package className={`h-14 w-14 ${unavailable ? 'text-gray-200' : 'text-gray-300'}`} />
+            </div>
+          )}
 
-      {/* Content */}
-      <div className="flex flex-1 flex-col p-4">
-        <div className="flex-1">
-          <h3 className="mb-1 line-clamp-2 text-sm leading-tight font-semibold text-gray-900">
-            {product.name}
-          </h3>
-          <div className="mt-2 mb-2 flex flex-wrap gap-1.5">
-            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-              {product.concentration}
-            </span>
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-              {product.presentation}
-            </span>
-          </div>
-          <p className="mb-3 line-clamp-2 text-xs text-gray-500">{product.short_description}</p>
-        </div>
+          {unavailable && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/30">
+              <span className="rounded-full bg-gray-800/80 px-3 py-1 text-xs font-semibold text-white">
+                Indisponível
+              </span>
+            </div>
+          )}
 
-        {/* Price and deadline */}
-        <div className="space-y-2 border-t border-gray-100 pt-3">
-          <div className="flex items-baseline justify-between">
-            <span className="text-xl font-bold text-[hsl(213,75%,24%)]">
-              {formatCurrency(product.price_current)}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            <Clock className="h-3.5 w-3.5" />
-            <span>Prazo: {product.estimated_deadline_days} dias úteis</span>
-          </div>
-
-          {product.pharmacies && (
-            <p className="truncate text-xs text-gray-400">por {product.pharmacies.trade_name}</p>
+          {product.featured && !unavailable && (
+            <div className="absolute top-2 left-2">
+              <Badge className="gap-1 border-0 bg-amber-500 text-xs text-white">
+                <Star className="h-3 w-3 fill-current" />
+                Destaque
+              </Badge>
+            </div>
+          )}
+          {product.product_categories && (
+            <div className="absolute top-2 right-2">
+              <Badge variant="secondary" className="text-xs">
+                {product.product_categories.name}
+              </Badge>
+            </div>
           )}
         </div>
 
-        <ButtonLink href={`/catalog/${product.slug}`} className="mt-3 w-full" size="sm">
-          Ver detalhes
-        </ButtonLink>
+        {/* Content */}
+        <div className="flex flex-1 flex-col p-4">
+          <div className="flex-1">
+            <h3 className="mb-1 line-clamp-2 text-sm leading-tight font-semibold text-gray-900">
+              {product.name}
+            </h3>
+            <div className="mt-2 mb-2 flex flex-wrap gap-1.5">
+              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+                {product.concentration}
+              </span>
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                {product.presentation}
+              </span>
+            </div>
+            <p className="mb-3 line-clamp-2 text-xs text-gray-500">{product.short_description}</p>
+          </div>
+
+          <div className="space-y-2 border-t border-gray-100 pt-3">
+            {!unavailable && (
+              <div className="flex items-baseline justify-between">
+                <span className="text-xl font-bold text-[hsl(213,75%,24%)]">
+                  {formatCurrency(product.price_current)}
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center gap-1 text-xs text-gray-500">
+              <Clock className="h-3.5 w-3.5" />
+              <span>Prazo: {product.estimated_deadline_days} dias úteis</span>
+            </div>
+
+            {product.pharmacies && (
+              <p className="truncate text-xs text-gray-400">por {product.pharmacies.trade_name}</p>
+            )}
+          </div>
+
+          {unavailable ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 w-full gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+              onClick={() => setInterestOpen(true)}
+            >
+              <Bell className="h-3.5 w-3.5" />
+              Tenho interesse
+            </Button>
+          ) : (
+            <ButtonLink href={`/catalog/${product.slug}`} className="mt-3 w-full" size="sm">
+              Ver detalhes
+            </ButtonLink>
+          )}
+        </div>
       </div>
-    </div>
+
+      {unavailable && (
+        <InterestModal
+          open={interestOpen}
+          onClose={() => setInterestOpen(false)}
+          productId={product.id}
+          productName={product.name}
+        />
+      )}
+    </>
   )
 }

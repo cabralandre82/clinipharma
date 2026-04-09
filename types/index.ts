@@ -205,6 +205,7 @@ export interface Product {
   currency: string
   estimated_deadline_days: number
   active: boolean
+  status: 'active' | 'unavailable' | 'inactive'
   featured: boolean
   created_at: string
   updated_at: string
@@ -224,6 +225,17 @@ export interface ProductImage {
   alt_text?: string | null
   sort_order: number
   created_at: string
+}
+
+export interface ProductInterest {
+  id: string
+  product_id: string
+  user_id: string
+  name: string
+  whatsapp: string
+  created_at: string
+  product?: { name: string; sku: string }
+  user?: { email: string }
 }
 
 export interface ProductPriceHistory {

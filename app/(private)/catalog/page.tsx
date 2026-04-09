@@ -54,13 +54,13 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     .select(
       `id, name, slug, concentration, presentation,
        short_description, price_current, estimated_deadline_days,
-       active, featured,
+       active, status, featured,
        product_categories (id, name, slug),
        pharmacies (id, trade_name),
        product_images (id, public_url, alt_text, sort_order)`,
       { count: 'exact' }
     )
-    .eq('active', true)
+    .in('status', ['active', 'unavailable'])
 
   if (categoryId) query = query.eq('category_id', categoryId)
   if (params.pharmacy) query = query.eq('pharmacy_id', params.pharmacy)

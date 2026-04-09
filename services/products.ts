@@ -24,7 +24,8 @@ export async function createProduct(
       .insert({
         ...parsed.data,
         slug,
-        active: parsed.data.active ?? true,
+        active: parsed.data.status !== 'inactive',
+        status: parsed.data.status ?? 'active',
         featured: parsed.data.featured ?? false,
       })
       .select('id')
@@ -65,6 +66,7 @@ export async function updateProduct(
 
     const updateData: Record<string, unknown> = { ...data, updated_at: new Date().toISOString() }
     delete updateData['price_current']
+    if (data.status) updateData['active'] = data.status !== 'inactive'
 
     const { error } = await adminClient.from('products').update(updateData).eq('id', id)
 

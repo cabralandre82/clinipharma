@@ -58,10 +58,12 @@ export function ProductForm({ product, categories, pharmacies, consultantRate }:
           pharmacy_cost: product.pharmacy_cost,
           estimated_deadline_days: product.estimated_deadline_days,
           active: product.active,
+          status: (product.status as 'active' | 'unavailable' | 'inactive') ?? 'active',
           featured: product.featured,
         }
       : {
           active: true,
+          status: 'active' as const,
           featured: false,
           pharmacy_cost: 0,
           characteristics_json: {},
@@ -389,16 +391,26 @@ export function ProductForm({ product, categories, pharmacies, consultantRate }:
         <h3 className="mb-4 text-sm font-semibold tracking-wider text-gray-700 uppercase">
           Visibilidade
         </h3>
-        <div className="flex gap-8">
-          <div className="flex items-center gap-3">
-            <Switch
-              id="active"
-              defaultChecked={product?.active ?? true}
-              onCheckedChange={(v) => setValue('active', v)}
-            />
-            <Label htmlFor="active">Produto ativo no catálogo</Label>
+        <div className="flex flex-wrap items-end gap-6">
+          <div className="space-y-1.5">
+            <Label>Status no catálogo</Label>
+            <Select
+              defaultValue={product?.status ?? 'active'}
+              onValueChange={(v) => setValue('status', v as 'active' | 'unavailable' | 'inactive')}
+            >
+              <SelectTrigger className="w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">✅ Ativo — disponível para pedido</SelectItem>
+                <SelectItem value="unavailable">
+                  ⚠️ Indisponível — exibe botão de interesse
+                </SelectItem>
+                <SelectItem value="inactive">🚫 Inativo — oculto do catálogo</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 pb-1">
             <Switch
               id="featured"
               defaultChecked={product?.featured ?? false}

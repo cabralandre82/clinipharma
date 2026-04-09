@@ -105,10 +105,17 @@ export const productSchema = z.object({
   pharmacy_cost: z.number().min(0, 'Repasse à farmácia deve ser ≥ 0'),
   estimated_deadline_days: z.number().int().positive('Prazo deve ser positivo'),
   active: z.boolean().optional(),
+  status: z.enum(['active', 'unavailable', 'inactive']).optional(),
   featured: z.boolean().optional(),
 })
 
 export type ProductFormData = z.infer<typeof productSchema>
+
+export const productInterestSchema = z.object({
+  product_id: z.string().uuid(),
+  name: z.string().min(2, 'Nome é obrigatório'),
+  whatsapp: z.string().min(8, 'WhatsApp inválido'),
+})
 
 export const priceUpdateSchema = z.object({
   new_price: z.number().positive('Novo preço deve ser positivo'),

@@ -7,6 +7,7 @@ export type NotificationType =
   | 'TRANSFER_REGISTERED'
   | 'CONSULTANT_TRANSFER'
   | 'DOCUMENT_UPLOADED'
+  | 'PRODUCT_INTEREST'
   | 'GENERIC'
 
 interface CreateNotificationInput {
