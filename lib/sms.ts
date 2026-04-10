@@ -8,6 +8,8 @@ function getTwilioClient() {
 }
 
 export async function sendSms(to: string, body: string): Promise<void> {
+  if (!to?.trim()) return
+
   const from = process.env.TWILIO_PHONE_NUMBER
   if (!from) {
     console.warn('[sms] TWILIO_PHONE_NUMBER not configured')
@@ -15,7 +17,12 @@ export async function sendSms(to: string, body: string): Promise<void> {
   }
 
   // Normalize BR phone: ensure +55 prefix
-  const normalizedTo = to.startsWith('+') ? to : `+55${to.replace(/\D/g, '')}`
+  const digits = to.replace(/\D/g, '')
+  if (digits.length < 10) {
+    console.warn('[sms] Invalid phone number, skipping:', to)
+    return
+  }
+  const normalizedTo = to.startsWith('+') ? to : `+55${digits}`
 
   try {
     const client = getTwilioClient()

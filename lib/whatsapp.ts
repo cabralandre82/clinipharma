@@ -42,6 +42,12 @@ function normalizePhone(phone: string): string {
 }
 
 export async function sendWhatsApp(phone: string, text: string): Promise<void> {
+  if (!phone?.trim()) return
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length < 10) {
+    console.warn('[whatsapp] Invalid phone number, skipping:', phone)
+    return
+  }
   await evolutionFetch(`/message/sendText/${INSTANCE}`, {
     number: normalizePhone(phone),
     text,

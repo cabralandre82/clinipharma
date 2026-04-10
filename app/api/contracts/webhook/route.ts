@@ -4,9 +4,20 @@ import { createNotification, createNotificationForRole } from '@/lib/notificatio
 
 /**
  * Clicksign webhook handler.
- * Configure in Clicksign sandbox: POST https://clinipharma.com.br/api/contracts/webhook
+ * Configure in Clicksign: POST https://clinipharma.com.br/api/contracts/webhook
+ * Set CLICKSIGN_WEBHOOK_SECRET env var and pass it as X-Clicksign-Secret header in Clicksign settings.
  */
 export async function POST(req: NextRequest) {
+  // Verify shared secret to prevent forged webhook events
+  const secret = process.env.CLICKSIGN_WEBHOOK_SECRET
+  if (secret) {
+    const receivedSecret =
+      req.headers.get('x-clicksign-secret') ?? req.nextUrl.searchParams.get('secret')
+    if (receivedSecret !== secret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  }
+
   const body = await req.json()
   const eventType: string = body.event?.name ?? ''
   const documentKey: string = body.document?.key ?? ''

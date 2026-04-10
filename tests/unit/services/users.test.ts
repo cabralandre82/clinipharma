@@ -249,27 +249,26 @@ describe('createUser', () => {
 })
 
 describe('assignUserRole', () => {
-  it('replaces existing roles and assigns new one', async () => {
-    const deleteMock = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
-    const insertMock = vi.fn().mockResolvedValue({ error: null })
+  it('upserts new role for user', async () => {
+    const upsertMock = vi.fn().mockResolvedValue({ error: null })
     vi.mocked(adminModule.createAdminClient).mockReturnValue({
       from: vi.fn().mockReturnValue({
-        delete: deleteMock,
-        insert: insertMock,
+        upsert: upsertMock,
       }),
     } as unknown as ReturnType<typeof adminModule.createAdminClient>)
 
     const result = await assignUserRole('user-1', 'PLATFORM_ADMIN')
     expect(result.error).toBeUndefined()
-    expect(deleteMock).toHaveBeenCalled()
-    expect(insertMock).toHaveBeenCalledWith({ user_id: 'user-1', role: 'PLATFORM_ADMIN' })
+    expect(upsertMock).toHaveBeenCalledWith(
+      { user_id: 'user-1', role: 'PLATFORM_ADMIN' },
+      { onConflict: 'user_id' }
+    )
   })
 
-  it('returns error when insert fails', async () => {
+  it('returns error when upsert fails', async () => {
     vi.mocked(adminModule.createAdminClient).mockReturnValue({
       from: vi.fn().mockReturnValue({
-        delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-        insert: vi.fn().mockResolvedValue({ error: { message: 'dup' } }),
+        upsert: vi.fn().mockResolvedValue({ error: { message: 'constraint' } }),
       }),
     } as unknown as ReturnType<typeof adminModule.createAdminClient>)
 

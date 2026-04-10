@@ -212,33 +212,33 @@ describe('registerConsultantTransfer', () => {
     expect(result.error).toBe('Nenhuma comissão selecionada')
   })
 
-  it('returns error when no commissions found or already paid', async () => {
-    const qb = makeQueryBuilder(null, null)
-    qb.in = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: null, error: { message: 'not found' } }),
-      }),
-    })
+  it('returns error when atomic claim finds no commissions (already paid or error)', async () => {
+    // The atomic UPDATE ... .select() chain returns error
+    const selectMock = vi.fn().mockResolvedValue({ data: null, error: { message: 'not found' } })
+    const eqMock2 = vi.fn().mockReturnValue({ select: selectMock })
+    const eqMock1 = vi.fn().mockReturnValue({ eq: eqMock2 })
+    const inMock = vi.fn().mockReturnValue({ eq: eqMock1 })
+    const updateMock = vi.fn().mockReturnValue({ in: inMock })
     vi.mocked(adminModule.createAdminClient).mockReturnValue({
-      from: vi.fn().mockReturnValue(qb),
+      from: vi.fn().mockReturnValue({ update: updateMock }),
     } as unknown as ReturnType<typeof adminModule.createAdminClient>)
 
     const result = await registerConsultantTransfer('cons-1', ['comm-1'], 'REF-001')
-    expect(result.error).toBe('Comissões não encontradas ou já pagas')
+    expect(result.error).toBe('Comissões não encontradas ou já estão sendo processadas')
   })
 
-  it('returns error when empty array returned', async () => {
-    const qb = makeQueryBuilder([], null)
-    qb.in = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-      }),
-    })
+  it('returns error when atomic claim returns empty array (all already claimed)', async () => {
+    // The atomic UPDATE ... .select() returns empty array
+    const selectMock = vi.fn().mockResolvedValue({ data: [], error: null })
+    const eqMock2 = vi.fn().mockReturnValue({ select: selectMock })
+    const eqMock1 = vi.fn().mockReturnValue({ eq: eqMock2 })
+    const inMock = vi.fn().mockReturnValue({ eq: eqMock1 })
+    const updateMock = vi.fn().mockReturnValue({ in: inMock })
     vi.mocked(adminModule.createAdminClient).mockReturnValue({
-      from: vi.fn().mockReturnValue(qb),
+      from: vi.fn().mockReturnValue({ update: updateMock }),
     } as unknown as ReturnType<typeof adminModule.createAdminClient>)
 
     const result = await registerConsultantTransfer('cons-1', ['comm-1'], 'REF-001')
-    expect(result.error).toBe('Comissões não encontradas ou já pagas')
+    expect(result.error).toBe('Comissões não encontradas ou já estão sendo processadas')
   })
 })

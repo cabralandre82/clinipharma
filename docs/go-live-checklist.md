@@ -4,7 +4,7 @@
 
 ## Infraestrutura
 
-- [x] Migrations aplicadas no Supabase de produção (`jomdntqlgrupvhrqoyai`) — inclui migrations 013–016 (fcm_tokens, asaas_fields, contracts, templates, sla_configs, tracking, sessions, UNIQUE payments, índices, precisão financeira numeric(15,2), soft-delete, RLS, 8 novos índices de performance)
+- [x] Migrations aplicadas no Supabase de produção (`jomdntqlgrupvhrqoyai`) — inclui migrations 013–020 (fcm_tokens, asaas_fields, contracts, templates, sla_configs, tracking, sessions, UNIQUE payments, índices, precisão financeira numeric(15,2), soft-delete, RLS, 8 índices de performance, constraints financeiras, status PROCESSING para comissões)
 - [x] RLS habilitada em todas as tabelas
 - [x] Buckets de Storage criados (`product-images` público, `order-documents` privado)
 - [x] Seed de categorias e produtos rodado
@@ -50,6 +50,7 @@
 - [x] `EVOLUTION_INSTANCE_NAME` = `clinipharma`
 - [x] `CLICKSIGN_ACCESS_TOKEN` (sandbox)
 - [x] `CLICKSIGN_API_URL` = `https://sandbox.clicksign.com/api/v1`
+- [ ] `CLICKSIGN_WEBHOOK_SECRET` — **ação necessária antes do go-live:** gere um segredo aleatório (ex: `openssl rand -hex 32`), configure no Vercel e registre como header `X-Clicksign-Secret` nas configurações de webhook do Clicksign
 - [x] `NUVEM_FISCAL_CLIENT_ID` = `PENDING_CNPJ`
 - [x] `NUVEM_FISCAL_CLIENT_SECRET` = `PENDING_CNPJ`
 - [x] `NUVEM_FISCAL_CNPJ` = `PENDING_CNPJ`

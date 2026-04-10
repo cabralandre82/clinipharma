@@ -2,6 +2,37 @@
 
 ---
 
+## [2.3.0] — 2026-04-08 — Auditoria 5: Services, Webhooks, Constraints
+
+### Security — Critical
+
+- **`createUser` — PHARMACY_ADMIN não vinculado a `pharmacy_members`:** Farmacêuticos criados via painel admin nunca eram inseridos na tabela `pharmacy_members`. Resultado: RLS bloqueava todos os pedidos para esse usuário, e o fix da Auditoria 3 (`updateOrderStatus`) também os bloqueava. Adicionado `from('pharmacy_members').insert(...)` no path `PHARMACY_ADMIN` de `services/users.ts`.
+- **Webhook Clicksign sem verificação de assinatura:** `POST /api/contracts/webhook` aceitava qualquer payload sem validação. Qualquer pessoa com a URL podia forjar eventos de contrato assinado. Adicionada verificação de `X-Clicksign-Secret` header contra `CLICKSIGN_WEBHOOK_SECRET` env var (retorna 401 se inválido).
+
+### Security — High
+
+- **`registerConsultantTransfer` — race condition / double-payment:** Duas requisições simultâneas com os mesmos `commissionIds` podiam criar dois repasses. Implementado guarda atômico: `UPDATE consultant_commissions SET status='PROCESSING' WHERE status='PENDING'` antes de criar o repasse. Com rollback para `PENDING` se a criação do repasse falhar.
+- **`assignUserRole` — operação não atômica:** Delete + Insert separados deixavam janela onde o usuário ficava sem papel. Substituído por `upsert({ user_id, role }, { onConflict: 'user_id' })`.
+
+### Bug Fixes
+
+- **`updatePharmacyStatus` + `updateDoctorStatus` — audit log incompleto:** Ambas as funções não buscavam o status antigo antes de atualizar, resultando em audit logs sem `oldValues`. Adicionado `select('status')` antes do `update` em ambas.
+- **SMS (`lib/sms.ts`) — guard contra phone vazio:** `sendSms('')` chamava Twilio com número inválido (`+55`). Adicionado early return se `phone.trim()` for vazio ou tiver menos de 10 dígitos.
+- **WhatsApp (`lib/whatsapp.ts`) — guard contra phone vazio:** Mesmo problema. Adicionado early return com log de aviso.
+
+### Database — Migrations (019, 020)
+
+- **Migration 019 — Constraints financeiras:** `pharmacy_cost <= price_current` em `products`; `price_current > 0` em `products`; `gross_amount > 0` em `payments`, `consultant_transfers`, `transfers`; `commission_amount >= 0` em `consultant_commissions`; `quantity > 0` e `unit_price >= 0` em `order_items`.
+- **Migration 020 — Status `PROCESSING`:** Expandido o CHECK de `consultant_commissions.status` para incluir `'PROCESSING'` (necessário para o guarda atômico de double-payment) e `'CANCELLED'`.
+
+### Tests
+
+- **26 novos testes** em `tests/unit/audit5-fixes.test.ts` cobrindo: phone guards (SMS/WhatsApp), constraint logic simulado, verificação do source das correções aplicadas.
+- **Testes existentes atualizados:** `assignUserRole` agora testa `upsert`; `registerConsultantTransfer` testa o novo guarda atômico com mensagem de erro correta.
+- **Total: 510 testes passando** (26 novos).
+
+---
+
 ## [2.2.0] — 2026-04-08 — Auditoria 4: RLS e Pages
 
 ### Database — RLS (migration 018)

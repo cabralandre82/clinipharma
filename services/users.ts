@@ -147,10 +147,11 @@ export async function createUser(
     }
 
     if (parsed.data.role === 'PHARMACY_ADMIN' && parsed.data.pharmacy_id) {
-      await adminClient
-        .from('pharmacies')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', parsed.data.pharmacy_id)
+      // Insert into pharmacy_members so RLS policies and auth checks work correctly
+      await adminClient.from('pharmacy_members').insert({
+        user_id: userId,
+        pharmacy_id: parsed.data.pharmacy_id,
+      })
       await adminClient.auth.admin.updateUserById(userId, {
         user_metadata: {
           full_name: parsed.data.full_name,
@@ -234,11 +235,10 @@ export async function assignUserRole(userId: string, role: UserRole): Promise<{ 
     const actor = await requireRole(['SUPER_ADMIN'])
     const adminClient = createAdminClient()
 
-    // Remove existing roles
-    await adminClient.from('user_roles').delete().eq('user_id', userId)
-
-    // Insert new role
-    const { error } = await adminClient.from('user_roles').insert({ user_id: userId, role })
+    // Upsert is safer than delete+insert — no window where user has no role
+    const { error } = await adminClient
+      .from('user_roles')
+      .upsert({ user_id: userId, role }, { onConflict: 'user_id' })
     if (error) return { error: 'Erro ao atribuir papel' }
 
     await createAuditLog({

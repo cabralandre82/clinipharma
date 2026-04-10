@@ -81,10 +81,18 @@ export async function updateDoctorStatus(
     const user = await requireRole(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
     const adminClient = createAdminClient()
 
-    await adminClient
+    const { data: existing } = await adminClient
+      .from('doctors')
+      .select('status')
+      .eq('id', id)
+      .single()
+
+    const { error } = await adminClient
       .from('doctors')
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', id)
+
+    if (error) return { error: 'Erro ao atualizar status' }
 
     await createAuditLog({
       actorUserId: user.id,
@@ -92,6 +100,7 @@ export async function updateDoctorStatus(
       entityType: AuditEntity.DOCTOR,
       entityId: id,
       action: AuditAction.STATUS_CHANGE,
+      oldValues: { status: existing?.status },
       newValues: { status },
     })
 

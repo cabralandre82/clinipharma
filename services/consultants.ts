@@ -198,16 +198,20 @@ export async function registerConsultantTransfer(
 
     const adminClient = createAdminClient()
 
-    // Sum pending commissions
-    const { data: commissions, error: fetchErr } = await adminClient
+    // Atomic claim: mark commissions as PROCESSING only if still PENDING
+    // This prevents double-payment in concurrent requests
+    const { data: claimed, error: claimErr } = await adminClient
       .from('consultant_commissions')
-      .select('id, commission_amount')
+      .update({ status: 'PROCESSING', updated_at: new Date().toISOString() })
       .in('id', commissionIds)
       .eq('consultant_id', consultantId)
       .eq('status', 'PENDING')
+      .select('id, commission_amount')
 
-    if (fetchErr || !commissions?.length) return { error: 'Comissões não encontradas ou já pagas' }
+    if (claimErr || !claimed?.length)
+      return { error: 'Comissões não encontradas ou já estão sendo processadas' }
 
+    const commissions = claimed
     const grossAmount = commissions.reduce((sum, c) => sum + Number(c.commission_amount), 0)
 
     // Create transfer
@@ -226,7 +230,14 @@ export async function registerConsultantTransfer(
       .select('id')
       .single()
 
-    if (transferErr || !transfer) return { error: 'Erro ao registrar repasse' }
+    if (transferErr || !transfer) {
+      // Rollback: revert commissions back to PENDING so they can be retried
+      await adminClient
+        .from('consultant_commissions')
+        .update({ status: 'PENDING', updated_at: new Date().toISOString() })
+        .in('id', commissionIds)
+      return { error: 'Erro ao registrar repasse' }
+    }
 
     // Mark commissions as PAID and link to transfer
     await adminClient
