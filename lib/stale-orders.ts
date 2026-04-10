@@ -14,6 +14,7 @@ const FALLBACK_THRESHOLDS: Record<string, number> = {
   IN_EXECUTION: 5,
   READY: 3,
   SHIPPED: 5,
+  WITH_ISSUE: 1, // critical: must be resolved within 1 day
 }
 
 export const STALE_THRESHOLDS = FALLBACK_THRESHOLDS

@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    return buildResponse(rows, format, `pedidos${periodSuffix || '-' + now}`)
+    return await buildResponse(rows, format, `pedidos${periodSuffix || '-' + now}`)
   }
 
   if (type === 'payments') {
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    return buildResponse(rows, format, `pagamentos${periodSuffix || '-' + now}`)
+    return await buildResponse(rows, format, `pagamentos${periodSuffix || '-' + now}`)
   }
 
   if (type === 'commissions') {
@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
       Data: c.created_at?.slice(0, 16).replace('T', ' '),
     }))
 
-    return buildResponse(rows, format, `comissoes${periodSuffix || '-' + now}`)
+    return await buildResponse(rows, format, `comissoes${periodSuffix || '-' + now}`)
   }
 
   if (type === 'transfers') {
@@ -147,15 +147,15 @@ export async function GET(req: NextRequest) {
       Criado: t.created_at?.slice(0, 16).replace('T', ' '),
     }))
 
-    return buildResponse(rows, format, `repasses${periodSuffix || '-' + now}`)
+    return await buildResponse(rows, format, `repasses${periodSuffix || '-' + now}`)
   }
 
   return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
 }
 
-function buildResponse(rows: Record<string, unknown>[], format: string, filename: string) {
+async function buildResponse(rows: Record<string, unknown>[], format: string, filename: string) {
   if (format === 'xlsx') {
-    const uint8 = toXLSX([{ name: filename, rows }])
+    const uint8 = await toXLSX([{ name: filename, rows }])
     return new NextResponse(uint8.buffer as ArrayBuffer, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

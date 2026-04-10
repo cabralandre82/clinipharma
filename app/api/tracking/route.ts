@@ -7,16 +7,20 @@ const STATUS_LABELS: Record<string, string> = {
   AWAITING_DOCUMENTS: 'Aguardando Documentos',
   AWAITING_PAYMENT: 'Aguardando Pagamento',
   PAYMENT_UNDER_REVIEW: 'Pagamento em Análise',
+  PAYMENT_CONFIRMED: 'Pagamento Confirmado',
   READY_FOR_REVIEW: 'Em Revisão',
   COMMISSION_CALCULATED: 'Comissão Calculada',
   TRANSFER_PENDING: 'Repasse Pendente',
+  TRANSFER_COMPLETED: 'Repasse Concluído',
   READY: 'Pedido Aprovado',
   RELEASED_FOR_EXECUTION: 'Liberado para Execução',
   RECEIVED_BY_PHARMACY: 'Recebido pela Farmácia',
   IN_EXECUTION: 'Em Manipulação',
   SHIPPED: 'Enviado',
   DELIVERED: 'Entregue',
-  CANCELLED: 'Cancelado',
+  COMPLETED: 'Concluído',
+  CANCELED: 'Cancelado',
+  WITH_ISSUE: 'Com Problema',
 }
 
 const STATUS_ORDER = [
@@ -107,7 +111,7 @@ export async function GET(req: NextRequest) {
     updatedAt: o.updated_at,
     estimatedDelivery: o.order_status === 'DELIVERED' ? null : etaDate.toISOString(),
     isDelivered: o.order_status === 'DELIVERED',
-    isCancelled: o.order_status === 'CANCELLED',
+    isCancelled: o.order_status === 'CANCELED',
     itemCount: (o.order_items ?? []).length,
     timeline,
   })

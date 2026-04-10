@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
-import { createNotification } from '@/lib/notifications'
+import { createNotification, createNotificationForRole } from '@/lib/notifications'
 
 /**
  * Clicksign webhook handler.
@@ -44,9 +44,8 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Notify admins
-    await createNotification({
-      userId: '',
+    // Notify all super admins
+    await createNotificationForRole('SUPER_ADMIN', {
       type: 'GENERIC',
       title: `Contrato ${contract.type} assinado`,
       message: `Contrato ${contract.type} (entidade ${contract.entity_id}) foi assinado digitalmente.`,

@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 
 export function toCSV(rows: Record<string, unknown>[]): string {
   if (!rows.length) return ''
@@ -14,13 +14,31 @@ export function toCSV(rows: Record<string, unknown>[]): string {
   return lines.join('\n')
 }
 
-export function toXLSX(
+export async function toXLSX(
   sheets: Array<{ name: string; rows: Record<string, unknown>[] }>
-): Uint8Array {
-  const wb = XLSX.utils.book_new()
+): Promise<Uint8Array> {
+  const wb = new ExcelJS.Workbook()
   for (const { name, rows } of sheets) {
-    const ws = XLSX.utils.json_to_sheet(rows)
-    XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31))
+    const ws = wb.addWorksheet(name.slice(0, 31))
+    if (rows.length > 0) {
+      const headers = Object.keys(rows[0])
+      ws.addRow(headers)
+      // Style header row
+      ws.getRow(1).font = { bold: true }
+      ws.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE2E8F0' },
+      }
+      for (const row of rows) {
+        ws.addRow(headers.map((h) => row[h] ?? ''))
+      }
+      // Auto-width columns
+      ws.columns.forEach((col) => {
+        col.width = 18
+      })
+    }
   }
-  return XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as Uint8Array
+  const buffer = await wb.xlsx.writeBuffer()
+  return new Uint8Array(buffer)
 }

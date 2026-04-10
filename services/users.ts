@@ -125,7 +125,7 @@ export async function createUser(
       await adminClient.from('clinic_members').insert({
         user_id: userId,
         clinic_id: parsed.data.clinic_id,
-        role: parsed.data.membership_role ?? 'ADMIN',
+        membership_role: parsed.data.membership_role ?? 'ADMIN',
       })
     }
 
@@ -306,6 +306,15 @@ export async function updateOwnProfile(
   data: { full_name: string; phone?: string }
 ): Promise<{ error?: string }> {
   try {
+    // Verify caller is updating their own profile (prevent IDOR)
+    const { createClient: createServerClient } = await import('@/lib/db/server')
+    const supabase = await createServerClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user || user.id !== userId) return { error: 'Sem permissão' }
+
     const adminClient = createAdminClient()
     const { error } = await adminClient
       .from('profiles')

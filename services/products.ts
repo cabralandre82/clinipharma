@@ -111,7 +111,8 @@ export async function updateProductPrice(
 
     await adminClient.from('product_price_history').insert({
       product_id: productId,
-      price: product.price_current,
+      old_price: product.price_current,
+      new_price: parsed.data.new_price,
       changed_by_user_id: user.id,
       reason: parsed.data.reason,
     })

@@ -107,7 +107,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           await admin.from('clinic_members').insert({
             user_id: request.user_id,
             clinic_id: clinic.id,
-            role: 'ADMIN',
+            membership_role: 'ADMIN',
           })
         }
       } else {

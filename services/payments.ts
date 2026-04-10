@@ -29,11 +29,11 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ erro
     if (fetchError || !payment) return { error: 'Pagamento não encontrado' }
     if (payment.status !== 'PENDING') return { error: 'Pagamento já processado' }
 
-    // Fetch order with items (frozen cost fields) + clinic consultant
+    // Fetch order with items (frozen cost fields) + clinic consultant + current status
     const { data: orderData } = await adminClient
       .from('orders')
       .select(
-        'id, pharmacy_id, clinic_id, total_price, clinics(consultant_id), order_items(quantity, pharmacy_cost_per_unit, platform_commission_per_unit)'
+        'id, pharmacy_id, clinic_id, total_price, order_status, clinics(consultant_id), order_items(quantity, pharmacy_cost_per_unit, platform_commission_per_unit, products(name))'
       )
       .eq('id', payment.order_id)
       .single()
@@ -130,7 +130,7 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ erro
 
     await adminClient.from('order_status_history').insert({
       order_id: payment.order_id,
-      old_status: 'AWAITING_PAYMENT',
+      old_status: orderData.order_status ?? 'AWAITING_PAYMENT',
       new_status: 'COMMISSION_CALCULATED',
       changed_by_user_id: user.id,
       reason: `Pagamento confirmado (${input.paymentMethod}${input.referenceCode ? ' · ref: ' + input.referenceCode : ''})`,
@@ -157,17 +157,33 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ erro
       .eq('id', orderData.clinic_id)
       .single()
 
-    const { data: orderProduct } = await adminClient
+    // Product names from order_items (orders.product_id was removed in migration 008)
+    const productNames =
+      (
+        (orderData.order_items ?? []) as Array<{
+          products?: { name: string } | { name: string }[] | null
+        }>
+      )
+        .map((i) => {
+          const p = i.products
+          if (!p) return null
+          if (Array.isArray(p)) return p[0]?.name ?? null
+          return (p as { name: string }).name ?? null
+        })
+        .filter(Boolean)
+        .join(', ') || '—'
+
+    const { data: orderForCode } = await adminClient
       .from('orders')
-      .select('products(name)')
+      .select('code')
       .eq('id', payment.order_id)
       .single()
 
     if (clinicData?.email) {
       const tmpl = paymentConfirmedEmail({
-        orderCode: payment.order_id,
+        orderCode: orderForCode?.code ?? payment.order_id,
         orderId: payment.order_id,
-        productName: (orderProduct?.products as { name?: string } | null)?.name ?? '—',
+        productName: productNames,
         totalPrice: formatCurrency(Number(orderData.total_price)),
         clinicName: clinicData.trade_name,
       })

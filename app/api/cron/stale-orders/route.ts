@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
        pharmacy_id,
        clinics(trade_name), pharmacies(trade_name)`
     )
-    .not('order_status', 'in', '("COMPLETED","CANCELED","DRAFT")')
+    .not('order_status', 'in', '("COMPLETED","CANCELED","DRAFT","DELIVERED")')
 
   const stale: Array<{
     id: string
@@ -96,20 +96,27 @@ export async function GET(req: NextRequest) {
     pharmacyGroups[o.pharmacy_id].push(o)
   }
 
+  // Get PHARMACY_ADMIN users with their pharmacy membership (profiles has no pharmacy_id)
   const { data: pharmacyAdmins } = await admin
     .from('user_roles')
-    .select('user_id, profiles(email, full_name, pharmacy_id)')
+    .select('user_id, profiles(email, full_name)')
     .eq('role', 'PHARMACY_ADMIN')
 
   for (const pa of pharmacyAdmins ?? []) {
-    const profile = pa.profiles as {
-      email?: string
-      full_name?: string
-      pharmacy_id?: string
-    } | null
-    if (!profile?.email || !profile?.pharmacy_id) continue
+    const profile = pa.profiles as { email?: string; full_name?: string } | null
+    if (!profile?.email) continue
 
-    const myStale = pharmacyGroups[profile.pharmacy_id] ?? []
+    // Look up which pharmacy this user belongs to
+    const { data: membership } = await admin
+      .from('pharmacy_members')
+      .select('pharmacy_id')
+      .eq('user_id', pa.user_id)
+      .limit(1)
+      .maybeSingle()
+
+    if (!membership?.pharmacy_id) continue
+
+    const myStale = pharmacyGroups[membership.pharmacy_id] ?? []
     if (myStale.length === 0) continue
 
     await createNotification({
