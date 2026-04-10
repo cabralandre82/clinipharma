@@ -50,7 +50,7 @@
 - [x] `EVOLUTION_INSTANCE_NAME` = `clinipharma`
 - [x] `CLICKSIGN_ACCESS_TOKEN` (sandbox)
 - [x] `CLICKSIGN_API_URL` = `https://sandbox.clicksign.com/api/v1`
-- [ ] `CLICKSIGN_WEBHOOK_SECRET` — **ação necessária antes do go-live:** gere um segredo aleatório (ex: `openssl rand -hex 32`), configure no Vercel e registre como header `X-Clicksign-Secret` nas configurações de webhook do Clicksign
+- [x] `CLICKSIGN_WEBHOOK_SECRET` = `caeed4d59bc4ec8313fc3c9630e3fac0feb86026bda27a46aab055c1c1f14bb9` — ✅ configurada no Vercel (Production + Preview + Development). **Ação pendente:** registrar esse valor como header `X-Clicksign-Secret` nas configurações de webhook no painel do Clicksign (Sandbox → Produção)
 - [x] `NUVEM_FISCAL_CLIENT_ID` = `PENDING_CNPJ`
 - [x] `NUVEM_FISCAL_CLIENT_SECRET` = `PENDING_CNPJ`
 - [x] `NUVEM_FISCAL_CNPJ` = `PENDING_CNPJ`
