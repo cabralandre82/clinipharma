@@ -43,6 +43,7 @@ export interface Profile {
   phone?: string | null
   avatar_url?: string | null
   is_active: boolean
+  registration_status: RegistrationStatus
   created_at: string
   updated_at: string
 }
@@ -225,6 +226,41 @@ export interface ProductImage {
   alt_text?: string | null
   sort_order: number
   created_at: string
+}
+
+export type RegistrationStatus = 'PENDING' | 'PENDING_DOCS' | 'APPROVED' | 'REJECTED'
+export type RegistrationType = 'CLINIC' | 'DOCTOR'
+
+export interface RequestedDoc {
+  type: string
+  label: string
+  custom_text?: string
+}
+
+export interface RegistrationRequest {
+  id: string
+  type: RegistrationType
+  status: RegistrationStatus
+  form_data: Record<string, unknown>
+  user_id: string | null
+  entity_id: string | null
+  admin_notes: string | null
+  requested_docs: RequestedDoc[] | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RegistrationDocument {
+  id: string
+  request_id: string
+  document_type: string
+  label: string
+  filename: string
+  storage_path: string
+  public_url: string | null
+  uploaded_at: string
 }
 
 export interface ProductInterest {

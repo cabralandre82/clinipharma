@@ -142,6 +142,13 @@ export function LoginForm() {
         </svg>
         Continuar com Google (em breve)
       </Button>
+
+      <p className="text-center text-sm text-gray-500">
+        Não tem cadastro?{' '}
+        <Link href="/registro" className="font-medium text-[hsl(196,91%,36%)] hover:underline">
+          Solicitar cadastro
+        </Link>
+      </p>
     </form>
   )
 }

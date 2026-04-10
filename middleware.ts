@@ -5,9 +5,11 @@ const PUBLIC_ROUTES = [
   '/login',
   '/forgot-password',
   '/reset-password',
+  '/registro',
   '/auth/callback',
   '/unauthorized',
   '/api/auth/forgot-password',
+  '/api/registration/submit',
 ]
 
 export async function middleware(request: NextRequest) {

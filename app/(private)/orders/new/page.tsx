@@ -15,6 +15,10 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
   const user = await getCurrentUser()
   if (!user) redirect('/login')
 
+  if (user.registration_status && user.registration_status !== 'APPROVED') {
+    redirect('/dashboard')
+  }
+
   const supabase = await createClient()
 
   const { data: productsRaw } = await supabase
@@ -37,6 +41,27 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
       .order('full_name'),
   ])
 
+  // For doctors: fetch their linked clinics to pre-select / force selection
+  let doctorClinics: Array<{ id: string; trade_name: string }> | null = null
+  if (user.roles.includes('DOCTOR')) {
+    const { data: doctorRecord } = await supabase
+      .from('doctors')
+      .select('id')
+      .eq('email', user.email)
+      .maybeSingle()
+
+    if (doctorRecord) {
+      const { data: linked } = await supabase
+        .from('doctor_clinic_links')
+        .select('clinics(id, trade_name)')
+        .eq('doctor_id', doctorRecord.id)
+
+      doctorClinics = (linked ?? [])
+        .map((l) => l.clinics as unknown as { id: string; trade_name: string })
+        .filter(Boolean)
+    }
+  }
+
   return (
     <div className="max-w-3xl">
       <div className="mb-6">
@@ -50,6 +75,7 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
         availableProducts={products}
         clinics={clinics ?? []}
         doctors={doctors ?? []}
+        doctorClinics={doctorClinics}
       />
     </div>
   )

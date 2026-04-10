@@ -6,6 +6,7 @@ import { ClinicDashboard } from '@/components/dashboard/clinic-dashboard'
 import { DoctorDashboard } from '@/components/dashboard/doctor-dashboard'
 import { PharmacyDashboard } from '@/components/dashboard/pharmacy-dashboard'
 import { ConsultantDashboard } from '@/components/dashboard/consultant-dashboard'
+import { RegistrationStatusBanner } from '@/components/dashboard/registration-status-banner'
 
 export const metadata: Metadata = {
   title: 'Dashboard',
@@ -16,21 +17,44 @@ export default async function DashboardPage() {
   if (!user) redirect('/login')
 
   const primaryRole = user.roles[0]
+  const regStatus = user.registration_status ?? 'APPROVED'
+
+  const banner =
+    regStatus !== 'APPROVED' ? (
+      <div className="mb-6">
+        <RegistrationStatusBanner status={regStatus} />
+      </div>
+    ) : null
 
   if (primaryRole === 'SUPER_ADMIN' || primaryRole === 'PLATFORM_ADMIN') {
     return <AdminDashboard user={user} />
   }
 
   if (primaryRole === 'CLINIC_ADMIN') {
-    return <ClinicDashboard user={user} />
+    return (
+      <>
+        {banner}
+        <ClinicDashboard user={user} />
+      </>
+    )
   }
 
   if (primaryRole === 'DOCTOR') {
-    return <DoctorDashboard user={user} />
+    return (
+      <>
+        {banner}
+        <DoctorDashboard user={user} />
+      </>
+    )
   }
 
   if (primaryRole === 'PHARMACY_ADMIN') {
-    return <PharmacyDashboard user={user} />
+    return (
+      <>
+        {banner}
+        <PharmacyDashboard user={user} />
+      </>
+    )
   }
 
   if (primaryRole === 'SALES_CONSULTANT') {

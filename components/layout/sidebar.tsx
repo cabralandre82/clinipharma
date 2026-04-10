@@ -105,6 +105,12 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN'],
   },
   {
+    href: '/registrations',
+    label: 'Cadastros',
+    icon: ClipboardList,
+    roles: ['SUPER_ADMIN'],
+  },
+  {
     href: '/interests',
     label: 'Interesses',
     icon: Bell,

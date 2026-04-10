@@ -5,12 +5,55 @@ import { createAdminClient } from '@/lib/db/admin'
 import { createAuditLog, AuditAction, AuditEntity } from '@/lib/audit'
 import { requireRole } from '@/lib/rbac'
 import { z } from 'zod'
+import { Resend } from 'resend'
 import type { UserRole } from '@/types'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+const APP_URL = 'https://clinipharma.com.br'
+
+async function sendAdminWelcomeEmail(email: string, fullName: string) {
+  const adminClient = createAdminClient()
+  const { data } = await adminClient.auth.admin.generateLink({
+    type: 'recovery',
+    email,
+    options: { redirectTo: `${APP_URL}/auth/callback?type=recovery` },
+  })
+  const link = data?.properties?.hashed_token
+    ? `${APP_URL}/auth/callback?token_hash=${data.properties.hashed_token}&type=recovery`
+    : `${APP_URL}/login`
+
+  await resend.emails.send({
+    from: 'Clinipharma <noreply@clinipharma.com.br>',
+    to: email,
+    subject: 'Bem-vindo(a) à Clinipharma — Defina sua senha',
+    html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#f8fafc">
+      <div style="background:#1e3a5f;border-radius:12px;padding:28px 32px;margin-bottom:24px;text-align:center">
+        <h1 style="color:#fff;font-size:22px;margin:0">Clinipharma</h1>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:32px;border:1px solid #e2e8f0">
+        <h2 style="color:#1e293b;font-size:18px;margin:0 0 12px">Olá, ${fullName}!</h2>
+        <p style="color:#475569;font-size:14px;line-height:1.6">
+          Seu acesso à Clinipharma foi criado. Clique no botão abaixo para definir sua senha e começar a usar a plataforma.
+        </p>
+        <div style="text-align:center;margin:28px 0">
+          <a href="${link}" style="background:#1e3a5f;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;display:inline-block">
+            Definir minha senha
+          </a>
+        </div>
+        <p style="color:#94a3b8;font-size:12px;text-align:center">Este link expira em 1 hora.</p>
+      </div>
+    </div>`,
+  })
+}
 
 const createUserSchema = z.object({
   full_name: z.string().min(2, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
-  password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
+  password: z
+    .string()
+    .min(8, 'Senha deve ter pelo menos 8 caracteres')
+    .optional()
+    .or(z.literal('')),
   role: z.enum([
     'SUPER_ADMIN',
     'PLATFORM_ADMIN',
@@ -44,10 +87,11 @@ export async function createUser(
 
     const adminClient = createAdminClient()
 
-    // Create user in Supabase Auth
+    // Create user in Supabase Auth (with random password — user sets own via email link)
+    const tempPassword = parsed.data.password || `Tmp${Math.random().toString(36).slice(2)}!Cp`
     const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
       email: parsed.data.email,
-      password: parsed.data.password,
+      password: tempPassword,
       email_confirm: true,
       user_metadata: { full_name: parsed.data.full_name },
     })
@@ -134,6 +178,9 @@ export async function createUser(
         full_name: parsed.data.full_name,
       },
     })
+
+    // Send welcome email with password-set link (fire and forget)
+    sendAdminWelcomeEmail(parsed.data.email, parsed.data.full_name).catch(console.error)
 
     revalidatePath('/users')
     return { id: userId }

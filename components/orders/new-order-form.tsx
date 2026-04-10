@@ -35,6 +35,7 @@ interface NewOrderFormProps {
   availableProducts: NewOrderFormProduct[]
   clinics: { id: string; trade_name: string }[]
   doctors: { id: string; full_name: string; crm: string; crm_state: string }[]
+  doctorClinics?: { id: string; trade_name: string }[] | null
 }
 
 export function NewOrderForm({
@@ -42,11 +43,15 @@ export function NewOrderForm({
   availableProducts,
   clinics,
   doctors,
+  doctorClinics,
 }: NewOrderFormProps) {
+  // If doctor has exactly one clinic, auto-select it
+  const autoClinicId = doctorClinics?.length === 1 ? doctorClinics[0].id : ''
+  const clinicOptions = doctorClinics ?? clinics
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [documents, setDocuments] = useState<File[]>([])
-  const [clinicId, setClinicId] = useState('')
+  const [clinicId, setClinicId] = useState(autoClinicId)
   const [doctorId, setDoctorId] = useState('')
   const [notes, setNotes] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -242,7 +247,7 @@ export function NewOrderForm({
               className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
             >
               <option value="">Selecione a clínica...</option>
-              {clinics.map((c) => (
+              {clinicOptions.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.trade_name}
                 </option>
