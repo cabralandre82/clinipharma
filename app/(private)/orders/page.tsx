@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import { createClient } from '@/lib/db/server'
+import { createAdminClient } from '@/lib/db/admin'
 import { getCurrentUser } from '@/lib/auth/session'
 import { OrdersTable, type OrderRow } from '@/components/orders/orders-table'
 import { ButtonLink } from '@/components/ui/button-link'
@@ -7,6 +8,7 @@ import { PaginationWrapper } from '@/components/ui/pagination-wrapper'
 import { ExportButton } from '@/components/shared/export-button'
 import { parsePage, paginationRange } from '@/lib/utils'
 import { Plus } from 'lucide-react'
+import { TemplatesList } from '@/components/orders/templates/templates-list'
 
 export const metadata: Metadata = { title: 'Pedidos | Clinipharma' }
 
@@ -21,6 +23,19 @@ export default async function OrdersPage({ searchParams }: Props) {
   const user = await getCurrentUser()
   const supabase = await createClient()
   const isAdmin = user?.roles.some((r) => ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(r))
+
+  // Get clinic for non-admin users (for templates)
+  let clinicId: string | null = null
+  if (!isAdmin && user) {
+    const admin = createAdminClient()
+    const { data: membership } = await admin
+      .from('clinic_members')
+      .select('clinic_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .single()
+    clinicId = membership?.clinic_id ?? null
+  }
 
   const page = parsePage(pageRaw)
   const { from, to } = paginationRange(page, PAGE_SIZE)
@@ -54,6 +69,8 @@ export default async function OrdersPage({ searchParams }: Props) {
           )}
         </div>
       </div>
+
+      {!isAdmin && clinicId && <TemplatesList clinicId={clinicId} />}
 
       <OrdersTable orders={(orders ?? []) as unknown as OrderRow[]} isAdmin={!!isAdmin} />
 

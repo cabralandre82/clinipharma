@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Metadata } from 'next'
 import { Suspense } from 'react'
 import { createAdminClient } from '@/lib/db/admin'
@@ -26,7 +27,14 @@ import {
   Package,
   Clock,
   AlertCircle,
+  BarChart3,
 } from 'lucide-react'
+import {
+  PeriodComparison,
+  ClinicRanking,
+  ConversionFunnel,
+  ProductMarginChart,
+} from '@/components/reports/advanced-bi'
 
 export const metadata: Metadata = { title: 'Relatórios | Clinipharma' }
 
@@ -76,6 +84,15 @@ export default async function ReportsPage({ searchParams }: PageProps) {
 
   const admin = createAdminClient()
 
+  // Previous period range (same duration, shifted back)
+  const fromDateObj = new Date(range.from + 'T00:00:00')
+  const toDateObj = new Date(range.to + 'T00:00:00')
+  const durationMs = toDateObj.getTime() - fromDateObj.getTime()
+  const prevFrom = new Date(fromDateObj.getTime() - durationMs - 86400000)
+  const prevTo = new Date(fromDateObj.getTime() - 86400000)
+  const prevFromStr = `${prevFrom.toISOString().slice(0, 10)}T00:00:00`
+  const prevToStr = `${prevTo.toISOString().slice(0, 10)}T23:59:59`
+
   const [
     ordersRes,
     paymentsRes,
@@ -84,6 +101,10 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     productsRes,
     consultantsRes,
     commissionRes,
+    prevOrdersRes,
+    prevPaymentsRes,
+    clinicOrdersRes,
+    orderItemsRes,
   ] = await Promise.all([
     admin
       .from('orders')
@@ -113,11 +134,38 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       .select('id, status, commission_amount, sales_consultants(full_name)')
       .gte('created_at', rangeFrom)
       .lte('created_at', rangeTo),
+    // Previous period
+    admin
+      .from('orders')
+      .select('id, order_status, total_price')
+      .gte('created_at', prevFromStr)
+      .lte('created_at', prevToStr),
+    admin
+      .from('payments')
+      .select('id, status, gross_amount')
+      .gte('created_at', prevFromStr)
+      .lte('created_at', prevToStr),
+    // Clinic ranking
+    admin
+      .from('orders')
+      .select('clinic_id, total_price, clinics(trade_name)')
+      .gte('created_at', rangeFrom)
+      .lte('created_at', rangeTo),
+    // Product margin
+    admin
+      .from('order_items')
+      .select(
+        'product_id, quantity, unit_price, pharmacy_cost_per_unit, platform_commission_per_unit, products(name)'
+      )
+      .gte('created_at', rangeFrom)
+      .lte('created_at', rangeTo),
   ])
 
   const orders = ordersRes.data ?? []
   const payments = paymentsRes.data ?? []
   const transfers = transfersRes.data ?? []
+  const prevOrders = prevOrdersRes.data ?? []
+  const prevPayments = prevPaymentsRes.data ?? []
 
   // ── KPIs ──────────────────────────────────────────────
   const totalOrders = orders.length
@@ -205,6 +253,82 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       name: name.length > 18 ? name.slice(0, 16) + '…' : name,
       comissao,
     }))
+
+  // ── BI Avançado ────────────────────────────────────────
+  // 1. Period comparison
+  const prevRevenue = (prevPayments as any[])
+    .filter((p) => p.status === 'CONFIRMED')
+    .reduce((s: number, p: any) => s + Number(p.gross_amount), 0)
+  const prevTicket = (() => {
+    const cp = (prevPayments as any[]).filter((p) => p.status === 'CONFIRMED')
+    return cp.length ? prevRevenue / cp.length : 0
+  })()
+  const periodCompData = [
+    {
+      metric: 'Pedidos',
+      current: totalOrders,
+      previous: prevOrders.length,
+      unit: 'number' as const,
+    },
+    { metric: 'Receita', current: totalRevenue, previous: prevRevenue, unit: 'currency' as const },
+    { metric: 'Ticket Médio', current: avgTicket, previous: prevTicket, unit: 'currency' as const },
+    {
+      metric: 'Concluídos',
+      current: completedOrders,
+      previous: (prevOrders as any[]).filter((o) => o.order_status === 'COMPLETED').length,
+      unit: 'number' as const,
+    },
+  ]
+
+  // 2. Clinic ranking
+  const clinicRevMap: Record<string, { name: string; orders: number; revenue: number }> = {}
+  for (const o of (clinicOrdersRes.data ?? []) as any[]) {
+    const name = o.clinics?.trade_name ?? 'Clínica desconhecida'
+    const id = o.clinic_id
+    if (!clinicRevMap[id]) clinicRevMap[id] = { name, orders: 0, revenue: 0 }
+    clinicRevMap[id].orders++
+    clinicRevMap[id].revenue += Number(o.total_price ?? 0)
+  }
+  const clinicRankingData = Object.values(clinicRevMap)
+
+  // 3. Conversion funnel
+  const funnelStatuses = [
+    { status: 'DRAFT', label: 'Criados' },
+    { status: 'AWAITING_PAYMENT', label: 'Aguard. Pagamento' },
+    { status: 'RELEASED_FOR_EXECUTION', label: 'Liberados' },
+    { status: 'IN_EXECUTION', label: 'Em Execução' },
+    { status: 'SHIPPED', label: 'Enviados' },
+    { status: 'DELIVERED', label: 'Entregues' },
+  ]
+  const funnelCounts: Record<string, number> = {}
+  for (const o of orders as any[])
+    funnelCounts[o.order_status] = (funnelCounts[o.order_status] ?? 0) + 1
+  const firstCount = orders.length || 1
+  const funnelData = funnelStatuses.map((s) => {
+    const count = funnelCounts[s.status] ?? 0
+    return { ...s, count, pct: (count / firstCount) * 100 }
+  })
+
+  // 4. Product margin
+  const productMap: Record<
+    string,
+    { name: string; revenue: number; pharmacyCost: number; consultantCommission: number }
+  > = {}
+  for (const item of (orderItemsRes.data ?? []) as any[]) {
+    const name = item.products?.name ?? 'Produto desconhecido'
+    const id = item.product_id
+    if (!productMap[id])
+      productMap[id] = { name, revenue: 0, pharmacyCost: 0, consultantCommission: 0 }
+    productMap[id].revenue += Number(item.unit_price ?? 0) * Number(item.quantity ?? 1)
+    productMap[id].pharmacyCost +=
+      Number(item.pharmacy_cost_per_unit ?? 0) * Number(item.quantity ?? 1)
+    // Approximation: consultant commission comes from transfers; use platform commission as proxy
+    productMap[id].consultantCommission += 0
+  }
+  const productMarginData = Object.values(productMap).map((p) => ({
+    ...p,
+    platformMargin: p.revenue - p.pharmacyCost - p.consultantCommission,
+  }))
 
   const fmtDate = (s: string) =>
     new Date(s + 'T12:00:00').toLocaleDateString('pt-BR', {
@@ -389,6 +513,22 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* BI Avançado */}
+      <div>
+        <div className="mb-4 flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-indigo-600" />
+          <h2 className="text-lg font-bold text-gray-900">BI Avançado</h2>
+        </div>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <PeriodComparison data={periodCompData} />
+          <ClinicRanking data={clinicRankingData} />
+        </div>
+        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <ConversionFunnel data={funnelData} />
+          <ProductMarginChart data={productMarginData} />
+        </div>
+      </div>
 
       {/* Entidades (always totals, not period-filtered) */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

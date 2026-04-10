@@ -16,6 +16,9 @@ const PUBLIC_ROUTES = [
   '/api/cron/',
   // Firebase service worker
   '/firebase-messaging-sw.js',
+  // Public order tracking (no login required)
+  '/track/',
+  '/api/tracking',
 ]
 
 export async function middleware(request: NextRequest) {

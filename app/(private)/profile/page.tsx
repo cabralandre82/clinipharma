@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/db/admin'
 import { ProfileForm } from '@/components/profile/profile-form'
 import { PendingDocsUpload } from '@/components/profile/pending-docs-upload'
 import { NotificationPreferences } from '@/components/profile/notification-preferences'
+import { SessionHistory } from '@/components/profile/session-history'
 import {
   REGISTRATION_STATUS_LABELS,
   REGISTRATION_STATUS_COLORS,
@@ -126,6 +127,17 @@ export default async function ProfilePage() {
           </p>
         </div>
         <NotificationPreferences initialPreferences={user.notification_preferences ?? {}} />
+      </div>
+
+      {/* Session history */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Segurança</h2>
+          <p className="mt-0.5 text-sm text-gray-500">
+            Histórico de acessos à sua conta. Alertas automáticos em novos dispositivos.
+          </p>
+        </div>
+        <SessionHistory />
       </div>
     </div>
   )

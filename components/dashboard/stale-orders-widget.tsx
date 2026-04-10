@@ -28,6 +28,7 @@ export async function StaleOrdersWidget() {
         updated_at: o.updated_at,
         daysStale: days,
         threshold,
+        alertLevel: days >= threshold * 1.5 ? 'critical' : days >= threshold ? 'alert' : 'warning',
         clinic: (o.clinics as { trade_name?: string } | null)?.trade_name ?? '—',
         pharmacy: (o.pharmacies as { trade_name?: string } | null)?.trade_name ?? '—',
       })

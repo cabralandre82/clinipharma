@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
+import { ProductVariantsManager } from '@/components/products/product-variants-manager'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -420,6 +421,17 @@ export function ProductForm({ product, categories, pharmacies, consultantRate }:
           </div>
         </div>
       </section>
+
+      {/* Variant manager — shown only for existing products */}
+      {isEditing && product && (
+        <div>
+          <ProductVariantsManager
+            productId={product.id}
+            basePrice={watch('price_current') ?? 0}
+            basePharmacyCost={watch('pharmacy_cost') ?? 0}
+          />
+        </div>
+      )}
 
       <div className="flex gap-3">
         <Button type="submit" disabled={loading}>
