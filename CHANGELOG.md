@@ -2,6 +2,26 @@
 
 ---
 
+## [2.2.0] — 2026-04-08 — Auditoria 4: RLS e Pages
+
+### Database — RLS (migration 018)
+
+- **`order_operational_updates` sem RLS:** Tabela expunha atualizações operacionais de qualquer pedido para qualquer usuário autenticado. Adicionados 4 políticas: admins (ALL), farmácia da atualização (INSERT + SELECT), clínica do pedido (SELECT), service_role (ALL).
+- **`pharmacy_products` sem RLS:** Associações farmácia-produto visíveis por qualquer usuário. Adicionadas políticas: admins (ALL), farmácia membro (SELECT próprios), usuários autenticados (SELECT ativos — necessário para fluxo de pedido), service_role (ALL).
+- **`products` política com precedência ambígua:** `auth.uid() IS NOT NULL AND active = true OR is_platform_admin()` reescrita com parênteses explícitos: `is_platform_admin() OR (auth.uid() IS NOT NULL AND active = true)`.
+- **`sla_configs` sem política de leitura para farmácias:** PHARMACY_ADMIN não conseguia ler seus próprios SLAs via Supabase client. Adicionada política: SLA global (pharmacy_id IS NULL) visível para todos autenticados; SLA específico visível apenas para membros da farmácia.
+
+### Components
+
+- **`order-detail.tsx` — comissões sem guarda de role:** Seção de comissões renderizava sem `isAdmin &&`. RLS bloqueava os dados, mas a defesa em profundidade estava ausente. Adicionado `{isAdmin && commission && (`.
+
+### Tests
+
+- **36 novos testes** de lógica de políticas RLS para: commissions, transfers, orders, order_operational_updates, products, sla_configs, pharmacy_products.
+- **Total: 484 testes passando.**
+
+---
+
 ## [2.1.0] — 2026-04-08 — Auditoria 3: Segurança Cirúrgica
 
 ### Security — Critical (3 IDORs corrigidos)

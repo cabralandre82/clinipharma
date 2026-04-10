@@ -332,8 +332,8 @@ export function OrderDetail({ order, currentUser }: OrderDetailProps) {
                   )}
                 </div>
 
-                {/* Commission */}
-                {commission && (
+                {/* Commission — admin only (RLS also blocks non-admins, this is defense-in-depth) */}
+                {isAdmin && commission && (
                   <div>
                     <p className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                       Comissão
