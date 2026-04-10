@@ -55,17 +55,22 @@ export async function revokeAllUserTokens(userId: string): Promise<void> {
  *  - A user-level sentinel (`user:{userId}:all`) exists and is not expired
  */
 export async function isTokenRevoked(jti: string, userId: string): Promise<boolean> {
-  const admin = createAdminClient()
-  const now = new Date().toISOString()
+  try {
+    const admin = createAdminClient()
+    const now = new Date().toISOString()
 
-  const { data } = await admin
-    .from('revoked_tokens')
-    .select('jti')
-    .or(`jti.eq.${jti},jti.eq.user:${userId}:all`)
-    .gt('expires_at', now)
-    .limit(1)
+    const { data } = await admin
+      .from('revoked_tokens')
+      .select('jti')
+      .or(`jti.eq.${jti},jti.eq.user:${userId}:all`)
+      .gt('expires_at', now)
+      .limit(1)
 
-  return (data?.length ?? 0) > 0
+    return (data?.length ?? 0) > 0
+  } catch {
+    // Fail open — if blacklist check fails, don't block legitimate users
+    return false
+  }
 }
 
 /** Delete expired rows — called by daily cron. */

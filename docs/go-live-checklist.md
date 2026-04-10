@@ -4,7 +4,7 @@
 
 ## Infraestrutura
 
-- [x] Migrations aplicadas no Supabase de produção (`jomdntqlgrupvhrqoyai`) — inclui migrations 013–020 (fcm_tokens, asaas_fields, contracts, templates, sla_configs, tracking, sessions, UNIQUE payments, índices, precisão financeira numeric(15,2), soft-delete, RLS, 8 índices de performance, constraints financeiras, status PROCESSING para comissões)
+- [x] Migrations aplicadas no Supabase de produção (`jomdntqlgrupvhrqoyai`) — inclui migrations 013–022 (fcm_tokens, asaas_fields, contracts, templates, sla_configs, tracking, sessions, UNIQUE payments, índices, precisão financeira, soft-delete, RLS completo, constraints financeiras, session revocation blacklist, pharmacy CNPJ validation columns)
 - [x] RLS habilitada em todas as tabelas
 - [x] Buckets de Storage criados (`product-images` público, `order-documents` privado)
 - [x] Seed de categorias e produtos rodado
@@ -50,7 +50,20 @@
 - [x] `EVOLUTION_INSTANCE_NAME` = `clinipharma`
 - [x] `CLICKSIGN_ACCESS_TOKEN` (sandbox)
 - [x] `CLICKSIGN_API_URL` = `https://sandbox.clicksign.com/api/v1`
-- [x] `CLICKSIGN_WEBHOOK_SECRET` = `caeed4d59bc4ec8313fc3c9630e3fac0feb86026bda27a46aab055c1c1f14bb9` — ✅ configurada no Vercel (Production + Preview + Development). **Ação pendente:** registrar esse valor como header `X-Clicksign-Secret` nas configurações de webhook no painel do Clicksign (Sandbox → Produção)
+- [x] `CLICKSIGN_WEBHOOK_SECRET` = `caeed4d59bc4ec8313fc3c9630e3fac0feb86026bda27a46aab055c1c1f14bb9` — ✅ configurada no Vercel. **Ação pendente:** registrar como header `X-Clicksign-Secret` no painel do Clicksign (Sandbox → Produção)
+
+## Segurança (Roadmap 90pts — Semana 1–2)
+
+- [x] **Session revocation** — `revoked_tokens` blacklist implementada. `deactivateUser()` e `assignUserRole()` revogam sessões imediatamente via `revokeAllUserTokens()`.
+- [x] **Middleware revocation check** — todo request autenticado verifica a blacklist. Token revogado → redirect para login + limpeza de cookies.
+- [x] **Security headers** — CSP, HSTS (max-age=31536000 preload), X-Frame-Options: DENY, X-Content-Type-Options, Referrer-Policy, Permissions-Policy em todas as rotas.
+- [x] **Circuit breaker** — Asaas e Clicksign protegidos contra cascade failure (3 falhas → OPEN, 30s recovery). Estado exposto em `/api/health`.
+- [x] **X-Request-ID** — gerado no middleware e propagado em todos os responses para rastreamento.
+- [x] **API response padronizada** — `lib/api-response.ts` com `apiSuccess()`, `apiError()`, `ApiErrors` factory.
+- [x] **Compliance engine** — `lib/compliance.ts` com `validateCNPJ()` (ReceitaWS), `canPlaceOrder()`, `canAcceptOrder()`.
+- [x] **CNPJ validation cron** — revalidação semanal (segunda 06h UTC) suspende farmácias com CNPJ irregular e notifica admins.
+- [ ] **Cloudflare WAF** — ativar OWASP Core Ruleset + rate limit 100 req/min por IP em `/api/` (configuração manual no painel Cloudflare)
+- [ ] **Pentest externo** — contratar antes do go-live comercial (Tempest, Conviso, Kondado)
 - [x] `NUVEM_FISCAL_CLIENT_ID` = `PENDING_CNPJ`
 - [x] `NUVEM_FISCAL_CLIENT_SECRET` = `PENDING_CNPJ`
 - [x] `NUVEM_FISCAL_CNPJ` = `PENDING_CNPJ`
