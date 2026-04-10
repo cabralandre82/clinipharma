@@ -26,8 +26,8 @@
 ## Notificações
 
 - **Sem notificações push ou SMS**: apenas notificações in-app e emails transacionais
-- **Sem preferências de notificação por usuário**: todas as notificações chegam para o papel inteiro, sem controle individual de quais tipos receber
-- **Sem alertas de pedidos parados**: não há mecanismo automático para detectar pedidos sem movimentação por X dias
+- ~~Sem preferências de notificação por usuário~~ ✅ **Implementado na v1.2.0**: usuários podem silenciar tipos não-críticos em `/profile`
+- ~~Sem alertas de pedidos parados~~ ✅ **Implementado na v1.2.0**: widget no dashboard + Vercel Cron diário (08h) notifica SUPER_ADMIN e PHARMACY_ADMIN
 
 ## Mobile
 
@@ -36,9 +36,13 @@
 
 ## Relatórios
 
-- **Sem BI avançado**: gráficos são CSS puro (barras) sem biblioteca de charts interativa (Recharts/Chart.js)
-- **Sem filtro de período em relatórios**: a página de relatórios exibe totais acumulados sem corte por data
-- **Exportação sem filtro de período**: CSV/Excel baixa todos os registros históricos sem filtro por mês/intervalo
+- ~~Sem BI avançado: gráficos são CSS puro sem biblioteca interativa~~ ✅ **Implementado na v1.2.0**: Recharts com 5 tipos de gráfico (barras, donut, horizontal)
+- ~~Sem filtro de período em relatórios~~ ✅ **Implementado na v1.2.0**: DateRangePicker com 8 presets
+- ~~Exportação sem filtro de período~~ ✅ **Implementado na v1.2.0**: CSV/Excel respeita o período ativo na tela
+
+## Infraestrutura
+
+- **`CRON_SECRET` deve ser adicionado manualmente no Vercel**: gerar qualquer string segura (ex: `openssl rand -hex 32`) e adicionar nas Environment Variables do projeto como `CRON_SECRET` (Production + Preview). O cron de pedidos parados não irá executar sem este secret.
 
 ## Integrações futuras planejadas
 
@@ -48,5 +52,3 @@
 - Notificações push / SMS / WhatsApp
 - App mobile
 - Integração com ERP de farmácias
-- Gráficos interativos (Recharts ou Chart.js)
-- Filtro de período em relatórios e exportações

@@ -2,6 +2,42 @@
 
 ---
 
+## [1.2.0] — 2026-04-10
+
+### Added
+
+- **Filtro de período nos relatórios:** `DateRangePicker` com atalhos (Hoje, Esta semana, Este mês, Mês anterior, Últimos 3/6/12 meses, Personalizado). Padrão: Este mês. Persiste em URL params (`?from=&to=&preset=`). Todos os KPIs e gráficos filtrados pelo período.
+- **Gráficos interativos com Recharts:** substituídas as barras CSS por:
+  - `OrdersBarChart` — pedidos por período (BarChart)
+  - `RevenueBarChart` — faturamento por período (BarChart)
+  - `StatusPieChart` — pedidos por status (donut chart)
+  - `PharmacyRevenueChart` — faturamento por farmácia (horizontal bar)
+  - `ConsultantCommChart` — comissões por consultor (horizontal bar)
+  - Todos com tooltip, hover e valores formatados em R$
+- **Export filtrado por período:** botão de exportação em relatórios agora passa `from`/`to` para a API; nome do arquivo inclui o período (ex: `pedidos_2026-04-01_a_2026-04-30.csv`).
+- **Alertas de pedidos parados:**
+  - Widget vermelho no dashboard do SUPER_ADMIN e PHARMACY_ADMIN listando pedidos stale com link direto
+  - Thresholds: 3 dias (fases financeiras/docs), 5 dias (fases operacionais)
+  - Vercel Cron (`0 8 * * *`) em `/api/cron/stale-orders`: notificação in-app + email digest para SUPER_ADMIN e farmácia responsável pelos pedidos dela
+  - Tipo `STALE_ORDER` adicionado a `NotificationType`
+- **Preferências de notificação por usuário:**
+  - Migration 012: coluna `notification_preferences jsonb` em `profiles` (default `{}`)
+  - Críticas (sempre enviadas): `ORDER_CREATED`, `ORDER_STATUS`, `PAYMENT_CONFIRMED`, `DOCUMENT_UPLOADED`
+  - Silenciáveis: `TRANSFER_REGISTERED`, `CONSULTANT_TRANSFER`, `PRODUCT_INTEREST`, `REGISTRATION_REQUEST`, `STALE_ORDER`
+  - UI em `/profile` — seção "Preferências de notificação" com toggles por tipo
+  - API `PATCH /api/profile/notification-preferences` persiste as preferências
+  - `lib/notifications.ts` checa `notification_preferences` antes de inserir qualquer notificação (críticos ignoram a preferência)
+- **Variável de ambiente `CRON_SECRET`:** adicionada ao `.env.local` para proteger o endpoint do cron.
+
+### Tests
+
+- **142 testes unitários passando (zero falhas):** 56 novos testes em 3 novos arquivos.
+- **`tests/unit/stale-orders.test.ts`** (19 casos): cobre `getStaleThreshold` (thresholds corretos por fase, null para terminais), `getDaysDiff` (com fake timers), e lógica de detecção de pedido parado.
+- **`tests/unit/notifications.test.ts`** (20 casos): valida `SILENCEABLE_TYPES`, `CRITICAL_TYPES`, disjunção entre os dois conjuntos, e semântica de preferências (tipos críticos sempre ativos; silenciáveis respeitam `prefs[type] !== false`).
+- **`tests/unit/date-range.test.ts`** (17 casos): testa as funções puras `today`, `daysAgo`, `startOfMonth`, `endOfMonth`, `startOfYear` e garante que todos os presets têm `from <= to`.
+
+---
+
 ## [1.1.0] — 2026-04-10
 
 ### Fixed

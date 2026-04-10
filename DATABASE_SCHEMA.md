@@ -24,19 +24,22 @@ O banco é organizado em 5 schemas lógicos:
 Extensão da tabela `auth.users` do Supabase.
 
 ```sql
-id                  uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE
-full_name           text NOT NULL
-email               text NOT NULL
-phone               text
-avatar_url          text
-is_active           boolean DEFAULT true
-registration_status text NOT NULL DEFAULT 'APPROVED'
-                    CHECK (registration_status IN ('PENDING','PENDING_DOCS','APPROVED','REJECTED'))
-created_at          timestamptz DEFAULT now()
-updated_at          timestamptz DEFAULT now()
+id                        uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE
+full_name                 text NOT NULL
+email                     text NOT NULL
+phone                     text
+avatar_url                text
+is_active                 boolean DEFAULT true
+registration_status       text NOT NULL DEFAULT 'APPROVED'
+                          CHECK (registration_status IN ('PENDING','PENDING_DOCS','APPROVED','REJECTED'))
+notification_preferences  jsonb NOT NULL DEFAULT '{}'
+created_at                timestamptz DEFAULT now()
+updated_at                timestamptz DEFAULT now()
 ```
 
 `registration_status` é `APPROVED` para todos os usuários criados pelo admin. Para usuários vindos do auto-cadastro público (`/registro`), começa como `PENDING` e evolui conforme o fluxo de aprovação.
+
+`notification_preferences` armazena as preferências do usuário para tipos silenciáveis. Formato: `{"STALE_ORDER": false, "PRODUCT_INTEREST": false}`. Chave ausente = tipo habilitado. Tipos críticos (`ORDER_CREATED`, `ORDER_STATUS`, `PAYMENT_CONFIRMED`, `DOCUMENT_UPLOADED`) ignoram esta configuração e são sempre enviados. Migration: `012_notification_preferences.sql`.
 
 ## Tabela: user_roles
 

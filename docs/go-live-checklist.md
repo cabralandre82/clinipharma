@@ -28,6 +28,7 @@
 - [x] `NEXT_PUBLIC_APP_URL` atualizada para `https://clinipharma.com.br`
 - [x] `RESEND_API_KEY` adicionada no Vercel
 - [x] `EMAIL_FROM` = `Clinipharma <noreply@clinipharma.com.br>` adicionada no Vercel
+- [ ] `CRON_SECRET` adicionada no Vercel (gerar com `openssl rand -hex 32`) — necessário para o cron de pedidos parados
 
 ## Build e Deploy
 
@@ -59,8 +60,10 @@
 - [x] Logs de auditoria sendo gerados (paginados)
 - [x] Notificações in-app em tempo real (sino no header)
 - [x] Busca global (⌘K) em pedidos, clínicas, médicos e produtos
-- [x] Exportação CSV/Excel em pedidos, pagamentos, repasses e comissões
-- [x] Dashboard de relatórios com KPIs, gráfico e alertas
+- [x] Exportação CSV/Excel em pedidos, pagamentos, repasses e comissões (com filtro de período)
+- [x] Dashboard de relatórios com KPIs, gráficos Recharts interativos e filtro de período
+- [x] Alertas de pedidos parados no dashboard (widget + Vercel Cron diário + email digest)
+- [x] Preferências de notificação individuais em `/profile` (tipos silenciáveis vs críticos)
 - [x] Produto indisponível exibido no catálogo com botão "Tenho interesse"
 - [x] Modal de interesse coleta nome e WhatsApp e notifica SUPER_ADMIN (in-app + email)
 - [x] Painel `/interests` lista todos os registros de interesse com link direto para WhatsApp
