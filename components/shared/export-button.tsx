@@ -9,9 +9,10 @@ type ExportType = 'orders' | 'payments' | 'transfers' | 'commissions'
 interface ExportButtonProps {
   type: ExportType
   label?: string
+  extraParams?: string
 }
 
-export function ExportButton({ type, label = 'Exportar' }: ExportButtonProps) {
+export function ExportButton({ type, label = 'Exportar', extraParams = '' }: ExportButtonProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState<'csv' | 'xlsx' | null>(null)
 
@@ -19,7 +20,7 @@ export function ExportButton({ type, label = 'Exportar' }: ExportButtonProps) {
     setLoading(format)
     setOpen(false)
     try {
-      const res = await fetch(`/api/export?type=${type}&format=${format}`)
+      const res = await fetch(`/api/export?type=${type}&format=${format}${extraParams}`)
       if (!res.ok) throw new Error('Export failed')
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)

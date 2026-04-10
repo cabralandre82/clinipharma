@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/db/server'
 import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react'
 import type { ProfileWithRoles } from '@/types'
 import Link from 'next/link'
+import { StaleOrdersWidget } from '@/components/dashboard/stale-orders-widget'
 
 interface AdminDashboardProps {
   user: ProfileWithRoles
@@ -71,6 +73,10 @@ export async function AdminDashboard({ user }: AdminDashboardProps) {
         </h1>
         <p className="mt-0.5 text-sm text-gray-500">Aqui está um resumo da operação</p>
       </div>
+
+      <Suspense fallback={null}>
+        <StaleOrdersWidget />
+      </Suspense>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

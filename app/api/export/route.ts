@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { getCurrentUser } from '@/lib/auth/session'
@@ -7,7 +8,7 @@ import { formatCurrency } from '@/lib/utils'
 const ADMIN_ROLES = ['SUPER_ADMIN', 'PLATFORM_ADMIN']
 
 /**
- * GET /api/export?type=orders|payments|commissions|transfers&format=csv|xlsx
+ * GET /api/export?type=orders|payments|commissions|transfers&format=csv|xlsx&from=YYYY-MM-DD&to=YYYY-MM-DD
  */
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser()
@@ -18,28 +19,40 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const type = searchParams.get('type') ?? 'orders'
   const format = searchParams.get('format') ?? 'csv'
+  const fromParam = searchParams.get('from')
+  const toParam = searchParams.get('to')
   const admin = createAdminClient()
 
   const now = new Date().toISOString().slice(0, 10)
+  const rangeFrom = fromParam ? `${fromParam}T00:00:00` : null
+  const rangeTo = toParam ? `${toParam}T23:59:59` : null
+  const periodSuffix = fromParam && toParam ? `_${fromParam}_a_${toParam}` : ''
+
+  function dateFilter(q: any) {
+    if (rangeFrom) q = q.gte('created_at', rangeFrom)
+    if (rangeTo) q = q.lte('created_at', rangeTo)
+    return q
+  }
 
   if (type === 'orders') {
-    const { data } = await admin
-      .from('orders')
-      .select(
-        `code, order_status, payment_status, transfer_status, total_price, created_at,
-         clinics(trade_name), doctors(full_name), pharmacies(trade_name),
-         order_items(quantity, unit_price, total_price, products(name))`
-      )
-      .order('created_at', { ascending: false })
+    const { data } = await dateFilter(
+      admin
+        .from('orders')
+        .select(
+          `code, order_status, payment_status, transfer_status, total_price, created_at,
+           clinics(trade_name), doctors(full_name), pharmacies(trade_name),
+           order_items(quantity, unit_price, total_price, products(name))`
+        )
+        .order('created_at', { ascending: false })
+    )
 
-    const rows = (data ?? []).map((o) => {
-      const items =
-        (o.order_items as unknown as Array<{
-          quantity: number
-          unit_price: number
-          total_price: number
-          products: { name: string } | null
-        }>) ?? []
+    const rows = (data ?? []).map((o: any) => {
+      const items: Array<{
+        quantity: number
+        unit_price: number
+        total_price: number
+        products: { name: string } | null
+      }> = o.order_items ?? []
       const productNames = items.map((i) => `${i.products?.name ?? '—'} ×${i.quantity}`).join(' | ')
       return {
         Código: o.code,
@@ -55,19 +68,21 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    return buildResponse(rows, format, `pedidos-${now}`)
+    return buildResponse(rows, format, `pedidos${periodSuffix || '-' + now}`)
   }
 
   if (type === 'payments') {
-    const { data } = await admin
-      .from('payments')
-      .select(
-        `gross_amount, status, payment_method, reference_code, confirmed_at, created_at,
-         orders(code, clinics(trade_name))`
-      )
-      .order('created_at', { ascending: false })
+    const { data } = await dateFilter(
+      admin
+        .from('payments')
+        .select(
+          `gross_amount, status, payment_method, reference_code, confirmed_at, created_at,
+           orders(code, clinics(trade_name))`
+        )
+        .order('created_at', { ascending: false })
+    )
 
-    const rows = (data ?? []).map((p) => {
+    const rows = (data ?? []).map((p: any) => {
       const order = p.orders as { code?: string; clinics?: { trade_name?: string } } | null
       return {
         Pedido: order?.code ?? '—',
@@ -81,19 +96,21 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    return buildResponse(rows, format, `pagamentos-${now}`)
+    return buildResponse(rows, format, `pagamentos${periodSuffix || '-' + now}`)
   }
 
   if (type === 'commissions') {
-    const { data } = await admin
-      .from('consultant_commissions')
-      .select(
-        `commission_amount, commission_rate, order_total, status, created_at,
-         orders(code), sales_consultants(full_name)`
-      )
-      .order('created_at', { ascending: false })
+    const { data } = await dateFilter(
+      admin
+        .from('consultant_commissions')
+        .select(
+          `commission_amount, commission_rate, order_total, status, created_at,
+           orders(code), sales_consultants(full_name)`
+        )
+        .order('created_at', { ascending: false })
+    )
 
-    const rows = (data ?? []).map((c) => ({
+    const rows = (data ?? []).map((c: any) => ({
       Consultor: (c.sales_consultants as { full_name?: string } | null)?.full_name ?? '—',
       Pedido: (c.orders as { code?: string } | null)?.code ?? '—',
       'Total do pedido': formatCurrency(Number(c.order_total)),
@@ -103,20 +120,22 @@ export async function GET(req: NextRequest) {
       Data: c.created_at?.slice(0, 16).replace('T', ' '),
     }))
 
-    return buildResponse(rows, format, `comissoes-${now}`)
+    return buildResponse(rows, format, `comissoes${periodSuffix || '-' + now}`)
   }
 
   if (type === 'transfers') {
-    const { data } = await admin
-      .from('transfers')
-      .select(
-        `gross_amount, commission_amount, net_amount, status,
-         transfer_reference, processed_at, created_at,
-         pharmacies(trade_name), orders(code)`
-      )
-      .order('created_at', { ascending: false })
+    const { data } = await dateFilter(
+      admin
+        .from('transfers')
+        .select(
+          `gross_amount, commission_amount, net_amount, status,
+           transfer_reference, processed_at, created_at,
+           pharmacies(trade_name), orders(code)`
+        )
+        .order('created_at', { ascending: false })
+    )
 
-    const rows = (data ?? []).map((t) => ({
+    const rows = (data ?? []).map((t: any) => ({
       Pedido: (t.orders as { code?: string } | null)?.code ?? '—',
       Farmácia: (t.pharmacies as { trade_name?: string } | null)?.trade_name ?? '—',
       Bruto: formatCurrency(Number(t.gross_amount)),
@@ -128,7 +147,7 @@ export async function GET(req: NextRequest) {
       Criado: t.created_at?.slice(0, 16).replace('T', ' '),
     }))
 
-    return buildResponse(rows, format, `repasses-${now}`)
+    return buildResponse(rows, format, `repasses${periodSuffix || '-' + now}`)
   }
 
   return NextResponse.json({ error: 'Invalid type' }, { status: 400 })

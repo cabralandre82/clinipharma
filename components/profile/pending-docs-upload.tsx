@@ -4,7 +4,6 @@ import { useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Upload, FileText, X, CheckCircle2, Loader2 } from 'lucide-react'
 import type { RequestedDoc } from '@/types'
 

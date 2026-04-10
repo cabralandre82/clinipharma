@@ -44,6 +44,7 @@ export interface Profile {
   avatar_url?: string | null
   is_active: boolean
   registration_status: RegistrationStatus
+  notification_preferences: Record<string, boolean>
   created_at: string
   updated_at: string
 }

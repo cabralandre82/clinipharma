@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { FileText, Upload, CheckCircle, AlertCircle, X, Loader2 } from 'lucide-react'
+import { FileText, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'

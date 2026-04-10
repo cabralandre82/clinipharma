@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth/session'
 import { createAdminClient } from '@/lib/db/admin'
 import { ProfileForm } from '@/components/profile/profile-form'
 import { PendingDocsUpload } from '@/components/profile/pending-docs-upload'
+import { NotificationPreferences } from '@/components/profile/notification-preferences'
 import {
   REGISTRATION_STATUS_LABELS,
   REGISTRATION_STATUS_COLORS,
@@ -113,6 +114,18 @@ export default async function ProfilePage() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Notification preferences */}
+      <div className="rounded-lg border bg-white p-6">
+        <div className="mb-5">
+          <h2 className="font-semibold text-gray-900">Preferências de notificação</h2>
+          <p className="mt-0.5 text-sm text-gray-500">
+            Escolha quais notificações deseja receber. Notificações essenciais não podem ser
+            desativadas.
+          </p>
+        </div>
+        <NotificationPreferences initialPreferences={user.notification_preferences ?? {}} />
       </div>
     </div>
   )

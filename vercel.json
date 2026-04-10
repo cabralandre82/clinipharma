@@ -3,5 +3,11 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
-  "regions": ["gru1"]
+  "regions": ["gru1"],
+  "crons": [
+    {
+      "path": "/api/cron/stale-orders",
+      "schedule": "0 8 * * *"
+    }
+  ]
 }
