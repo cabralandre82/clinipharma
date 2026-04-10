@@ -2,6 +2,22 @@
 
 ---
 
+## [1.1.0] — 2026-04-10
+
+### Fixed
+
+- **Upload de documentos no fluxo PENDING_DOCS:** a página `/profile` agora detecta automaticamente quando o usuário está com status `PENDING_DOCS` e exibe um bloco laranja no topo com a lista exata de documentos solicitados pelo admin, incluindo texto personalizado ("Outro"). Cada documento tem botão de upload individual com troca de arquivo.
+- **Re-notificação ao SUPER_ADMIN:** após o usuário enviar os documentos extras, a API `POST /api/registration/upload-docs` reverte o status para `PENDING`, envia notificação in-app e email HTML a todos os SUPER_ADMINs com link direto para a solicitação.
+- **Status do cadastro visível em /profile:** campo "Status do cadastro" exibido na sidebar de informações quando o usuário não está APPROVED.
+
+### Tests
+
+- **86 testes unitários passando (zero falhas):** corrigido prefixo `CP-` em `generateOrderCode`; `orderSchema` refatorado para `items array`; `clinicSchema` e `productSchema` validados com campos reais.
+- **Novo arquivo `tests/unit/registration.test.ts`:** 13 casos cobrindo `CLINIC_REQUIRED_DOCS`, `DOCTOR_REQUIRED_DOCS`, labels, cores de status e `ALL_REQUESTABLE_DOCS`; duplicata `OPERATING_LICENSE` removida de `EXTRA_DOC_OPTIONS`.
+- **E2E (Playwright) expandido:** credenciais atualizadas; 10 novos casos em `auth.test.ts` cobrindo `/registro`; `catalog.test.ts` expandido com filtros, modal de interesse, painéis `/registrations` e `/interests`.
+
+---
+
 ## [1.0.0] — 2026-04-10
 
 ### Added

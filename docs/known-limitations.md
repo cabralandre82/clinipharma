@@ -10,7 +10,7 @@
 
 - **Recuperação de senha via rota própria**: usa `admin.generateLink()` + Resend diretamente. O SMTP do Supabase Auth não está configurado (tentativa falhou silenciosamente; Auth Hook HTTPS também não disparava). A solução atual é robusta e funciona em produção.
 - **Google OAuth preparado mas não ativado**: precisa de configuração manual no Google Cloud Console
-- **Sem autenticação por convite**: novos usuários são cadastrados manualmente pelo admin
+- **Sem 2FA**: autenticação em dois fatores não implementada
 
 ## Produtos
 
@@ -26,7 +26,8 @@
 ## Notificações
 
 - **Sem notificações push ou SMS**: apenas notificações in-app e emails transacionais
-- **Sem preferências de notificação por usuário**: todas as notificações são enviadas para os papéis relevantes
+- **Sem preferências de notificação por usuário**: todas as notificações chegam para o papel inteiro, sem controle individual de quais tipos receber
+- **Sem alertas de pedidos parados**: não há mecanismo automático para detectar pedidos sem movimentação por X dias
 
 ## Mobile
 
@@ -35,8 +36,9 @@
 
 ## Relatórios
 
-- **Sem BI avançado**: gráficos são CSS puro (barras) sem biblioteca de charts interativa
-- **Exportação limitada ao período atual**: não há filtro de período na exportação CSV/Excel
+- **Sem BI avançado**: gráficos são CSS puro (barras) sem biblioteca de charts interativa (Recharts/Chart.js)
+- **Sem filtro de período em relatórios**: a página de relatórios exibe totais acumulados sem corte por data
+- **Exportação sem filtro de período**: CSV/Excel baixa todos os registros históricos sem filtro por mês/intervalo
 
 ## Integrações futuras planejadas
 
