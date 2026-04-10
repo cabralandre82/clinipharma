@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { Resend } from 'resend'
+import { registrationLimiter } from '@/lib/rate-limit'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const APP_URL = 'https://clinipharma.com.br'
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 3 registration attempts per 10 minutes per IP
+    const ip =
+      req.headers.get('x-forwarded-for')?.split(',')[0] ?? req.headers.get('x-real-ip') ?? 'unknown'
+    const rl = registrationLimiter.check(`registration:${ip}`)
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: 'Muitas tentativas de cadastro. Aguarde antes de tentar novamente.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
+        }
+      )
+    }
+
     const fd = await req.formData()
     const type = fd.get('type') as 'CLINIC' | 'DOCTOR'
     const formDataRaw = fd.get('form_data') as string

@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   const { data: order } = await admin
     .from('orders')
     .select(
-      `id, code, total_amount, clinic_id, clinics(trade_name, cnpj, asaas_customer_id, profiles(email, phone))`
+      `id, code, total_price, clinic_id, clinics(trade_name, cnpj, asaas_customer_id, profiles(email, phone))`
     )
     .eq('id', orderId)
     .single()
@@ -49,16 +49,19 @@ export async function POST(req: NextRequest) {
     })
     customerId = customer.id
     // Save asaas_customer_id to clinic
-    await admin.from('clinics').update({ asaas_customer_id: customerId }).eq('id', order.clinic_id)
+    await admin
+      .from('clinics')
+      .update({ asaas_customer_id: customerId })
+      .eq('id', (order as any).clinic_id)
   }
 
   const dueDate = dueDateFromNow(3)
-  const description = `Pedido ${order.code} — Clinipharma`
+  const description = `Pedido ${(order as any).code} — Clinipharma`
 
   // Create payment in Asaas
   const payment = await createPayment({
     customerId,
-    value: Number(order.total_amount),
+    value: Number((order as any).total_price),
     dueDate,
     description,
     externalReference: orderId,
@@ -100,8 +103,9 @@ export async function POST(req: NextRequest) {
   } else {
     await admin.from('payments').insert({
       order_id: orderId,
-      amount: Number(order.total_amount),
+      gross_amount: Number((order as any).total_price),
       status: 'PENDING',
+      payment_method: 'ASAAS',
       asaas_payment_id: payment.id,
       asaas_invoice_url: payment.invoiceUrl,
       asaas_boleto_url: payment.bankSlipUrl ?? null,

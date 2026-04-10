@@ -25,13 +25,13 @@ export async function POST(req: NextRequest) {
   }> = []
   let clinicId: string
   let pharmacyId: string
+  let doctorId: string | null = null
 
   if (orderId) {
-    // Reorder from an existing order
     const { data: order } = await admin
       .from('orders')
       .select(
-        'clinic_id, pharmacy_id, order_items(product_id, variant_id, quantity, unit_price, pharmacy_cost_per_unit)'
+        'clinic_id, pharmacy_id, doctor_id, order_items(product_id, variant_id, quantity, unit_price, pharmacy_cost_per_unit)'
       )
       .eq('id', orderId)
       .single()
@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     clinicId = (order as any).clinic_id
     pharmacyId = (order as any).pharmacy_id
+    doctorId = (order as any).doctor_id ?? null
     items = ((order as any).order_items ?? []).map((i: any) => ({
       product_id: i.product_id,
       variant_id: i.variant_id ?? null,
@@ -48,7 +49,6 @@ export async function POST(req: NextRequest) {
       pharmacy_cost_per_unit: i.pharmacy_cost_per_unit ?? 0,
     }))
   } else if (templateId) {
-    // Use a saved template
     const { data: template } = await admin
       .from('order_templates')
       .select('*')
@@ -79,23 +79,44 @@ export async function POST(req: NextRequest) {
   }
 
   if (!items.length) return NextResponse.json({ error: 'No items to reorder' }, { status: 400 })
+  if (!pharmacyId!)
+    return NextResponse.json({ error: 'Pharmacy not found in source' }, { status: 400 })
 
-  // Generate new order code
-  const code = `PED-${Date.now().toString(36).toUpperCase()}`
+  // doctor_id is required by schema — if missing use clinic's primary doctor
+  if (!doctorId) {
+    const { data: docLink } = await admin
+      .from('doctor_clinic_links')
+      .select('doctor_id')
+      .eq('clinic_id', clinicId!)
+      .eq('is_primary', true)
+      .limit(1)
+      .maybeSingle()
+    doctorId = docLink?.doctor_id ?? null
+  }
+  if (!doctorId) {
+    return NextResponse.json(
+      { error: 'Médico não encontrado para esta clínica. Abra o pedido manualmente.' },
+      { status: 422 }
+    )
+  }
+
   const totalAmount = items.reduce((sum, i) => sum + i.unit_price * i.quantity, 0)
 
-  // Create new order
+  // Create new order — let DB trigger generate the code (MED-YYYY-NNNNNN format)
   const { data: newOrder, error: orderErr } = await admin
     .from('orders')
     .insert({
-      code,
+      code: '', // trigger generates it
       clinic_id: clinicId!,
       pharmacy_id: pharmacyId!,
+      doctor_id: doctorId,
       order_status: 'DRAFT',
-      total_amount: totalAmount,
-      created_by: user.id,
+      total_price: totalAmount,
+      payment_status: 'PENDING',
+      transfer_status: 'NOT_READY',
+      created_by_user_id: user.id,
     })
-    .select()
+    .select('id, code')
     .single()
 
   if (orderErr || !newOrder) {
@@ -105,37 +126,47 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Create order items
+  const orderId_new = (newOrder as any).id
+  const code = (newOrder as any).code
+
+  // Create order items (trigger will freeze prices from current product data)
   await admin.from('order_items').insert(
     items.map((i) => ({
-      order_id: (newOrder as any).id,
+      order_id: orderId_new,
       product_id: i.product_id,
       variant_id: i.variant_id,
       quantity: i.quantity,
       unit_price: i.unit_price,
       total_price: i.unit_price * i.quantity,
       pharmacy_cost_per_unit: i.pharmacy_cost_per_unit,
-      pharmacy_id: i.pharmacy_id,
     }))
   )
 
-  // Tracking token — upsert to avoid duplicate on conflict
-  await admin.from('order_tracking_tokens').upsert(
-    {
-      order_id: (newOrder as any).id,
-      expires_at: null,
-    },
-    { onConflict: 'order_id', ignoreDuplicates: true }
-  )
+  // Initial status history
+  await admin.from('order_status_history').insert({
+    order_id: orderId_new,
+    old_status: null,
+    new_status: 'DRAFT',
+    changed_by_user_id: user.id,
+    reason: `Repetição de ${orderId ? `pedido ${orderId.slice(0, 8)}` : 'template'}`,
+  })
 
-  // Notification
+  // Create tracking token
+  await admin
+    .from('order_tracking_tokens')
+    .upsert(
+      { order_id: orderId_new, expires_at: null },
+      { onConflict: 'order_id', ignoreDuplicates: true }
+    )
+
+  // Notify
   await createNotification({
     userId: user.id,
     type: 'ORDER_CREATED',
     title: `Pedido ${code} criado (repetição)`,
-    message: `Pedido gerado a partir de ${orderId ? 'pedido anterior' : 'template'}. Acesse para concluir.`,
-    link: `/orders/${(newOrder as any).id}`,
+    message: `Pedido gerado a partir de ${orderId ? 'pedido anterior' : 'template'}. Complete os dados e confirme.`,
+    link: `/orders/${orderId_new}`,
   })
 
-  return NextResponse.json({ orderId: (newOrder as any).id, code }, { status: 201 })
+  return NextResponse.json({ orderId: orderId_new, code }, { status: 201 })
 }

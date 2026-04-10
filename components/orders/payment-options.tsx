@@ -35,7 +35,7 @@ interface PaymentOptionsProps {
 
 export function PaymentOptions({
   orderId,
-  orderCode,
+  orderCode: _orderCode,
   amount,
   payment,
   isAdmin,

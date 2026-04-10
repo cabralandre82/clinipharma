@@ -9,6 +9,7 @@ import { newOrderEmail, orderStatusUpdatedEmail } from '@/lib/email/templates'
 import { createNotification, createNotificationForRole } from '@/lib/notifications'
 import { formatCurrency } from '@/lib/utils'
 import { z } from 'zod'
+import { isValidTransition } from '@/lib/orders/status-machine'
 
 const createOrderSchema = z.object({
   clinic_id: z.string().uuid(),
@@ -124,7 +125,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 
     const finalTotal = updatedOrder?.total_price ?? estimatedTotal
 
-    // Create payment record
+    // Create payment record (gross_amount = total at time of order creation)
     await adminClient.from('payments').insert({
       order_id: order.id,
       payer_profile_id: user.id,
@@ -132,6 +133,14 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       status: 'PENDING',
       payment_method: 'MANUAL',
     })
+
+    // Create public tracking token for this order
+    await adminClient
+      .from('order_tracking_tokens')
+      .upsert(
+        { order_id: order.id, expires_at: null },
+        { onConflict: 'order_id', ignoreDuplicates: true }
+      )
 
     // Upload documents if any
     if (input.documents && input.documents.length > 0) {
@@ -265,6 +274,14 @@ export async function updateOrderStatus(
     const isPharmacy = user.roles.includes('PHARMACY_ADMIN')
 
     if (!isAdmin && !isPharmacy) return { error: 'Sem permissão para alterar status do pedido' }
+
+    // Enforce state machine transitions
+    const role = isAdmin ? 'admin' : 'pharmacy'
+    if (!isValidTransition(order.order_status, newStatus, role)) {
+      return {
+        error: `Transição inválida: ${order.order_status} → ${newStatus} não é permitida para ${role}`,
+      }
+    }
 
     const { error: updateError } = await adminClient
       .from('orders')

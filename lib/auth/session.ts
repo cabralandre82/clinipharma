@@ -1,6 +1,11 @@
 import { createClient } from '@/lib/db/server'
 import type { ProfileWithRoles, UserRole } from '@/types'
 
+/**
+ * @deprecated Use getCurrentUser() instead.
+ * getSession() reads from cookie without server-side JWT validation.
+ * Only use if you need the raw session object for token refresh flows.
+ */
 export async function getSession() {
   const supabase = await createClient()
   const {

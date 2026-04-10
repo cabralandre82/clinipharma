@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
-import { createNotification } from '@/lib/notifications'
+import { createNotification, createNotificationForRole } from '@/lib/notifications'
 import { sendEmail } from '@/lib/email'
 import { sendSms, SMS } from '@/lib/sms'
 import { sendWhatsApp, WA } from '@/lib/whatsapp'
@@ -44,7 +45,6 @@ export async function POST(req: NextRequest) {
 
   if (!order) return NextResponse.json({ ok: true, skipped: 'order not found' })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const clinic = (order as any).clinics as {
     trade_name: string
     profiles: {
@@ -66,11 +66,25 @@ export async function POST(req: NextRequest) {
     .eq('order_id', orderId)
 
   if (event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED') {
+    // Idempotency guard: only advance if not already confirmed
+    if ((order as any).order_status === 'PAYMENT_CONFIRMED') {
+      return NextResponse.json({ ok: true, skipped: 'already_confirmed' })
+    }
+
     // Advance order status
     await admin
       .from('orders')
       .update({ order_status: 'PAYMENT_CONFIRMED', updated_at: new Date().toISOString() })
       .eq('id', orderId)
+
+    // Record status history
+    await admin.from('order_status_history').insert({
+      order_id: orderId,
+      old_status: (order as any).order_status,
+      new_status: 'PAYMENT_CONFIRMED',
+      changed_by_user_id: '00000000-0000-0000-0000-000000000000', // system
+      reason: `Confirmado automaticamente via Asaas (evento: ${event})`,
+    })
 
     // Notify clinic user
     const { data: clinicMember } = await admin
@@ -125,9 +139,8 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Notify admins
-    await createNotification({
-      userId: '', // will be overridden by role-based
+    // Notify all admins via role-based notification
+    await createNotificationForRole('SUPER_ADMIN', {
       type: 'PAYMENT_CONFIRMED',
       title: `Pagamento confirmado — Pedido ${order.code}`,
       message: `Pagamento do pedido ${order.code} (${clinicName}) confirmado pelo gateway Asaas.`,
