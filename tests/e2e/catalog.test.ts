@@ -3,7 +3,8 @@ import { test, expect } from '@playwright/test'
 const SUPER_ADMIN_EMAIL = 'cabralandre@yahoo.com.br'
 const SUPER_ADMIN_PASSWORD = 'Clinipharma@2026'
 
-async function loginAs(page: Parameters<typeof test>[1]['page'], email: string, password: string) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loginAs(page: any, email: string, password: string) {
   await page.goto('/login')
   await page.fill('input[type="email"]', email)
   await page.fill('input[type="password"]', password)

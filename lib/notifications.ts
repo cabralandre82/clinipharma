@@ -1,41 +1,20 @@
+import 'server-only'
 import { createAdminClient } from '@/lib/db/admin'
+import { sendPushToUser, sendPushToRole, type PushPayload } from '@/lib/push'
+import { type NotificationType, SILENCEABLE_TYPES, CRITICAL_TYPES } from '@/lib/notification-types'
 
-export type NotificationType =
-  | 'ORDER_CREATED'
-  | 'ORDER_STATUS'
-  | 'PAYMENT_CONFIRMED'
-  | 'TRANSFER_REGISTERED'
-  | 'CONSULTANT_TRANSFER'
-  | 'DOCUMENT_UPLOADED'
-  | 'PRODUCT_INTEREST'
-  | 'REGISTRATION_REQUEST'
-  | 'STALE_ORDER'
-  | 'GENERIC'
+export type { NotificationType }
+export { SILENCEABLE_TYPES, CRITICAL_TYPES }
 
-// Types the user can silence. Critical types are always delivered.
-export const SILENCEABLE_TYPES: NotificationType[] = [
-  'TRANSFER_REGISTERED',
-  'CONSULTANT_TRANSFER',
-  'PRODUCT_INTEREST',
-  'REGISTRATION_REQUEST',
-  'STALE_ORDER',
-]
-
-// Critical types are NEVER silenced
-export const CRITICAL_TYPES: NotificationType[] = [
-  'ORDER_CREATED',
-  'ORDER_STATUS',
-  'PAYMENT_CONFIRMED',
-  'DOCUMENT_UPLOADED',
-]
-
-interface CreateNotificationInput {
+export interface CreateNotificationInput {
   userId: string
   type: NotificationType
   title: string
   body?: string
   message?: string
   link?: string
+  /** If true, also sends a push notification in addition to in-app */
+  push?: boolean | Partial<PushPayload>
 }
 
 /** Returns true if the user has this type enabled (or if it's critical). */
@@ -57,6 +36,7 @@ async function isTypeEnabled(userId: string, type: NotificationType): Promise<bo
 
 export async function createNotification(input: CreateNotificationInput): Promise<void> {
   try {
+    if (!input.userId) return
     const admin = createAdminClient()
     const enabled = await isTypeEnabled(input.userId, input.type)
     if (!enabled) return
@@ -68,6 +48,18 @@ export async function createNotification(input: CreateNotificationInput): Promis
       body: input.body ?? input.message ?? null,
       link: input.link ?? null,
     })
+
+    // Send push notification for critical types or when explicitly requested
+    const shouldPush = input.push !== undefined ? !!input.push : CRITICAL_TYPES.includes(input.type)
+
+    if (shouldPush) {
+      const pushOverride = typeof input.push === 'object' ? input.push : {}
+      await sendPushToUser(input.userId, {
+        title: pushOverride.title ?? input.title,
+        body: pushOverride.body ?? input.body ?? input.message ?? '',
+        link: pushOverride.link ?? input.link,
+      })
+    }
   } catch (err) {
     console.warn('[notifications] failed to create notification:', err)
   }
@@ -82,7 +74,6 @@ export async function createNotificationForRole(
     const { data: roles } = await admin.from('user_roles').select('user_id').eq('role', role)
     if (!roles?.length) return
 
-    // Filter by preferences (skip critical check — done per-user below)
     const eligibleUserIds: string[] = []
     for (const r of roles) {
       const enabled = await isTypeEnabled(r.user_id, input.type)
@@ -99,6 +90,17 @@ export async function createNotificationForRole(
         link: input.link ?? null,
       }))
     )
+
+    // Push for critical types
+    const shouldPush = input.push !== undefined ? !!input.push : CRITICAL_TYPES.includes(input.type)
+
+    if (shouldPush) {
+      await sendPushToRole(role, {
+        title: input.title,
+        body: input.body ?? input.message ?? '',
+        link: input.link,
+      })
+    }
   } catch (err) {
     console.warn('[notifications] failed to create role notification:', err)
   }

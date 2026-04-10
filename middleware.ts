@@ -10,6 +10,12 @@ const PUBLIC_ROUTES = [
   '/unauthorized',
   '/api/auth/forgot-password',
   '/api/registration/submit',
+  // Webhook endpoints — verified by their own secrets, no session needed
+  '/api/payments/asaas/webhook',
+  '/api/contracts/webhook',
+  '/api/cron/',
+  // Firebase service worker
+  '/firebase-messaging-sw.js',
 ]
 
 export async function middleware(request: NextRequest) {

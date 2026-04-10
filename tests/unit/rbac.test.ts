@@ -9,6 +9,7 @@ function makeUser(roles: string[], registration_status = 'APPROVED'): ProfileWit
     email: 'test@test.com',
     is_active: true,
     registration_status: registration_status as ProfileWithRoles['registration_status'],
+    notification_preferences: {},
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     roles: roles as ProfileWithRoles['roles'],

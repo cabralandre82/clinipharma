@@ -2,6 +2,74 @@
 
 ---
 
+## [1.3.0] — 2026-04-10
+
+### Added
+
+- **Firebase Push Notifications (FCM):**
+  - `lib/firebase-admin.ts` — Firebase Admin SDK singleton (server-side)
+  - `lib/push.ts` — `sendPushToUser` / `sendPushToRole` helpers
+  - `lib/notification-types.ts` — tipos/constantes separados para uso client-side sem dependências Node.js
+  - `public/firebase-messaging-sw.js` — service worker para mensagens em background
+  - `lib/firebase/client.ts` — SDK cliente; `requestPushPermission` (captura token FCM) + `onForegroundMessage` (toast em foreground)
+  - `components/push/push-permission.tsx` — botão no header para solicitar permissão; exibe status ativo/bloqueado
+  - `app/api/push/subscribe/route.ts` — `POST`/`DELETE` para salvar/remover FCM tokens na tabela `fcm_tokens`
+  - `lib/notifications.ts` — agora envia push automático para `CRITICAL_TYPES`; suporte a `push` flag por notificação
+  - **Pendente:** `NEXT_PUBLIC_FIREBASE_VAPID_KEY` — gerar em Firebase Console → Project Settings → Cloud Messaging → Web Push certificates → Generate key pair e atualizar no Vercel
+
+- **Asaas Payment Gateway (sandbox):**
+  - `lib/asaas.ts` — wrapper completo: `findOrCreateCustomer`, `createPayment`, `getPixQrCode`, `cancelPayment`, validação de webhook
+  - `app/api/payments/asaas/create/route.ts` — `POST`: cria cobrança Asaas para um pedido; salva `asaas_payment_id`, QR PIX, boleto URL, invoice URL
+  - `app/api/payments/asaas/webhook/route.ts` — recebe eventos Asaas (`PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`); avança status do pedido; dispara notificação in-app + push + SMS + WhatsApp + email
+  - `components/orders/payment-options.tsx` — UI com abas PIX (QR Code + copia-e-cola), Boleto e Cartão; botão de geração para admins
+  - Integrado na tela de detalhe do pedido (status `AWAITING_PAYMENT`)
+  - **Variáveis Vercel configuradas:** `ASAAS_API_KEY`, `ASAAS_API_URL` (sandbox), `ASAAS_WEBHOOK_SECRET`
+  - **Pendente produção:** substituir sandbox URL/key; configurar webhook no painel Asaas → `https://clinipharma.com.br/api/payments/asaas/webhook?accessToken=<secret>`
+
+- **SMS via Twilio (test credentials):**
+  - `lib/sms.ts` — `sendSms` com normalização de número BR; templates para eventos críticos
+  - Integrado no webhook Asaas (PAYMENT_CONFIRMED → SMS à clínica)
+  - **Variáveis Vercel:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` (test), `TWILIO_PHONE_NUMBER` (+15005550006 test)
+  - **Pendente produção:** conta real Twilio + número BR +55
+
+- **WhatsApp via Evolution API (infraestrutura pronta, deploy pendente):**
+  - `lib/whatsapp.ts` — wrapper `sendWhatsApp` + templates completos (pedido criado/confirmado/pronto/enviado/entregue, contrato enviado, cadastro aprovado/reprovado, alerta parado)
+  - Integrado no webhook Asaas e notificações
+  - **Pendente:** (1) número WhatsApp; (2) deploy Evolution API (Docker `atendai/evolution-api:v2.2.3` em Render/VPS pago ou Railway); (3) atualizar `EVOLUTION_API_URL` no Vercel
+
+- **Assinatura eletrônica Clicksign (sandbox):**
+  - `lib/clicksign.ts` — `generateContractPdf` (gera PDF A4 com `pdf-lib`), `uploadDocument`, `addSigner`, `notifySigners`, `createAndSendContract`
+  - Templates de contrato para CLINIC, DOCTOR, PHARMACY, CONSULTANT
+  - `app/api/contracts/route.ts` — `POST` (SUPER_ADMIN cria e envia contrato) + `GET` (lista contratos por entidade)
+  - `app/api/contracts/webhook/route.ts` — recebe eventos Clicksign (`sign`, `auto_close`, `deadline_exceeded`, `cancelled`); atualiza status + notifica usuário
+  - `components/contracts/contract-status.tsx` — exibe status do contrato com badge, data de assinatura e link para download
+  - Botão "Enviar contrato" adicionado em `RegistrationActions` (aprovação de clínica/médico)
+  - **Variáveis Vercel:** `CLICKSIGN_ACCESS_TOKEN` (sandbox), `CLICKSIGN_API_URL` (sandbox)
+  - **Pendente produção:** token + URL produção Clicksign; configurar webhook → `https://clinipharma.com.br/api/contracts/webhook`
+
+- **NF-e / NFS-e — modelo fiscal definido (implementação pendente CNPJ):**
+  - Modelo: Clinipharma recebe pagamento integral → repassa `pharmacy_cost` à farmácia + `consultant_commission` ao consultor → retém margem
+  - Farmácia emite NF-e para a clínica (produtos); Clinipharma emite NFS-e para a clínica (serviço de intermediação)
+  - Integrador escolhido: **Nuvem Fiscal**
+  - **Variáveis Vercel pré-configuradas:** `NUVEM_FISCAL_CLIENT_ID`, `NUVEM_FISCAL_CLIENT_SECRET`, `NUVEM_FISCAL_CNPJ` (todos com valor `PENDING_CNPJ`)
+  - **Pendente:** CNPJ + regime tributário com contadora → substituir valores no Vercel → implementar emissão
+
+### Database
+
+- **Migration 013 (`013_payments_push_contracts.sql`) aplicada:**
+  - `fcm_tokens` — armazena tokens FCM por usuário (com RLS)
+  - `payments.asaas_payment_id`, `asaas_invoice_url`, `asaas_pix_qr_code`, `asaas_pix_copy_paste`, `asaas_boleto_url`, `payment_link`, `payment_due_date` — campos do gateway Asaas
+  - `clinics.asaas_customer_id` — ID do cliente no Asaas (evita re-criação)
+  - `contracts` — contratos digitais com status, chaves Clicksign, signatários (com RLS)
+
+### Tests
+
+- **142 testes unitários passando (zero falhas)**
+- `tests/setup.ts` atualizado: mocks para `firebase-admin`, Firebase client SDK e Twilio (evita inicialização de credenciais nos testes)
+- `tests/unit/notifications.test.ts` — atualizado para importar de `@/lib/notification-types` (sem dependências Node.js)
+
+---
+
 ## [1.2.0] — 2026-04-10
 
 ### Added

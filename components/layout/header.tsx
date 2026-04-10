@@ -15,6 +15,7 @@ import {
 import { LogOut, User, ChevronDown } from 'lucide-react'
 import { NotificationBell } from '@/components/layout/notification-bell'
 import { GlobalSearch } from '@/components/layout/global-search'
+import { PushPermissionButton } from '@/components/push/push-permission'
 import type { ProfileWithRoles } from '@/types'
 
 const ROLE_LABELS: Record<string, string> = {
@@ -56,6 +57,7 @@ export function Header({ user, title }: HeaderProps) {
 
       <div className="flex items-center gap-3">
         <GlobalSearch />
+        <PushPermissionButton />
         <NotificationBell />
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors outline-none hover:bg-gray-50">

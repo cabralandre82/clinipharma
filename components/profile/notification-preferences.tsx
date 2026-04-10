@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Bell, Lock } from 'lucide-react'
-import { SILENCEABLE_TYPES, CRITICAL_TYPES } from '@/lib/notifications'
+import { SILENCEABLE_TYPES, CRITICAL_TYPES } from '@/lib/notification-types'
 
 const TYPE_LABELS: Record<string, string> = {
   ORDER_CREATED: 'Novo pedido criado',

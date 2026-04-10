@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SILENCEABLE_TYPES, CRITICAL_TYPES, type NotificationType } from '@/lib/notifications'
+import { SILENCEABLE_TYPES, CRITICAL_TYPES, type NotificationType } from '@/lib/notification-types'
 
 // ── SILENCEABLE_TYPES ────────────────────────────────────────────────────────
 

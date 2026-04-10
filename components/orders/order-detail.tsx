@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator'
 import { ButtonLink } from '@/components/ui/button-link'
 import { PharmacyOrderActions } from '@/components/orders/pharmacy-order-actions'
 import { DocumentManager } from '@/components/orders/document-manager'
+import { PaymentOptions } from '@/components/orders/payment-options'
 import {
   ChevronLeft,
   Building2,
@@ -89,10 +90,17 @@ export function OrderDetail({ order, currentUser }: OrderDetailProps) {
         id: string
         gross_amount: number
         status: string
-        payment_method: string
+        payment_method: string | null
         reference_code: string | null
         confirmed_at: string | null
         notes: string | null
+        asaas_payment_id: string | null
+        asaas_invoice_url: string | null
+        asaas_pix_qr_code: string | null
+        asaas_pix_copy_paste: string | null
+        asaas_boleto_url: string | null
+        payment_link: string | null
+        payment_due_date: string | null
       }>
     )?.[0] ?? null
 
@@ -292,9 +300,34 @@ export function OrderDetail({ order, currentUser }: OrderDetailProps) {
                   ) : (
                     <p className="text-sm text-gray-400">Sem dados de pagamento</p>
                   )}
-                  {isAdmin && payment?.status === 'PENDING' && (
+                  {/* Asaas payment gateway options */}
+                  {(order.order_status === 'AWAITING_PAYMENT' || payment?.asaas_payment_id) && (
+                    <div className="mt-3">
+                      <PaymentOptions
+                        orderId={String(order.id)}
+                        orderCode={String(order.code)}
+                        amount={Number(order.total_amount ?? 0) * 100}
+                        payment={
+                          payment
+                            ? {
+                                asaasPaymentId: payment.asaas_payment_id,
+                                asaasInvoiceUrl: payment.asaas_invoice_url,
+                                asaasPixQrCode: payment.asaas_pix_qr_code,
+                                asaasPixCopyPaste: payment.asaas_pix_copy_paste,
+                                asaasBoletoUrl: payment.asaas_boleto_url,
+                                paymentLink: payment.payment_link,
+                                paymentDueDate: payment.payment_due_date,
+                                status: payment.status,
+                              }
+                            : null
+                        }
+                        isAdmin={isAdmin}
+                      />
+                    </div>
+                  )}
+                  {isAdmin && payment?.status === 'PENDING' && !payment?.asaas_payment_id && (
                     <ButtonLink href={`/payments?order=${order.id}`} size="sm" className="mt-2">
-                      Confirmar pagamento
+                      Confirmar pagamento manualmente
                     </ButtonLink>
                   )}
                 </div>

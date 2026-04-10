@@ -5,18 +5,21 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2, XCircle, FileQuestion, Loader2, X } from 'lucide-react'
+import { CheckCircle2, XCircle, FileQuestion, Loader2, X, FileSignature } from 'lucide-react'
 import { ALL_REQUESTABLE_DOCS } from '@/lib/registration-constants'
 
 interface RegistrationActionsProps {
   requestId: string
+  entityType?: 'CLINIC' | 'DOCTOR'
+  entityId?: string
 }
 
 type Panel = null | 'reject' | 'docs'
 
-export function RegistrationActions({ requestId }: RegistrationActionsProps) {
+export function RegistrationActions({ requestId, entityType, entityId }: RegistrationActionsProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [contractLoading, setContractLoading] = useState(false)
   const [panel, setPanel] = useState<Panel>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [selectedDocs, setSelectedDocs] = useState<
@@ -49,6 +52,26 @@ export function RegistrationActions({ requestId }: RegistrationActionsProps) {
       toast.success('Cadastro aprovado! Email enviado ao solicitante.')
       router.push('/registrations')
       router.refresh()
+    }
+  }
+
+  async function handleSendContract() {
+    if (!entityType || !entityId) return
+    setContractLoading(true)
+    try {
+      const res = await fetch('/api/contracts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entityType, entityId }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        toast.error('Erro ao enviar contrato: ' + (json.error ?? 'Tente novamente'))
+        return
+      }
+      toast.success('Contrato enviado para assinatura digital via Clicksign!')
+    } finally {
+      setContractLoading(false)
     }
   }
 
@@ -97,6 +120,21 @@ export function RegistrationActions({ requestId }: RegistrationActionsProps) {
 
       {panel === null && (
         <div className="flex flex-wrap gap-3">
+          {entityType && entityId && (
+            <Button
+              variant="outline"
+              onClick={handleSendContract}
+              disabled={contractLoading}
+              className="gap-2 border-purple-300 text-purple-700 hover:bg-purple-50"
+            >
+              {contractLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileSignature className="h-4 w-4" />
+              )}
+              Enviar contrato
+            </Button>
+          )}
           <Button
             onClick={handleApprove}
             disabled={loading}

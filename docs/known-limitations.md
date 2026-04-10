@@ -2,9 +2,9 @@
 
 ## Financeiro
 
-- **Sem gateway de pagamento automático**: confirmação de pagamento é manual pelo admin
-- **Sem emissão fiscal**: NF-e/NFS-e não integrada
-- **Sem split de pagamento automático**: repasse é registrado manualmente
+- ~~Sem gateway de pagamento automático~~ ✅ **Implementado na v1.3.0**: Asaas (sandbox) integrado — PIX QR, boleto e cartão. Webhook confirma pagamento automaticamente. **Pendente produção**: trocar credenciais sandbox → produção no Vercel.
+- **Sem emissão fiscal**: NF-e/NFS-e não integrada — **modelo fiscal definido** (Nuvem Fiscal); implementação aguarda CNPJ com contadora. Variáveis `NUVEM_FISCAL_*` já configuradas no Vercel com valor `PENDING_CNPJ`.
+- **Sem split de pagamento automático**: repasse é registrado manualmente pelo admin (por design — admin aprova repasses)
 
 ## Autenticação
 
@@ -25,7 +25,9 @@
 
 ## Notificações
 
-- **Sem notificações push ou SMS**: apenas notificações in-app e emails transacionais
+- ~~Sem notificações push~~ ✅ **Implementado na v1.3.0**: Firebase FCM integrado — service worker, botão no header para ativar. **Pendente:** gerar VAPID key no Firebase Console → atualizar `NEXT_PUBLIC_FIREBASE_VAPID_KEY` no Vercel.
+- ~~Sem SMS~~ ✅ **Implementado na v1.3.0**: Twilio integrado (test credentials). **Pendente produção:** conta real Twilio + número BR.
+- **Sem WhatsApp**: infraestrutura e templates prontos via Evolution API. **Pendente:** número WhatsApp + deploy Evolution API (Docker) + atualizar `EVOLUTION_API_URL` no Vercel.
 - ~~Sem preferências de notificação por usuário~~ ✅ **Implementado na v1.2.0**: usuários podem silenciar tipos não-críticos em `/profile`
 - ~~Sem alertas de pedidos parados~~ ✅ **Implementado na v1.2.0**: widget no dashboard + Vercel Cron diário (08h) notifica SUPER_ADMIN e PHARMACY_ADMIN
 
@@ -44,11 +46,14 @@
 
 - ~~`CRON_SECRET` deve ser adicionado manualmente no Vercel~~ ✅ **Configurado**: adicionado via API em Production + Preview + Development. Redeploy concluído.
 
-## Integrações futuras planejadas
+## Assinatura Eletrônica
 
-- Gateway de pagamento (Stripe, PagSeguro, Asaas)
-- Emissão fiscal (NF-e/NFS-e)
-- Assinatura eletrônica de documentos
-- Notificações push / SMS / WhatsApp
-- App mobile
-- Integração com ERP de farmácias
+- ~~Sem assinatura eletrônica~~ ✅ **Implementado na v1.3.0**: Clicksign integrado (sandbox) — geração de PDF com `pdf-lib`, upload, signatários, notificação por email e webhook. Botão "Enviar contrato" disponível em aprovações de cadastro. **Pendente produção:** token + URL produção Clicksign; configurar webhook no painel Clicksign.
+
+## Integrações pendentes (itens menores)
+
+- **App mobile**: não existe, web é responsivo
+- **2FA**: autenticação em dois fatores não implementada
+- **Google OAuth**: preparado mas não ativado (requer Google Cloud Console)
+- **ERP de farmácias**: sem integração de estoque
+- **Variações de produto**: cada SKU é um produto separado
