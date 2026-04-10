@@ -54,16 +54,18 @@
 - [x] `NUVEM_FISCAL_CLIENT_SECRET` = `PENDING_CNPJ`
 - [x] `NUVEM_FISCAL_CNPJ` = `PENDING_CNPJ`
 
-### Variáveis opcionais — código pronto, credenciais pendentes
+### Variáveis opcionais — status de configuração
 
-- [ ] `NEXT_PUBLIC_SENTRY_DSN` — ativa error tracking automático (obter em sentry.io)
-- [ ] `SENTRY_ORG` — slug da organização no Sentry
-- [ ] `SENTRY_PROJECT` — nome do projeto no Sentry (ex: `clinipharma`)
-- [ ] `SENTRY_AUTH_TOKEN` — token para upload de source maps (Settings → Auth Tokens no Sentry)
-- [ ] `UPSTASH_REDIS_REST_URL` — ativa rate limit distribuído (obter em upstash.com)
-- [ ] `UPSTASH_REDIS_REST_TOKEN` — token de acesso ao Upstash Redis
+- [x] `NEXT_PUBLIC_SENTRY_DSN` — ✅ configurada (production + preview + development)
+- [ ] `SENTRY_ORG` — pendente: slug da organização (ex: `minha-empresa`). Obtido em sentry.io → Settings → Organization
+- [ ] `SENTRY_PROJECT` — pendente: slug do projeto no Sentry (ex: `clinipharma`)
+- [ ] `SENTRY_AUTH_TOKEN` — pendente: necessário apenas para upload de source maps. Obtido em sentry.io → Settings → **User** → Auth Tokens → Create New Token (NÃO é o Security Header do projeto, é um token pessoal de usuário com escopo `project:releases`)
+- [x] `UPSTASH_REDIS_REST_URL` — ✅ configurada (production + preview + development)
+- [x] `UPSTASH_REDIS_REST_TOKEN` — ✅ configurada (production + preview + development)
 
-> Sem essas variáveis a plataforma funciona normalmente. Com elas, erros aparecem no Sentry e o rate limit fica multi-instância safe.
+> **Sentry operacional:** erros já são capturados e enviados ao Sentry com o DSN configurado.  
+> **Sem source maps:** stack traces mostram código minificado até o `SENTRY_AUTH_TOKEN` ser configurado.  
+> **Upstash ativo:** rate limit distribuído ativo em todas as instâncias do Vercel.
 
 ---
 

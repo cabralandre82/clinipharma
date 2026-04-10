@@ -7,12 +7,12 @@
 
 ## Status de execução
 
-| Semana       | Status       | Itens                                                                                                                                                             |
-| ------------ | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Semana 1** | ✅ Concluída | Fix N+1 notificações, singleton admin, cache dashboard, cursor pagination (orders), streaming export                                                              |
-| **Semana 2** | ✅ Concluída | pg_stat_statements (migration 017), 11 índices por análise de código, cursor pagination (payments/audit/transfers), StaleOrdersWidget com filtro DB + cache 10min |
-| **Mês 2**    | ✅ Concluído | /api/health, error boundaries, loading skeletons, rate-limit Redis-ready, Sentry (no-op sem DSN), cursor pagination consultant-transfers                          |
-| **Mês 3**    | ⏳ Pendente  | Particionamento tabelas, Inngest, read replica                                                                                                                    |
+| Semana       | Status       | Itens                                                                                                                                                                 |
+| ------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Semana 1** | ✅ Concluída | Fix N+1 notificações, singleton admin, cache dashboard, cursor pagination (orders), streaming export                                                                  |
+| **Semana 2** | ✅ Concluída | pg_stat_statements (migration 017), 11 índices por análise de código, cursor pagination (payments/audit/transfers), StaleOrdersWidget com filtro DB + cache 10min     |
+| **Mês 2**    | ✅ Concluído | /api/health, error boundaries, loading skeletons, rate-limit Redis-ready, Sentry ativo (DSN + Upstash configurados no Vercel), cursor pagination consultant-transfers |
+| **Mês 3**    | ⏳ Pendente  | Particionamento tabelas, Inngest, read replica                                                                                                                        |
 
 ---
 
@@ -175,40 +175,46 @@ LIMIT 20;
 
 > O código já está implementado e funcionando. Abaixo o que você precisa fazer para ativar cada serviço.
 
-### Sentry — Error Tracking
+### Sentry — Error Tracking ✅ Ativo
 
-**Custo:** Free tier disponível (5k erros/mês gratuitos)
+**Custo:** Free tier (5k erros/mês gratuitos)
 
-**O que você faz:**
+**Status:** DSN configurado no Vercel → erros já são capturados e enviados ao Sentry.
 
-1. [sentry.io](https://sentry.io) → Create Project → Next.js → copiar o DSN
-2. Settings → Auth Tokens → Create Token (escopos: `project:releases`, `org:read`)
-3. Adicionar no Vercel (Settings → Environment Variables):
+**Pendente — Source Maps (stack traces legíveis):**
+
+O token que aparece em Project Settings → Security Headers **não serve** para source maps.  
+Para erros apontarem para o código TypeScript original (em vez do bundle minificado):
+
+1. sentry.io → clique no avatar → **User Settings** → **Auth Tokens** → Create New Token
+2. Escopos mínimos: `project:releases`, `org:read`
+3. Adicionar no Vercel:
 
 ```
-NEXT_PUBLIC_SENTRY_DSN   = https://xxx@oyyy.ingest.sentry.io/zzz
-SENTRY_ORG               = seu-org-slug
-SENTRY_PROJECT           = clinipharma
-SENTRY_AUTH_TOKEN        = sntrys_xxx
+SENTRY_ORG           = <slug-da-sua-org>   # visível na URL: sentry.io/organizations/<slug>/
+SENTRY_PROJECT       = clinipharma         # slug do projeto
+SENTRY_AUTH_TOKEN    = sntrys_xxx          # token criado acima
 ```
 
-**O que acontece automaticamente após o próximo deploy:**
-
-- Todos os erros capturados pelos error boundaries aparecem no Sentry com stack trace
-- Source maps enviados → erros apontam para o código TypeScript original, não o bundle minificado
-- Performance monitoring ativo (10% sampling em produção)
+Sem isso a plataforma funciona. Erros aparecem no Sentry, mas o stack trace mostra o bundle.
 
 ---
 
-### Upstash Redis — Rate Limit Distribuído
+### Upstash Redis — Rate Limit Distribuído ✅ Ativo
 
 **Custo:** Free tier (10k requests/dia gratuitos). Pago a partir de ~$10/mês em uso real.
 
-**O que você faz:**
+**Status:** `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` configuradas no Vercel.  
+Rate limit distribuído ativo desde o próximo deploy.
 
-1. [upstash.com](https://upstash.com) → Create Database → Global (menor latência multi-região)
-2. Copiar as duas credenciais da tela do dashboard
-3. Adicionar no Vercel:
+**Para referência futura (credenciais já configuradas):**
+
+```
+UPSTASH_REDIS_REST_URL   = https://subtle-mackerel-96084.upstash.io
+UPSTASH_REDIS_REST_TOKEN = [configurado — ver Vercel env vars]
+```
+
+3. Adicionar no Vercel (para futuras instâncias/projetos):
 
 ```
 UPSTASH_REDIS_REST_URL   = https://xxx.upstash.io
@@ -353,13 +359,13 @@ k6 run --vus 1000 --duration 60s tests/load/order-flow.js
 
 ## Checklist de escala por faixa
 
-| Faixa                 | ✅ Feito                                                                   | ⏳ Pendente                                                       |
-| --------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| **0–100 clínicas**    | Singleton admin, cache dashboard, fix N+1, cursor orders, streaming export | Sentry, Upstash Redis                                             |
-| **100–300 clínicas**  | —                                                                          | pg_stat_statements, índices confirmados, Vercel KV                |
-| **300–500 clínicas**  | —                                                                          | Particionamento tabelas, cursor pagination em todas as 13 páginas |
-| **500–1000 clínicas** | —                                                                          | Inngest, read replica, Firebase batch 500                         |
-| **1000+ clínicas**    | —                                                                          | Multi-região, DataDog, Supabase Enterprise                        |
+| Faixa                 | ✅ Feito                                                                                                      | ⏳ Pendente                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **0–100 clínicas**    | Singleton admin, cache dashboard, fix N+1, cursor orders, streaming export, Sentry ativo, Upstash Redis ativo | Source maps Sentry (SENTRY_AUTH_TOKEN)                            |
+| **100–300 clínicas**  | —                                                                                                             | pg_stat_statements, índices confirmados, Vercel KV                |
+| **300–500 clínicas**  | —                                                                                                             | Particionamento tabelas, cursor pagination em todas as 13 páginas |
+| **500–1000 clínicas** | —                                                                                                             | Inngest, read replica, Firebase batch 500                         |
+| **1000+ clínicas**    | —                                                                                                             | Multi-região, DataDog, Supabase Enterprise                        |
 
 ---
 
