@@ -8,6 +8,14 @@
     {
       "path": "/api/cron/stale-orders",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/purge-revoked-tokens",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/revalidate-pharmacies",
+      "schedule": "0 6 * * 1"
     }
   ]
 }

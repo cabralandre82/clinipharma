@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/db/admin'
 import { createAuditLog, AuditAction, AuditEntity } from '@/lib/audit'
 import { requireRole } from '@/lib/rbac'
+import { revokeAllUserTokens } from '@/lib/token-revocation'
 import { z } from 'zod'
 import { Resend } from 'resend'
 import type { UserRole } from '@/types'
@@ -241,6 +242,9 @@ export async function assignUserRole(userId: string, role: UserRole): Promise<{ 
       .upsert({ user_id: userId, role }, { onConflict: 'user_id' })
     if (error) return { error: 'Erro ao atribuir papel' }
 
+    // Revoke all active sessions — user must log in again to get a token with the new role
+    await revokeAllUserTokens(userId)
+
     await createAuditLog({
       actorUserId: actor.id,
       actorRole: actor.roles[0],
@@ -284,6 +288,9 @@ export async function deactivateUser(userId: string): Promise<{ error?: string }
       ban_duration: '876600h',
     })
     if (error) return { error: 'Erro ao desativar usuário' }
+
+    // Revoke all active sessions immediately — JWT is stateless so we blacklist
+    await revokeAllUserTokens(userId)
 
     await createAuditLog({
       actorUserId: actor.id,

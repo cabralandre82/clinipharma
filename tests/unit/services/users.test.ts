@@ -20,6 +20,9 @@ vi.mock('@/lib/audit', () => ({
   AuditAction: { CREATE: 'CREATE', UPDATE: 'UPDATE', STATUS_CHANGE: 'STATUS_CHANGE' },
   AuditEntity: { PROFILE: 'PROFILE' },
 }))
+vi.mock('@/lib/token-revocation', () => ({
+  revokeAllUserTokens: vi.fn().mockResolvedValue(undefined),
+}))
 
 const actorMock = {
   id: 'admin-1',

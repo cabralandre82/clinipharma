@@ -2,6 +2,51 @@
 
 ---
 
+## [3.0.0] — 2026-04-08 — Roadmap 90pts: Semana 1–2 (Segurança + API + Compliance)
+
+### Security — Session Revocation (Camadas 3 e 6)
+
+- **`revoked_tokens` table (migration 021):** Blacklist de JWTs com índices em `jti` e `expires_at`. RLS habilitada, acesso exclusivo via service_role.
+- **`lib/token-revocation.ts`:** `revokeToken()`, `revokeAllUserTokens()` (invalida refresh tokens via Supabase Admin API + insere sentinel `user:{id}:all`), `isTokenRevoked()`, `purgeExpiredTokens()`.
+- **`middleware.ts`:** Agora verifica blacklist a cada request autenticado. Token revogado → redireciona para login limpando cookies. Adicionado `X-Request-ID` em todos os responses.
+- **`services/users.ts`:** `deactivateUser()` e `assignUserRole()` chamam `revokeAllUserTokens()` imediatamente após a mudança.
+- **`/api/cron/purge-revoked-tokens`:** Cron diário às 03h UTC para limpar tokens expirados da blacklist.
+
+### Security — HTTP Security Headers (Camada 3)
+
+- **`next.config.ts`:** Adicionados em todas as rotas: `Content-Security-Policy`, `Strict-Transport-Security` (HSTS com preload), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`.
+
+### Reliability — Circuit Breaker (Camada 2)
+
+- **`lib/circuit-breaker.ts`:** Padrão CLOSED→OPEN→HALF_OPEN com threshold de 3 falhas em 60s, recovery de 30s. Alerta Sentry quando abre.
+- **`lib/asaas.ts`:** Envolvido com `withCircuitBreaker('asaas', ...)`.
+- **`lib/clicksign.ts`:** Envolvido com `withCircuitBreaker('clicksign', ...)`.
+- **`/api/health`:** Expõe estado de todos os circuits em `circuits` + alerta em `checks.circuits` quando algum está OPEN. Versão atualizada para `2.4.0`.
+
+### API — Resposta Padronizada (Camada 2)
+
+- **`lib/api-response.ts`:** Helpers `apiSuccess(data)` e `apiError(code, message, status)` com shape consistente: `{ data, meta: { requestId, timestamp, version } }` / `{ error: { code, message }, meta }`. Factory `ApiErrors` com erros comuns pré-definidos.
+
+### Compliance — CNPJ Validation (Camada 4)
+
+- **`lib/compliance.ts`:** Engine completo com `validateCNPJ()` (ReceitaWS API, fail-open em timeout/rate-limit), `canPlaceOrder()` (valida clínica + farmácia + CNPJ + produto), `canAcceptOrder()` (verifica farmácia ativa antes de avançar status).
+- **Migration 022:** Colunas `cnpj_validated_at` e `cnpj_situation` em `pharmacies` com índice partial para o cron.
+- **`/api/cron/revalidate-pharmacies`:** Cron semanal (segundas-feiras 06h UTC). Re-valida CNPJ de todas as farmácias ativas. Suspende automaticamente e notifica SUPER_ADMIN se CNPJ ficar inativo.
+
+### Infrastructure
+
+- **`vercel.json`:** Adicionados 2 novos crons: `purge-revoked-tokens` (diário 03h) e `revalidate-pharmacies` (semanal segunda 06h).
+
+### Documentation
+
+- **`docs/roadmap-90pts.md`:** Plano completo para atingir ≥ 90/100 em cada camada, com scores por camada, 17 itens de ação, cronograma de 10 semanas, e checklist de desbloqueio para quando CNPJ estiver disponível.
+
+### Tests
+
+- **510 testes passando** (sem regressões). Mock de `token-revocation` adicionado em `users.test.ts`.
+
+---
+
 ## [2.3.0] — 2026-04-08 — Auditoria 5: Services, Webhooks, Constraints
 
 ### Security — Critical

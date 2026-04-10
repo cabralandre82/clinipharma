@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
+import { getCircuitStates } from '@/lib/circuit-breaker'
 
 /**
  * GET /api/health
@@ -40,6 +41,18 @@ export async function GET() {
   checks.env = { ok: missingEnvs.length === 0 }
   if (missingEnvs.length > 0) checks.env.error = `Missing: ${missingEnvs.join(', ')}`
 
+  // ── Circuit breaker states ───────────────────────────────────────────────
+  const circuits = getCircuitStates()
+  const openCircuits = Object.entries(circuits).filter(([, v]) => v.state !== 'CLOSED')
+  if (openCircuits.length > 0) {
+    checks.circuits = {
+      ok: false,
+      error: `Open circuits: ${openCircuits.map(([k]) => k).join(', ')}`,
+    }
+  } else {
+    checks.circuits = { ok: true }
+  }
+
   // ── Result ───────────────────────────────────────────────────────────────
   const allOk = Object.values(checks).every((c) => c.ok)
   const totalMs = Date.now() - start
@@ -47,10 +60,11 @@ export async function GET() {
   return NextResponse.json(
     {
       status: allOk ? 'ok' : 'degraded',
-      version: process.env.npm_package_version ?? '1.9.0',
+      version: process.env.npm_package_version ?? '2.4.0',
       timestamp: new Date().toISOString(),
       totalLatencyMs: totalMs,
       checks,
+      circuits,
     },
     {
       status: allOk ? 200 : 503,

@@ -1,7 +1,9 @@
+import { withCircuitBreaker } from '@/lib/circuit-breaker'
+
 const BASE_URL = process.env.ASAAS_API_URL ?? 'https://sandbox.asaas.com/api/v3'
 const API_KEY = process.env.ASAAS_API_KEY ?? ''
 
-async function asaasFetch<T>(path: string, options?: RequestInit): Promise<T> {
+async function asaasFetchRaw<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -15,6 +17,10 @@ async function asaasFetch<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(`Asaas API error ${res.status}: ${body}`)
   }
   return res.json() as Promise<T>
+}
+
+async function asaasFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  return withCircuitBreaker(() => asaasFetchRaw<T>(path, options), { name: 'asaas' })
 }
 
 // ── Customer ─────────────────────────────────────────────────────────────────

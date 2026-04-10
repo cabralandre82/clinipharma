@@ -1,9 +1,10 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import { withCircuitBreaker } from '@/lib/circuit-breaker'
 
 const BASE_URL = process.env.CLICKSIGN_API_URL ?? 'https://sandbox.clicksign.com/api/v1'
 const ACCESS_TOKEN = process.env.CLICKSIGN_ACCESS_TOKEN ?? ''
 
-async function clicksignFetch<T>(path: string, options?: RequestInit): Promise<T> {
+async function clicksignFetchRaw<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${BASE_URL}${path}?access_token=${ACCESS_TOKEN}`
   const res = await fetch(url, {
     ...options,
@@ -14,6 +15,10 @@ async function clicksignFetch<T>(path: string, options?: RequestInit): Promise<T
     throw new Error(`Clicksign error ${res.status}: ${body}`)
   }
   return res.json() as Promise<T>
+}
+
+async function clicksignFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  return withCircuitBreaker(() => clicksignFetchRaw<T>(path, options), { name: 'clicksign' })
 }
 
 // ── Document ──────────────────────────────────────────────────────────────────
