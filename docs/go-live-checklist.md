@@ -4,7 +4,7 @@
 
 ## Infraestrutura
 
-- [x] Migrations aplicadas no Supabase de produção (`jomdntqlgrupvhrqoyai`) — inclui migrations 013 (fcm_tokens, asaas_fields, contracts), 014 (order_templates, sla_configs, order_tracking_tokens, product_variants, access_logs) e 015 (UNIQUE payments, índices críticos, precisão financeira numeric(15,2), soft-delete, RLS pharmacy docs)
+- [x] Migrations aplicadas no Supabase de produção (`jomdntqlgrupvhrqoyai`) — inclui migrations 013–016 (fcm_tokens, asaas_fields, contracts, templates, sla_configs, tracking, sessions, UNIQUE payments, índices, precisão financeira numeric(15,2), soft-delete, RLS, 8 novos índices de performance)
 - [x] RLS habilitada em todas as tabelas
 - [x] Buckets de Storage criados (`product-images` público, `order-documents` privado)
 - [x] Seed de categorias e produtos rodado
@@ -151,9 +151,9 @@
 
 ## Build e Deploy
 
-- [x] `npm run build` passa sem erros (v1.5.0 auditoria ✅)
+- [x] `npm run build` passa sem erros (v1.6.0 auditoria round 2 ✅)
 - [x] `npm run lint` passa sem warnings críticos
-- [x] Testes unitários passando
+- [x] Testes unitários passando (155 testes, 9 suítes)
 - [x] Deploy na Vercel bem-sucedido (status: Ready)
 - [x] URL de produção acessível (`https://clinipharma.com.br`)
 - [x] Repositório GitHub conectado (auto-deploy no push para `main`)
@@ -205,6 +205,12 @@
 - [x] State machine de status — PHARMACY_ADMIN não pode setar status financeiros
 - [x] Idempotência no webhook Asaas — pagamento duplo ignorado
 - [x] UNIQUE constraint em `payments.order_id` — previne cobrança duplicada
+- [x] IDOR bloqueado em `updateOwnProfile` — usuário não pode editar perfil alheio
+- [x] Dependência vulnerável `xlsx` substituída por `exceljs`
+- [x] `clinic_members` insert corrigido — aprovação de clínica agora linka usuário corretamente
+- [x] `product_price_history` corrigido — histórico de preço agora é persistido
+- [x] Cron `stale-orders` corrigido — farmácias agora recebem alertas de pedidos parados
+- [x] Tracking route — `isCancelled` e labels de todos os status corrigidos
 - [ ] **Rate limiter em produção multi-instância** — migrar `lib/rate-limit.ts` para Upstash Redis quando Vercel escalar além de 1 instância (atualmente in-memory funciona por instância)
 
 ## Email transacional
