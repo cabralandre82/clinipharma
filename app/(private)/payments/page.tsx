@@ -1,9 +1,10 @@
 import { Metadata } from 'next'
 import { createClient } from '@/lib/db/server'
 import { requireRolePage } from '@/lib/rbac'
-import { formatCurrency, formatDate, parsePage, paginationRange } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import { parseCursorParams, sliceCursorResult } from '@/lib/cursor-pagination'
+import { CursorPagination } from '@/components/ui/cursor-pagination'
 import { PaymentConfirmDialog } from '@/components/shared/payment-confirm-dialog'
-import { PaginationWrapper } from '@/components/ui/pagination-wrapper'
 import { ExportButton } from '@/components/shared/export-button'
 import {
   Table,
@@ -19,7 +20,7 @@ export const metadata: Metadata = { title: 'Pagamentos | Clinipharma' }
 const PAGE_SIZE = 20
 
 interface Props {
-  searchParams: Promise<{ page?: string }>
+  searchParams: Promise<{ after?: string; before?: string }>
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -40,29 +41,56 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default async function PaymentsPage({ searchParams }: Props) {
   await requireRolePage(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
-  const { page: pageRaw } = await searchParams
+  const { after, before } = await searchParams
   const supabase = await createClient()
 
-  const page = parsePage(pageRaw)
-  const { from, to } = paginationRange(page, PAGE_SIZE)
+  const cursor = parseCursorParams({ after, before, pageSize: PAGE_SIZE })
 
-  const { data: payments, count } = await supabase
+  let q = supabase
     .from('payments')
     .select(
       `id, gross_amount, status, payment_method, reference_code,
        confirmed_at, notes, created_at,
-       orders (code, clinics (trade_name), doctors (full_name))`,
-      { count: 'exact' }
+       orders (code, clinics (trade_name), doctors (full_name))`
     )
-    .order('created_at', { ascending: false })
-    .range(from, to)
+    .order('created_at', { ascending: cursor.ascending })
+
+  if (cursor.after) q = q.lt('created_at', cursor.after)
+  if (cursor.before) q = q.gt('created_at', cursor.before)
+
+  const { data: raw } = await q.limit(cursor.fetchSize)
+
+  type PaymentRow = {
+    id: string
+    gross_amount: number
+    status: string
+    payment_method: string | null
+    reference_code: string | null
+    confirmed_at: string | null
+    notes: string | null
+    created_at: string
+    orders: {
+      code: string
+      clinics: { trade_name: string } | null
+      doctors: { full_name: string } | null
+    } | null
+  }
+
+  const {
+    rows: payments,
+    nextCursor,
+    prevCursor,
+    isFirstPage,
+  } = sliceCursorResult<PaymentRow>((raw ?? []) as unknown as PaymentRow[], cursor)
 
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Pagamentos</h1>
-          <p className="mt-0.5 text-sm text-gray-500">{count ?? 0} pagamento(s) no total</p>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {payments.length} pagamento{payments.length !== 1 ? 's' : ''} nesta página
+          </p>
         </div>
         <ExportButton type="payments" />
       </div>
@@ -82,70 +110,68 @@ export default async function PaymentsPage({ searchParams }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(payments?.length ?? 0) === 0 ? (
+              {payments.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="py-10 text-center text-gray-400">
                     Nenhum pagamento encontrado
                   </TableCell>
                 </TableRow>
               ) : (
-                payments?.map((p) => {
-                  const order = p.orders as unknown as {
-                    code: string
-                    clinics: { trade_name: string } | null
-                    doctors: { full_name: string } | null
-                  } | null
-                  return (
-                    <TableRow key={p.id} className="hover:bg-gray-50">
-                      <TableCell>
-                        <span className="font-mono text-xs font-medium text-[hsl(213,75%,24%)]">
-                          {order?.code ?? '—'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-700">
-                          {order?.clinics?.trade_name ?? '—'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className="text-sm font-semibold">
-                          {formatCurrency(p.gross_amount)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">{p.payment_method}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            STATUS_STYLES[p.status] ?? 'bg-gray-100 text-gray-700'
-                          }`}
-                        >
-                          {STATUS_LABELS[p.status] ?? p.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-xs text-gray-500">
-                        {formatDate(p.created_at)}
-                      </TableCell>
-                      <TableCell>
-                        {p.status === 'PENDING' && (
-                          <PaymentConfirmDialog
-                            paymentId={p.id}
-                            amount={p.gross_amount}
-                            orderCode={order?.code ?? ''}
-                          />
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
+                payments.map((p) => (
+                  <TableRow key={p.id} className="hover:bg-gray-50">
+                    <TableCell>
+                      <span className="font-mono text-xs font-medium text-[hsl(213,75%,24%)]">
+                        {p.orders?.code ?? '—'}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-gray-700">
+                        {p.orders?.clinics?.trade_name ?? '—'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className="text-sm font-semibold">
+                        {formatCurrency(Number(p.gross_amount))}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-gray-600">{p.payment_method}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          STATUS_STYLES[p.status] ?? 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {STATUS_LABELS[p.status] ?? p.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-xs text-gray-500">
+                      {formatDate(p.created_at)}
+                    </TableCell>
+                    <TableCell>
+                      {p.status === 'PENDING' && (
+                        <PaymentConfirmDialog
+                          paymentId={p.id}
+                          amount={p.gross_amount}
+                          orderCode={p.orders?.code ?? ''}
+                        />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
         </div>
       </div>
 
-      <PaginationWrapper total={count ?? 0} pageSize={PAGE_SIZE} currentPage={page} />
+      <CursorPagination
+        nextCursor={nextCursor}
+        prevCursor={isFirstPage ? null : prevCursor}
+        pageSize={PAGE_SIZE}
+        resultCount={payments.length}
+      />
     </div>
   )
 }

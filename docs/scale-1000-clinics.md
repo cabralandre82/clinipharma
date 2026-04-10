@@ -7,12 +7,12 @@
 
 ## Status de execução
 
-| Semana       | Status       | Itens                                                                                                |
-| ------------ | ------------ | ---------------------------------------------------------------------------------------------------- |
-| **Semana 1** | ✅ Concluída | Fix N+1 notificações, singleton admin, cache dashboard, cursor pagination (orders), streaming export |
-| **Semana 2** | ⏳ Pendente  | pg_stat_statements, índices confirmados por dados, remover índices inúteis                           |
-| **Mês 2**    | ⏳ Pendente  | Upstash Redis, Sentry, Vercel KV                                                                     |
-| **Mês 3**    | ⏳ Pendente  | Particionamento tabelas, Inngest, read replica                                                       |
+| Semana       | Status       | Itens                                                                                                                                                             |
+| ------------ | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Semana 1** | ✅ Concluída | Fix N+1 notificações, singleton admin, cache dashboard, cursor pagination (orders), streaming export                                                              |
+| **Semana 2** | ✅ Concluída | pg_stat_statements (migration 017), 11 índices por análise de código, cursor pagination (payments/audit/transfers), StaleOrdersWidget com filtro DB + cache 10min |
+| **Mês 2**    | ⏳ Pendente  | Upstash Redis, Sentry, Vercel KV                                                                                                                                  |
+| **Mês 3**    | ⏳ Pendente  | Particionamento tabelas, Inngest, read replica                                                                                                                    |
 
 ---
 
@@ -149,7 +149,7 @@ const stream = new ReadableStream({
 
 ---
 
-## Semana 2 — Diagnóstico real antes de adicionar índices (⏳ Pendente)
+## Semana 2 — Índices por análise de código + cursor nas páginas de crescimento rápido (✅ Implementado)
 
 ```sql
 -- Habilitar no Supabase Dashboard → SQL Editor

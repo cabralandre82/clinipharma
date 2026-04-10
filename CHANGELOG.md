@@ -2,6 +2,31 @@
 
 ---
 
+## [1.9.0] — 2026-04-08 — Semana 2: Índices, Cursor Pagination e Cache de Widget
+
+### Performance (Semana 2)
+
+- **Migration 017 — `pg_stat_statements` + 11 índices:** Extensão de diagnóstico habilitada. Índices adicionados por análise de código: `profiles(full_name)`, `clinics(trade_name)`, `pharmacies(trade_name)`, `doctors(full_name)`, `sales_consultants(full_name)`, `payments(created_at DESC)`, `transfers(created_at DESC)`, `consultant_commissions(created_at DESC)`, `audit_logs(created_at DESC)`, `notifications(user_id, created_at DESC)`, `products(name)`, `orders(updated_at)`, `registration_requests(status, created_at DESC)`.
+- **Cursor pagination em `/payments`, `/audit`, `/transfers`:** Substituído `OFFSET/LIMIT` por cursor `created_at` nas três páginas de maior crescimento após `/orders`. Novo helper reutilizável `lib/cursor-pagination.ts` com `parseCursorParams` e `sliceCursorResult`.
+- **StaleOrdersWidget — filtro DB pré-cursor + `unstable_cache`:** O widget agora filtra `updated_at <= now() - 1 day` no banco (eliminando full table scan de toda a tabela `orders`). Resultado cacheado por 10 minutos com tag `'dashboard'`.
+
+### Tests
+
+- **394 testes passando** (era 370 após Semana 1).
+- `tests/unit/cursor-pagination.test.ts` — 15 novos testes cobrindo `parseCursorParams`, `sliceCursorResult`, e cenário de navegação multi-página (3 páginas, 55 registros).
+- `tests/unit/lib/notifications-batch.test.ts` — 10 novos testes para `isPreferenceEnabled` (pure function) e semântica do batch query (profileMap filtering).
+
+### Changes
+
+- `supabase/migrations/017_week2_indexes.sql` — migration aplicada
+- `lib/cursor-pagination.ts` — helper reutilizável de cursor pagination
+- `app/(private)/payments/page.tsx` — cursor pagination
+- `app/(private)/audit/page.tsx` — cursor pagination
+- `app/(private)/transfers/page.tsx` — cursor pagination
+- `components/dashboard/stale-orders-widget.tsx` — filtro DB + `unstable_cache` 10min
+
+---
+
 ## [1.8.0] — 2026-04-08 — Semana 1: Performance & Escala
 
 ### Performance (Semana 1 — zero custo, só código)
