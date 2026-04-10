@@ -4,7 +4,7 @@
 
 ## Infraestrutura
 
-- [x] Migrations aplicadas no Supabase de produção (`jomdntqlgrupvhrqoyai`) — inclui migration 013 (fcm_tokens, asaas_fields, contracts)
+- [x] Migrations aplicadas no Supabase de produção (`jomdntqlgrupvhrqoyai`) — inclui migrations 013 (fcm_tokens, asaas_fields, contracts) e 014 (order_templates, sla_configs, order_tracking_tokens, product_variants, access_logs)
 - [x] RLS habilitada em todas as tabelas
 - [x] Buckets de Storage criados (`product-images` público, `order-documents` privado)
 - [x] Seed de categorias e produtos rodado
@@ -151,9 +151,9 @@
 
 ## Build e Deploy
 
-- [x] `npm run build` passa sem erros
+- [x] `npm run build` passa sem erros (v1.4.0 ✅)
 - [x] `npm run lint` passa sem warnings críticos
-- [x] 142 testes unitários passando
+- [x] Testes unitários passando
 - [x] Deploy na Vercel bem-sucedido (status: Ready)
 - [x] URL de produção acessível (`https://clinipharma.com.br`)
 - [x] Repositório GitHub conectado (auto-deploy no push para `main`)
@@ -181,9 +181,15 @@
 - [x] Busca global (pedidos, clínicas, médicos, produtos)
 - [x] Exportação CSV/Excel com filtro de período
 - [x] Relatórios com Recharts interativo e DateRangePicker
+- [x] **BI Avançado** — comparação de períodos, ranking clínicas, funil de conversão, margem real por produto
 - [x] Alertas de pedidos parados (widget + Cron diário + email digest)
+- [x] **SLA configurável** — thresholds por farmácia com 3 níveis (aviso/alerta/crítico); UI em Configurações
 - [x] Preferências de notificação por usuário
 - [x] Produto indisponível + botão "Tenho interesse"
+- [x] **Variações de produto** — atributos livres, preço/custo/comissão por variante
+- [x] **Templates de pedido** — salvar, reutilizar e repetir pedidos por clínica
+- [x] **Portal de rastreamento público** — `/track/[token]` sem login, timeline + ETA
+- [x] **Histórico de sessões** — log de acesso com detecção de novo dispositivo + alerta in-app
 - [x] Auto-cadastro público de clínicas/médicos com aprovação e docs
 - [x] Contratos digitais via Clicksign (sandbox → produção pendente)
 

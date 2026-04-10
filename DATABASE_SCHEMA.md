@@ -4,16 +4,18 @@
 
 O banco é organizado em 5 schemas lógicos:
 
-| Schema             | Tabelas                                                                                                               |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `auth`             | Gerenciado pelo Supabase Auth                                                                                         |
-| `public.auth_ext`  | `profiles`, `user_roles`                                                                                              |
-| `public.orgs`      | `clinics`, `clinic_members`, `doctors`, `doctor_clinic_links`, `pharmacies`, `pharmacy_members`                       |
-| `public.catalog`   | `product_categories`, `products`, `product_images`, `product_price_history`, `pharmacy_products`                      |
-| `public.orders`    | `orders`, `order_items`, `order_documents`, `order_status_history`, `order_operational_updates`                       |
-| `public.financial` | `payments`, `commissions`, `transfers`                                                                                |
-| `public.system`    | `audit_logs`, `app_settings`, `notifications`, `product_interests`, `registration_requests`, `registration_documents` |
-| `public.sales`     | `sales_consultants`, `consultant_commissions`, `consultant_transfers`                                                 |
+| Schema             | Tabelas                                                                                                                                             |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth`             | Gerenciado pelo Supabase Auth                                                                                                                       |
+| `public.auth_ext`  | `profiles`, `user_roles`                                                                                                                            |
+| `public.orgs`      | `clinics`, `clinic_members`, `doctors`, `doctor_clinic_links`, `pharmacies`, `pharmacy_members`                                                     |
+| `public.catalog`   | `product_categories`, `products`, `product_images`, `product_price_history`, `pharmacy_products`, `product_variants`                                |
+| `public.orders`    | `orders`, `order_items`, `order_documents`, `order_status_history`, `order_operational_updates`, `order_templates`, `order_tracking_tokens`         |
+| `public.financial` | `payments`, `commissions`, `transfers`                                                                                                              |
+| `public.system`    | `audit_logs`, `app_settings`, `notifications`, `product_interests`, `registration_requests`, `registration_documents`, `sla_configs`, `access_logs` |
+| `public.sales`     | `sales_consultants`, `consultant_commissions`, `consultant_transfers`                                                                               |
+| `public.push`      | `fcm_tokens`                                                                                                                                        |
+| `public.contracts` | `contracts`                                                                                                                                         |
 
 > Na prática, todas as tabelas ficam no schema `public` do Supabase. Os agrupamentos acima são lógicos.
 
@@ -546,3 +548,119 @@ created_at  timestamptz NOT NULL DEFAULT now()
 
 - `idx_notifications_user` em `(user_id, created_at DESC)` — listagem do sino
 - `idx_notifications_unread` em `(user_id) WHERE read_at IS NULL` — contagem de não lidas
+
+---
+
+## Tabela: product_variants
+
+> Criada na migration `014`. Variações de um produto (concentração, apresentação, quantidade) com preço e custo independentes.
+
+```sql
+id                        uuid PRIMARY KEY DEFAULT gen_random_uuid()
+product_id                uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE
+name                      text NOT NULL                -- ex: "500mg / Comprimido / 30un"
+attributes                jsonb NOT NULL DEFAULT '{}'  -- ex: {concentracao: "500mg", apresentacao: "Comprimido"}
+price_current             numeric(12,2) NOT NULL
+pharmacy_cost             numeric(12,2) NOT NULL DEFAULT 0
+platform_commission_type  text NOT NULL DEFAULT 'PERCENTAGE' CHECK (IN 'PERCENTAGE','FIXED')
+platform_commission_value numeric(12,2) NOT NULL DEFAULT 0
+is_default                boolean NOT NULL DEFAULT false
+is_active                 boolean NOT NULL DEFAULT true
+created_at                timestamptz DEFAULT now()
+updated_at                timestamptz DEFAULT now()
+```
+
+**Regra:** apenas uma variante por produto pode ter `is_default = true`. Ao definir uma nova padrão, as demais são automaticamente desmarcadas via API route.
+
+**RLS:** leitura pública para variantes ativas; escrita apenas para SUPER_ADMIN e PLATFORM_ADMIN.
+
+> Produtos existentes foram migrados automaticamente com uma variante "Padrão" usando os valores do produto original.
+
+---
+
+## Tabela: order_templates
+
+> Criada na migration `014`. Templates de pedido reutilizáveis, com escopo por clínica.
+
+```sql
+id          uuid PRIMARY KEY DEFAULT gen_random_uuid()
+clinic_id   uuid NOT NULL REFERENCES clinics(id) ON DELETE CASCADE
+name        text NOT NULL
+items       jsonb NOT NULL DEFAULT '[]'
+-- items: [{product_id, variant_id, quantity, pharmacy_id, unit_price, pharmacy_cost_per_unit, product_name}]
+created_by  uuid REFERENCES profiles(id) ON DELETE SET NULL
+created_at  timestamptz DEFAULT now()
+updated_at  timestamptz DEFAULT now()
+```
+
+**RLS:** membros da clínica gerenciam templates da própria clínica; admins têm acesso total.
+
+---
+
+## Tabela: order_tracking_tokens
+
+> Criada na migration `014`. Token único por pedido para rastreamento público sem autenticação.
+
+```sql
+id         uuid PRIMARY KEY DEFAULT gen_random_uuid()
+order_id   uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE UNIQUE
+token      text NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(32), 'hex')
+expires_at timestamptz    -- null = não expira; definido como 30 dias após entrega
+created_at timestamptz DEFAULT now()
+```
+
+**RLS:** leitura pública (validação do token feita na API route); escrita somente via `service_role`.
+
+**Endpoint público:** `GET /api/tracking?token=<token>` → retorna status, timeline (sem dados financeiros), ETA.  
+**Página pública:** `/track/[token]` — acessível sem login.
+
+---
+
+## Tabela: sla_configs
+
+> Criada na migration `014`. Configurações de SLA por status de pedido, com suporte a overrides por farmácia.
+
+```sql
+id            uuid PRIMARY KEY DEFAULT gen_random_uuid()
+pharmacy_id   uuid REFERENCES pharmacies(id) ON DELETE CASCADE  -- null = global
+order_status  text NOT NULL
+warning_days  int NOT NULL DEFAULT 2
+alert_days    int NOT NULL DEFAULT 3
+critical_days int NOT NULL DEFAULT 5
+created_at    timestamptz DEFAULT now()
+updated_at    timestamptz DEFAULT now()
+UNIQUE(pharmacy_id, order_status)
+```
+
+**Lógica de resolução:** ao verificar SLA de um pedido de uma farmácia, o sistema busca o override específico da farmácia; se não existir, usa o global (`pharmacy_id IS NULL`).
+
+**RLS:** somente SUPER_ADMIN pode gerenciar; leitura via `service_role`.
+
+**Seed padrão:** 11 status configurados com `warning=2, alert=3, critical=5` (financeiro) e `warning=3, alert=5, critical=8` (operacional).
+
+---
+
+## Tabela: access_logs
+
+> Criada na migration `014`. Histórico de acesso dos usuários com detecção de novos dispositivos.
+
+```sql
+id            uuid PRIMARY KEY DEFAULT gen_random_uuid()
+user_id       uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE
+event         text NOT NULL DEFAULT 'SESSION_START'
+              CHECK (IN 'LOGIN','LOGOUT','SESSION_START','PASSWORD_RESET')
+ip            text
+user_agent    text
+city          text
+country       text DEFAULT 'BR'
+is_new_device boolean NOT NULL DEFAULT false
+created_at    timestamptz DEFAULT now()
+```
+
+**RLS:** cada usuário vê apenas seus próprios logs; SUPER_ADMIN e PLATFORM_ADMIN veem todos.
+
+**Retenção:** 90 dias (aplicação não purga automaticamente no MVP — recomendado adicionar job de limpeza em produção).
+
+**Alerta:** se `is_new_device = true`, uma notificação in-app é disparada automaticamente via `lib/session-logger.ts`.
+
+**Índices:** `idx_access_logs_user_id`, `idx_access_logs_created_at`
