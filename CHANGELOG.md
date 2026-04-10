@@ -2,6 +2,37 @@
 
 ---
 
+## [2.1.0] — 2026-04-08 — Auditoria 3: Segurança Cirúrgica
+
+### Security — Critical (3 IDORs corrigidos)
+
+- **`updateOrderStatus` — PHARMACY_ADMIN bypass:** Qualquer farmacêutico podia alterar o status de pedidos de outras farmácias. Adicionado check de `pharmacy_members` verificando se `user_id + pharmacy_id` do pedido coincidem antes de permitir a transição.
+- **`/api/orders/templates` — IDOR completo:** GET, POST e DELETE aceitavam qualquer `clinicId` sem verificar se o usuário pertencia àquela clínica. Adicionado check de `clinic_members` + verificação de `created_by` no DELETE. Zod schema com UUID obrigatório.
+- **`/api/orders/reorder` — IDOR:** Qualquer usuário autenticado podia repetir pedido de qualquer clínica passando um `orderId` ou `templateId` arbitrário. Adicionado check de `clinic_members` em ambos os caminhos. Zod schema com `.uuid()` obrigatório.
+
+### Security — Medium (5 vulnerabilidades)
+
+- **`GET /api/settings/sla` sem autenticação:** Qualquer pessoa podia consultar configurações de SLA sem estar logada. Adicionado `getCurrentUser()` com 401.
+- **`GET /api/products/variants` sem autenticação:** Preços e atributos de variantes expostos sem autenticação. Adicionado `getCurrentUser()` com 401.
+- **Race condition em `confirmPayment`:** Duas requisições simultâneas podiam ambas passar pelo guard `status !== 'PENDING'` antes de qualquer uma atualizar. Substituído por UPDATE atômico `WHERE status = 'PENDING'` com verificação de linhas afetadas.
+- **`/api/registration/upload-docs` sem validação server-side:** Qualquer tipo e tamanho de arquivo era aceito. Adicionado whitelist de MIME types (PDF, JPG, PNG, WEBP) e limite de 10 MB por arquivo.
+- **`/api/documents/upload` sem rate limiting:** Endpoint de upload sem proteção contra abuso. Adicionado `uploadLimiter` (20 uploads/min por usuário).
+
+### Validation — Zod schemas adicionados
+
+- **`/api/payments/asaas/create`:** `orderId` agora validado como UUID.
+- **`/api/contracts` POST:** `entityType` como enum + `entityId` como UUID obrigatório.
+- **`/api/settings/sla` PATCH:** Configs validados: `warning_days`, `alert_days`, `critical_days` como inteiros ≥ 0.
+- **`/api/orders/reorder`:** Schema com `.uuid()` para `orderId` e `templateId`.
+- **`/api/orders/templates` POST:** Schema com validação de `name`, `clinicId` (UUID) e `items`.
+
+### Tests
+
+- **37 novos testes** cobrindo: state machine (admin + pharmacy, todos os estados, transições inválidas, estados terminais), cálculo de comissões com edge cases de ponto flutuante, schemas Zod com entradas inválidas.
+- **Total: 448 testes passando.**
+
+---
+
 ## [2.0.0] — 2026-04-08 — Mês 2: Observabilidade, Resiliência e Escala
 
 ### Infrastructure
