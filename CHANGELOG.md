@@ -2,6 +2,31 @@
 
 ---
 
+## [1.7.0] — 2026-04-10
+
+### Performance
+
+- **Fix O(n) → O(1) no cron `stale-orders`:** loop de N queries SQL por PHARMACY_ADMIN substituído por uma única query batch via `.in('user_id', pharmacyAdminIds)`. Ganho: de ~N×latência a 1×latência, independente do número de farmácias.
+
+### Tests
+
+- **Cobertura unitária:** de 45% (baseline) para **75.86% statements / 81.55% functions** com 370 testes em 28 arquivos de teste.
+- **Novos testes para todos os services:** `clinics`, `doctors`, `pharmacies`, `products`, `payments`, `consultants`, `users`, `orders`, `settings`.
+- **Novos testes para lib:** `utils`, `cnpj`, `rate-limit`, `notification-types`, `stale-orders`, `export` (CSV + XLSX), `session`, `rbac`, `commission`, `audit`.
+- **Vitest coverage configurado:** `@vitest/coverage-v8` com thresholds de 75% statements / 60% branches / 80% functions.
+- **Setup de mocks centralizado:** `tests/setup.ts` com factory `makeQueryBuilder`, `mockSupabaseAdmin`, `mockSupabaseClient` reutilizáveis.
+
+### Documentation
+
+- **`docs/scale-1000-clinics.md` criado:** plano técnico detalhado para operação com 1000+ clínicas cobrindo rate limiter distribuído, particionamento de tabelas, cache de métricas, streaming de exports, Firebase batch, PgBouncer tuning, disaster recovery, roadmap de custo por faixa de clínicas.
+
+### Config
+
+- **`tsconfig.json`:** excluído `tests/**` da compilação principal (mocks são tipados frouxamente por design).
+- **`vitest.config.ts`:** coverage configurado com include/exclude adequados e thresholds para CI.
+
+---
+
 ## [1.6.0] — 2026-04-08
 
 ### Fixed (Auditoria completa — Round 2: arquivo por arquivo)

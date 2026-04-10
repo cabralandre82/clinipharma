@@ -10,6 +10,34 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/unit/**/*.test.ts', 'tests/unit/**/*.test.tsx'],
     exclude: ['tests/e2e/**'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'html'],
+      include: ['lib/**/*.ts', 'services/**/*.ts'],
+      exclude: [
+        'lib/db/**',
+        'lib/firebase/client.ts',
+        'lib/firebase-admin.ts',
+        'lib/push.ts',
+        'lib/sms.ts',
+        'lib/whatsapp.ts',
+        'lib/asaas.ts',
+        'lib/clicksign.ts',
+        'lib/email/index.ts',
+        'lib/email/templates.ts',
+        'lib/session-logger.ts',
+        '**/*.d.ts',
+      ],
+      thresholds: {
+        // Unit-test ceiling: complex service success paths (multi-step DB chains)
+        // require integration tests. 95% total coverage needs integration tests
+        // against a real Supabase test project.
+        statements: 75,
+        branches: 60,
+        functions: 80,
+        lines: 75,
+      },
+    },
   },
   resolve: {
     alias: {

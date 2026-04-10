@@ -96,27 +96,35 @@ export async function GET(req: NextRequest) {
     pharmacyGroups[o.pharmacy_id].push(o)
   }
 
-  // Get PHARMACY_ADMIN users with their pharmacy membership (profiles has no pharmacy_id)
+  // Get PHARMACY_ADMIN users with profiles in one query
   const { data: pharmacyAdmins } = await admin
     .from('user_roles')
     .select('user_id, profiles(email, full_name)')
     .eq('role', 'PHARMACY_ADMIN')
 
+  const pharmacyAdminIds = (pharmacyAdmins ?? []).map((pa) => pa.user_id)
+
+  // Batch-fetch ALL pharmacy memberships in a single query — O(1) instead of O(n)
+  const { data: allMemberships } = pharmacyAdminIds.length
+    ? await admin
+        .from('pharmacy_members')
+        .select('user_id, pharmacy_id')
+        .in('user_id', pharmacyAdminIds)
+    : { data: [] }
+
+  const membershipMap: Record<string, string> = {}
+  for (const m of allMemberships ?? []) {
+    membershipMap[m.user_id] = m.pharmacy_id
+  }
+
   for (const pa of pharmacyAdmins ?? []) {
     const profile = pa.profiles as { email?: string; full_name?: string } | null
     if (!profile?.email) continue
 
-    // Look up which pharmacy this user belongs to
-    const { data: membership } = await admin
-      .from('pharmacy_members')
-      .select('pharmacy_id')
-      .eq('user_id', pa.user_id)
-      .limit(1)
-      .maybeSingle()
+    const pharmacyId = membershipMap[pa.user_id]
+    if (!pharmacyId) continue
 
-    if (!membership?.pharmacy_id) continue
-
-    const myStale = pharmacyGroups[membership.pharmacy_id] ?? []
+    const myStale = pharmacyGroups[pharmacyId] ?? []
     if (myStale.length === 0) continue
 
     await createNotification({
