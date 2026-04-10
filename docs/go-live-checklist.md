@@ -62,7 +62,26 @@
 - [x] **API response padronizada** — `lib/api-response.ts` com `apiSuccess()`, `apiError()`, `ApiErrors` factory.
 - [x] **Compliance engine** — `lib/compliance.ts` com `validateCNPJ()` (ReceitaWS), `canPlaceOrder()`, `canAcceptOrder()`.
 - [x] **CNPJ validation cron** — revalidação semanal (segunda 06h UTC) suspende farmácias com CNPJ irregular e notifica admins.
-- [ ] **Cloudflare WAF** — ativar OWASP Core Ruleset + rate limit 100 req/min por IP em `/api/` (configuração manual no painel Cloudflare)
+- [x] **Compliance integrado nos services** — `createPharmacy`, `updatePharmacyStatus('ACTIVE')` e `createOrder` validam compliance antes de prosseguir.
+- [x] **API versioning** — rewrites `/api/v1/*` → `/api/*` ativo em `next.config.ts`.
+
+## Background Jobs (Inngest)
+
+- [x] **Inngest v4** — `INNGEST_SIGNING_KEY` + `INNGEST_EVENT_KEY` configuradas no Vercel (Production + Preview + Development). ✅
+- [x] **`/api/inngest` route** — serve endpoint registrado. Ativo em produção após redeploy.
+- [x] **`export-orders` job** — exportação CSV sem timeout, envia resultado por email.
+- [x] **`stale-orders` job** — alerta de pedidos parados com retry automático 3×.
+- [x] **`asaas-webhook` job** — webhook de pagamento enfileirado no Inngest, retorna 200 imediatamente.
+- [ ] Criar conta em [app.inngest.com](https://app.inngest.com) e sincronizar funções no dashboard (ação manual)
+
+## Staging e Load Testing
+
+- [x] **`docs/staging-environment.md`** — plano completo documentado com branch strategy e política de promoção.
+- [x] **`docs/load-testing.md`** — SLOs definidos + scripts k6 prontos para uso.
+- [ ] Provisionar projeto Supabase `clinipharma-staging` (ação manual — ver `docs/staging-environment.md`)
+- [ ] Criar branch `staging` e configurar deploy automático no Vercel
+- [ ] Executar scripts k6 contra staging (ver `docs/load-testing.md`)
+- [ ] **Cloudflare WAF** — ativar OWASP Core Ruleset + rate limit 100 req/min por IP em `/api/`
 - [ ] **Pentest externo** — contratar antes do go-live comercial (Tempest, Conviso, Kondado)
 - [x] `NUVEM_FISCAL_CLIENT_ID` = `PENDING_CNPJ`
 - [x] `NUVEM_FISCAL_CLIENT_SECRET` = `PENDING_CNPJ`

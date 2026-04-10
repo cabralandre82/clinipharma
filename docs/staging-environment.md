@@ -63,14 +63,64 @@ O seed cria:
 - 1 clínica de teste
 - 1 médico de teste
 
+## Checklist de Provisionamento (a fazer)
+
+> **Prioridade:** Fazer antes do primeiro go-live comercial com clientes reais.
+
+### Passo a Passo
+
+```bash
+# 1. Criar projeto Supabase staging em https://supabase.com/dashboard
+#    Nome sugerido: clinipharma-staging
+#    Região: sa-east-1 (São Paulo) — mesma da produção
+
+# 2. Copiar credenciais do projeto staging para um arquivo temporário
+STAGING_DB_URL="postgresql://postgres:<senha>@db.<ref-staging>.supabase.co:5432/postgres"
+STAGING_SUPABASE_URL="https://<ref-staging>.supabase.co"
+STAGING_ANON_KEY="eyJ..."
+STAGING_SERVICE_KEY="eyJ..."
+
+# 3. Aplicar migrations em staging
+cd /home/usuario/b2b-med-platform
+npx supabase db push --db-url "$STAGING_DB_URL"
+
+# 4. Rodar seed de dados de teste
+SUPABASE_URL="$STAGING_SUPABASE_URL" \
+SUPABASE_SERVICE_ROLE_KEY="$STAGING_SERVICE_KEY" \
+npx tsx scripts/setup-production.ts
+
+# 5. Criar branch staging no repositório
+git checkout -b staging main
+git push origin staging
+
+# 6. No Vercel: Settings → Git → configurar branch "staging" → Environment "Preview"
+#    Adicionar variáveis de ambiente de staging no scope Preview
+```
+
+### Variáveis de Ambiente a Adicionar no Vercel (scope: Preview, branch: staging)
+
+| Variável                        | Observação                                                 |
+| ------------------------------- | ---------------------------------------------------------- |
+| `SUPABASE_URL`                  | URL do projeto **staging**                                 |
+| `NEXT_PUBLIC_SUPABASE_URL`      | URL do projeto **staging**                                 |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Chave do projeto **staging**                               |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Chave anon do projeto **staging**                          |
+| `ASAAS_API_KEY`                 | Chave **Sandbox** Asaas                                    |
+| `ASAAS_BASE_URL`                | `https://sandbox.asaas.com/api/v3`                         |
+| `CLICKSIGN_TOKEN`               | Token **Sandbox** Clicksign                                |
+| `NEXT_PUBLIC_APP_URL`           | `https://staging.clinipharma.com.br` ou URL preview Vercel |
+
+> As demais variáveis (Sentry, Resend, Inngest, Firebase) podem ser reutilizadas do ambiente de produção/preview atual.
+
 ## Status
 
-- [ ] Projeto Supabase staging criado
-- [ ] Migrations aplicadas em staging
-- [ ] Seed de dados executado
-- [ ] Projeto/environment Vercel staging configurado
-- [ ] Branch `staging` criada e deploy automático ativo
-- [ ] Domínio `staging.clinipharma.com.br` configurado
+- [ ] Projeto Supabase `clinipharma-staging` criado
+- [ ] Migrations `001–022` aplicadas em staging
+- [ ] Seed de dados de teste executado
+- [ ] Branch `staging` criada no repositório
+- [ ] Deploy automático branch `staging` configurado no Vercel
+- [ ] Variáveis de ambiente de staging adicionadas no Vercel (scope Preview)
+- [ ] Domínio `staging.clinipharma.com.br` configurado (opcional)
 
 ## Política de Promção
 

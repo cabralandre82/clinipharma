@@ -115,12 +115,10 @@
   - [x] Export CSV (`lib/jobs/export-orders.ts`) — sem timeout, com email de resultado
   - [x] Stale orders notifications (`lib/jobs/stale-orders.ts`) — com retry 3x
   - [x] Webhook Asaas payment confirmed (`lib/jobs/asaas-webhook.ts`) — webhook retorna 200 imediatamente, processa em background
-- [ ] Configurar `INNGEST_EVENT_KEY` e `INNGEST_SIGNING_KEY` no Vercel (exige conta Inngest criada)
-- [ ] Testes de jobs com Inngest Dev Server (pós-conta criada)
+- [x] Configurar `INNGEST_EVENT_KEY` e `INNGEST_SIGNING_KEY` no Vercel — ✅ configuradas (2026-04-08)
+- [ ] Testes de jobs com Inngest Dev Server (rodar `npx inngest-cli@latest dev` localmente)
 
-**Pendente externo:** Criar conta em [inngest.com](https://app.inngest.com/sign-up) (free tier), copiar `INNGEST_EVENT_KEY` e `INNGEST_SIGNING_KEY` e adicionar no Vercel.
-
-**Esforço:** 4 dias | **Status:** ✅ implementado (2026-04-08) | ⬜ ativar após conta Inngest
+**Esforço:** 4 dias | **Status:** ✅ concluído (2026-04-08)
 
 ---
 
