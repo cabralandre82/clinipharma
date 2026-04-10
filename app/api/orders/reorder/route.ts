@@ -3,6 +3,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/db/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { createNotification } from '@/lib/notifications'
+import { z } from 'zod'
+
+const reorderSchema = z
+  .object({
+    orderId: z.string().uuid().optional(),
+    templateId: z.string().uuid().optional(),
+  })
+  .refine((d) => d.orderId || d.templateId, { message: 'orderId ou templateId obrigatório' })
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -12,9 +20,20 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { orderId, templateId } = body
+  const parsed = reorderSchema.safeParse(body)
+  if (!parsed.success)
+    return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
 
+  const { orderId, templateId } = parsed.data
   const admin = createAdminClient()
+
+  // Resolve user roles for ownership check
+  const { data: rolesData } = await admin
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .in('role', ['SUPER_ADMIN', 'PLATFORM_ADMIN'])
+  const isAdmin = (rolesData?.length ?? 0) > 0
   let items: Array<{
     product_id: string
     variant_id: string | null
@@ -37,6 +56,18 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+
+    // Verify user belongs to the source order's clinic (or is admin)
+    if (!isAdmin) {
+      const { data: membership } = await admin
+        .from('clinic_members')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .eq('clinic_id', (order as any).clinic_id)
+        .maybeSingle()
+      if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     clinicId = (order as any).clinic_id
     pharmacyId = (order as any).pharmacy_id
     doctorId = (order as any).doctor_id ?? null
@@ -56,6 +87,18 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (!template) return NextResponse.json({ error: 'Template not found' }, { status: 404 })
+
+    // Verify user belongs to the template's clinic (or is admin)
+    if (!isAdmin) {
+      const { data: membership } = await admin
+        .from('clinic_members')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .eq('clinic_id', (template as any).clinic_id)
+        .maybeSingle()
+      if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     clinicId = (template as any).clinic_id
     const templateItems = (template as any).items as Array<{
       product_id: string

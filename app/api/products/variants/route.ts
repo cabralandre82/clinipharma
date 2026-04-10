@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { requireRole } from '@/lib/rbac'
+import { getCurrentUser } from '@/lib/auth/session'
 import { z } from 'zod'
 
 const variantSchema = z.object({
@@ -15,6 +16,9 @@ const variantSchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
+  const user = await getCurrentUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { searchParams } = req.nextUrl
   const productId = searchParams.get('productId')
   if (!productId) return NextResponse.json({ error: 'productId required' }, { status: 400 })

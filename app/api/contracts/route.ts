@@ -4,6 +4,12 @@ import { createAdminClient } from '@/lib/db/admin'
 import { requireRole } from '@/lib/rbac'
 import { createAndSendContract, type ContractType } from '@/lib/clicksign'
 import { createNotification } from '@/lib/notifications'
+import { z } from 'zod'
+
+const contractSchema = z.object({
+  entityType: z.enum(['CLINIC', 'DOCTOR', 'PHARMACY', 'CONSULTANT']),
+  entityId: z.string().uuid('entityId inválido'),
+})
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,21 +19,13 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { entityType, entityId } = body
+  const parsed = contractSchema.safeParse(body)
+  if (!parsed.success)
+    return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
 
-  if (!entityType || !entityId) {
-    return NextResponse.json({ error: 'entityType and entityId required' }, { status: 400 })
-  }
-
+  const { entityType, entityId } = parsed.data
   const admin = createAdminClient()
-  const typeMap: Record<string, ContractType> = {
-    CLINIC: 'CLINIC',
-    DOCTOR: 'DOCTOR',
-    PHARMACY: 'PHARMACY',
-    CONSULTANT: 'CONSULTANT',
-  }
-  const contractType = typeMap[entityType]
-  if (!contractType) return NextResponse.json({ error: 'Invalid entityType' }, { status: 400 })
+  const contractType = entityType as ContractType
 
   // Resolve entity details
   let partyName = ''

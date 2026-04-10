@@ -277,6 +277,18 @@ export async function updateOrderStatus(
 
     if (!isAdmin && !isPharmacy) return { error: 'Sem permissão para alterar status do pedido' }
 
+    // PHARMACY_ADMIN must own the pharmacy of this order
+    if (isPharmacy && !isAdmin) {
+      const { data: membership } = await adminClient
+        .from('pharmacy_members')
+        .select('pharmacy_id')
+        .eq('user_id', user.id)
+        .eq('pharmacy_id', order.pharmacy_id)
+        .maybeSingle()
+
+      if (!membership) return { error: 'Sem permissão: pedido pertence a outra farmácia' }
+    }
+
     // Enforce state machine transitions
     const role = isAdmin ? 'admin' : 'pharmacy'
     if (!isValidTransition(order.order_status, newStatus, role)) {

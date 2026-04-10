@@ -1,13 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { getCurrentUser } from '@/lib/auth/session'
+import { rateLimit } from '@/lib/rate-limit'
 
 const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
-const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']
+const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'image/webp']
+
+const uploadLimiter = rateLimit({ windowMs: 60_000, max: 20 }) // 20 uploads/min per user
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const rl = await uploadLimiter.check(`upload:${user.id}`)
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Muitos uploads. Aguarde um minuto antes de tentar novamente.' },
+      { status: 429 }
+    )
+  }
 
   const formData = await req.formData()
   const orderId = formData.get('orderId')?.toString()

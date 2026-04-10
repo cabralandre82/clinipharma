@@ -6,6 +6,9 @@ import { Resend } from 'resend'
 const resend = new Resend(process.env.RESEND_API_KEY)
 const APP_URL = 'https://clinipharma.com.br'
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
+const ALLOWED_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'image/webp']
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
@@ -53,6 +56,20 @@ export async function POST(req: NextRequest) {
       const docType = key.replace('doc_', '')
       const label = (fd.get(`doc_${docType}_label`) as string) ?? docType
       const file = value as File
+
+      // Server-side file validation
+      if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+        return NextResponse.json(
+          { error: `Tipo de arquivo não permitido: ${file.type}. Use PDF, JPG, PNG ou WEBP.` },
+          { status: 400 }
+        )
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        return NextResponse.json(
+          { error: `Arquivo muito grande: ${file.name}. Limite de 10 MB por arquivo.` },
+          { status: 400 }
+        )
+      }
 
       const ext = file.name.split('.').pop()
       const storagePath = `${request.id}/${docType}_extra_${Date.now()}.${ext}`

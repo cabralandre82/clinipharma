@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { requireRole } from '@/lib/rbac'
+import { getCurrentUser } from '@/lib/auth/session'
+import { z } from 'zod'
 
 export async function GET(req: NextRequest) {
+  const user = await getCurrentUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { searchParams } = req.nextUrl
   const pharmacyId = searchParams.get('pharmacyId') // null = global
 
@@ -28,19 +33,23 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json()
+  const slaConfigSchema = z.object({
+    configs: z.array(
+      z.object({
+        order_status: z.string().min(1),
+        pharmacy_id: z.string().uuid().nullable().optional(),
+        warning_days: z.number().int().min(0),
+        alert_days: z.number().int().min(0),
+        critical_days: z.number().int().min(0),
+      })
+    ),
+  })
+  const parsed = slaConfigSchema.safeParse(body)
+  if (!parsed.success)
+    return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
+
+  const { configs } = parsed.data
   const admin = createAdminClient()
-
-  // body: { configs: [{order_status, pharmacy_id, warning_days, alert_days, critical_days}] }
-  const configs = body.configs as Array<{
-    order_status: string
-    pharmacy_id: string | null
-    warning_days: number
-    alert_days: number
-    critical_days: number
-  }>
-
-  if (!Array.isArray(configs))
-    return NextResponse.json({ error: 'configs array required' }, { status: 400 })
 
   const results = await Promise.all(
     configs.map((c) =>

@@ -67,19 +67,31 @@ describe('confirmPayment', () => {
   })
 
   it('returns error when order not found after payment', async () => {
-    let callCount = 0
-    const qb = makeQueryBuilder(null, null)
-    qb.single = vi.fn().mockImplementation(() => {
-      callCount++
-      if (callCount === 1)
-        return Promise.resolve({
-          data: { id: 'pay-1', order_id: 'ord-1', gross_amount: 500, status: 'PENDING' },
-          error: null,
-        })
-      return Promise.resolve({ data: null, error: null })
+    const singleCount = 0
+
+    // Build separate query builders per table so mocks don't collide
+    const paymentQb = makeQueryBuilder(null, null)
+    paymentQb.single = vi.fn().mockResolvedValue({
+      data: { id: 'pay-1', order_id: 'ord-1', gross_amount: 500, status: 'PENDING' },
+      error: null,
     })
+
+    // Atomic UPDATE builder: update().eq().eq().select() → returns claimed row
+    const updateQb = makeQueryBuilder(null, null)
+    updateQb.select = vi.fn().mockResolvedValue({ data: [{ id: 'pay-1' }], error: null })
+
+    // Order query builder: returns null (not found)
+    const orderQb = makeQueryBuilder(null, null)
+    orderQb.single = vi.fn().mockResolvedValue({ data: null, error: null })
+
+    let fromCallCount = 0
     vi.mocked(adminModule.createAdminClient).mockReturnValue({
-      from: vi.fn().mockReturnValue(qb),
+      from: vi.fn().mockImplementation((table: string) => {
+        fromCallCount++
+        if (table === 'payments' && fromCallCount === 1) return paymentQb // fetch payment
+        if (table === 'payments' && fromCallCount === 2) return updateQb // atomic update
+        return orderQb // everything else (order fetch)
+      }),
     } as unknown as ReturnType<typeof adminModule.createAdminClient>)
 
     const result = await confirmPayment({ paymentId: 'pay-1', paymentMethod: 'PIX' })

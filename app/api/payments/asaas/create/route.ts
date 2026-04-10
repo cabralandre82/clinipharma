@@ -4,6 +4,11 @@ import { createAdminClient } from '@/lib/db/admin'
 import { requireRole } from '@/lib/rbac'
 import { findOrCreateCustomer, createPayment, getPixQrCode, dueDateFromNow } from '@/lib/asaas'
 import { createNotification } from '@/lib/notifications'
+import { z } from 'zod'
+
+const createPaymentSchema = z.object({
+  orderId: z.string().uuid('orderId inválido'),
+})
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,8 +18,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { orderId } = body
-  if (!orderId) return NextResponse.json({ error: 'orderId required' }, { status: 400 })
+  const parsed = createPaymentSchema.safeParse(body)
+  if (!parsed.success)
+    return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
+  const { orderId } = parsed.data
 
   const admin = createAdminClient()
 
