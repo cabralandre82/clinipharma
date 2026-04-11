@@ -2,6 +2,49 @@
 
 ---
 
+## [5.0.0] — 2026-04-08 — Sistema de Suporte por Tickets
+
+### Funcionalidade
+
+Substituição do suporte por e-mail por um sistema moderno de tickets conversacionais, acessível
+diretamente na plataforma.
+
+**Principais recursos**:
+
+- Tickets com código único (`TKT-2026-00001`) gerado automaticamente por trigger SQL
+- Categorias: Pedido, Pagamento, Técnico, Reclamação, Geral
+- Prioridades: Baixa, Normal, Alta, Urgente (gerenciadas por admins)
+- Status flow: `ABERTO → EM ATENDIMENTO → AGUARDANDO CLIENTE ↔ EM ATENDIMENTO → RESOLVIDO → FECHADO`
+- Thread de conversa estilo chat (bolhas de mensagem por remetente)
+- **Notas internas** (`is_internal`) — visíveis apenas para admins, fundo âmbar
+- **Auto-assign** — o primeiro admin a responder é automaticamente atribuído ao ticket
+- **Notificações push** — cliente é notificado a cada resposta do admin e vice-versa; `SUPPORT_REPLY` e `SUPPORT_RESOLVED` são tipos críticos (nunca silenciados)
+- Status automático — se cliente responde a ticket `WAITING_CLIENT`, volta para `IN_PROGRESS`
+- Sidebar: entrada "Suporte" (ícone LifeBuoy) visível para todos os papéis
+
+### Arquivos criados/alterados
+
+| Arquivo                                       | Mudança                                                                          |
+| --------------------------------------------- | -------------------------------------------------------------------------------- |
+| `supabase/migrations/025_support_tickets.sql` | Tabelas, enums, trigger de código, RLS                                           |
+| `services/support.ts`                         | Novo: `createTicket`, `addMessage`, `updateTicketStatus`, `updateTicketPriority` |
+| `app/(private)/support/page.tsx`              | Novo: lista de tickets com filtros de status                                     |
+| `app/(private)/support/new/page.tsx`          | Novo: formulário de abertura de ticket                                           |
+| `app/(private)/support/[id]/page.tsx`         | Novo: detalhe do ticket + conversa                                               |
+| `components/support/ticket-list.tsx`          | Novo: tabela com tabs de status                                                  |
+| `components/support/new-ticket-form.tsx`      | Novo: formulário com seleção visual de categoria                                 |
+| `components/support/ticket-conversation.tsx`  | Novo: thread chat + painel admin (status/prioridade)                             |
+| `components/layout/sidebar.tsx`               | Adicionado item "Suporte" para todos os papéis                                   |
+| `lib/notification-types.ts`                   | Adicionados `SUPPORT_TICKET`, `SUPPORT_REPLY`, `SUPPORT_RESOLVED`                |
+| `tests/unit/services/support.test.ts`         | Novo: 13 testes unitários do serviço                                             |
+| `tests/unit/notifications.test.ts`            | Atualizado: inclui novos tipos críticos de suporte                               |
+
+### Cobertura de testes
+
+- **685 testes passando** (13 novos para o módulo de suporte)
+
+---
+
 ## [4.8.0] — 2026-04-11 — SKU gerado automaticamente no formato [CAT]-[FAR]-[NNNN]
 
 ### Funcionalidade

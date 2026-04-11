@@ -22,6 +22,7 @@ import {
   Wallet,
   Bell,
   Tags,
+  LifeBuoy,
 } from 'lucide-react'
 
 interface NavItem {
@@ -110,6 +111,12 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Repasses Consultores',
     icon: Wallet,
     roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN'],
+  },
+  {
+    href: '/support',
+    label: 'Suporte',
+    icon: LifeBuoy,
+    roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN', 'CLINIC_ADMIN', 'DOCTOR', 'PHARMACY_ADMIN'],
   },
   {
     href: '/registrations',

@@ -30,12 +30,14 @@ describe('SILENCEABLE_TYPES', () => {
 // ── CRITICAL_TYPES ───────────────────────────────────────────────────────────
 
 describe('CRITICAL_TYPES', () => {
-  it('contains the core order and payment types', () => {
+  it('contains the core order, payment and support types', () => {
     const expected: NotificationType[] = [
       'ORDER_CREATED',
       'ORDER_STATUS',
       'PAYMENT_CONFIRMED',
       'DOCUMENT_UPLOADED',
+      'SUPPORT_REPLY',
+      'SUPPORT_RESOLVED',
     ]
     expect(CRITICAL_TYPES).toEqual(expect.arrayContaining(expected))
     expect(CRITICAL_TYPES.length).toBe(expected.length)

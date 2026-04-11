@@ -13,6 +13,9 @@ export type NotificationType =
   | 'PRODUCT_INTEREST'
   | 'REGISTRATION_REQUEST'
   | 'STALE_ORDER'
+  | 'SUPPORT_TICKET'
+  | 'SUPPORT_REPLY'
+  | 'SUPPORT_RESOLVED'
   | 'GENERIC'
 
 /** Types the user can silence. Critical types are always delivered. */
@@ -30,4 +33,6 @@ export const CRITICAL_TYPES: NotificationType[] = [
   'ORDER_STATUS',
   'PAYMENT_CONFIRMED',
   'DOCUMENT_UPLOADED',
+  'SUPPORT_REPLY',
+  'SUPPORT_RESOLVED',
 ]
