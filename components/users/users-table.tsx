@@ -31,19 +31,28 @@ const ROLE_COLORS: Record<string, string> = {
   PHARMACY_ADMIN: 'bg-orange-100 text-orange-800',
 }
 
+type StatusFilter = 'all' | 'active' | 'inactive'
+
 interface User {
   id: string
   full_name: string
   email: string
   phone: string | null
   created_at: string
+  is_active: boolean
   user_roles: Array<{ role: string }>
 }
 
 export function UsersTable({ users }: { users: User[] }) {
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+
+  const totalActive = users.filter((u) => u.is_active).length
+  const totalInactive = users.filter((u) => !u.is_active).length
 
   const filtered = users.filter((u) => {
+    if (statusFilter === 'active' && !u.is_active) return false
+    if (statusFilter === 'inactive' && u.is_active) return false
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -53,10 +62,42 @@ export function UsersTable({ users }: { users: User[] }) {
     )
   })
 
+  const tabClass = (tab: StatusFilter) =>
+    `px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+      statusFilter === tab
+        ? 'bg-white shadow-sm text-gray-900'
+        : 'text-gray-500 hover:text-gray-700'
+    }`
+
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <div className="border-b border-gray-100 p-4">
-        <div className="relative max-w-sm">
+      <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* Status tabs */}
+        <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1">
+          <button className={tabClass('all')} onClick={() => setStatusFilter('all')}>
+            Todos
+            <span className="ml-1.5 rounded-full bg-gray-200 px-1.5 py-0.5 text-xs font-semibold text-gray-600">
+              {users.length}
+            </span>
+          </button>
+          <button className={tabClass('active')} onClick={() => setStatusFilter('active')}>
+            Ativos
+            <span className="ml-1.5 rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-semibold text-green-700">
+              {totalActive}
+            </span>
+          </button>
+          <button className={tabClass('inactive')} onClick={() => setStatusFilter('inactive')}>
+            Desativados
+            {totalInactive > 0 && (
+              <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700">
+                {totalInactive}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="relative w-full sm:max-w-xs">
           <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
             placeholder="Buscar por nome, email ou papel..."
@@ -66,6 +107,7 @@ export function UsersTable({ users }: { users: User[] }) {
           />
         </div>
       </div>
+
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -86,8 +128,18 @@ export function UsersTable({ users }: { users: User[] }) {
               </TableRow>
             ) : (
               filtered.map((user) => (
-                <TableRow key={user.id} className="hover:bg-gray-50">
-                  <TableCell className="font-medium">{user.full_name}</TableCell>
+                <TableRow
+                  key={user.id}
+                  className={`hover:bg-gray-50 ${!user.is_active ? 'opacity-60' : ''}`}
+                >
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {user.full_name}
+                      {!user.is_active && (
+                        <Badge className="bg-red-100 text-xs text-red-700">Desativado</Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-gray-600">{user.email}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">

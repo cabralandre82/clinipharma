@@ -26,7 +26,10 @@ export default async function UsersPage({ searchParams }: Props) {
 
   const { data: usersRaw, count } = await supabase
     .from('profiles')
-    .select('id, full_name, email, phone, created_at, user_roles(role)', { count: 'exact' })
+    .select('id, full_name, email, phone, created_at, is_active, user_roles(role)', {
+      count: 'exact',
+    })
+    .order('is_active', { ascending: false }) // active users first
     .order('full_name')
     .range(from, to)
 
@@ -36,6 +39,7 @@ export default async function UsersPage({ searchParams }: Props) {
     email: string
     phone: string | null
     created_at: string
+    is_active: boolean
     user_roles: Array<{ role: string }>
   }>
 

@@ -292,6 +292,10 @@ export async function deactivateUser(userId: string): Promise<{ error?: string }
     })
     if (error) return { error: 'Erro ao desativar usuário' }
 
+    // Mirror ban status in profiles so the list page can query it without
+    // calling the Auth Admin API for every row.
+    await adminClient.from('profiles').update({ is_active: false }).eq('id', userId)
+
     await revokeAllUserTokens(userId)
 
     await createAuditLog({
@@ -320,6 +324,8 @@ export async function reactivateUser(userId: string): Promise<{ error?: string }
       ban_duration: 'none',
     })
     if (error) return { error: 'Erro ao reativar usuário' }
+
+    await adminClient.from('profiles').update({ is_active: true }).eq('id', userId)
 
     await createAuditLog({
       actorUserId: actor.id,

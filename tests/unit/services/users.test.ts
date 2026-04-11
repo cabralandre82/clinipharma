@@ -158,7 +158,7 @@ describe('updateUserProfile', () => {
 })
 
 describe('deactivateUser', () => {
-  it('bans user and returns no error', async () => {
+  it('bans user, mirrors is_active=false in profiles, returns no error', async () => {
     const admin = mockSupabaseAdmin()
     vi.mocked(admin.auth.admin.updateUserById).mockResolvedValue({
       data: {},
@@ -202,7 +202,7 @@ describe('deactivateUser — self-deactivation guard', () => {
 })
 
 describe('reactivateUser', () => {
-  it('removes ban and returns no error', async () => {
+  it('removes ban, mirrors is_active=true in profiles, returns no error', async () => {
     const admin = mockSupabaseAdmin()
     vi.mocked(admin.auth.admin.updateUserById).mockResolvedValue({
       data: {},

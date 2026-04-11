@@ -2,6 +2,27 @@
 
 ---
 
+## [4.4.0] — 2026-04-08 — Lista de usuários: indicar ativos/inativos com filtros
+
+### Funcionalidade
+
+- **Migration 024**: coluna `is_active boolean NOT NULL DEFAULT true` adicionada à tabela `profiles`. Mantida em sincronia pelos server actions `deactivateUser` (→ `false`) e `reactivateUser` (→ `true`). Evita chamar a Auth Admin API para cada linha da lista.
+- **`UsersTable`**: reformulado com:
+  - Abas de filtro **Todos / Ativos / Desativados** com contadores coloridos.
+  - Badge `Desativado` vermelho inline ao lado do nome do usuário inativo.
+  - Linha com `opacity-60` para usuários desativados, distinguindo visualmente sem esconder.
+  - Ordenação padrão: ativos primeiro, depois alfabético.
+- **`users/page.tsx`**: inclui `is_active` no `SELECT` e ordena por `is_active DESC, full_name ASC`.
+- **`services/users.ts`**: `deactivateUser` e `reactivateUser` agora espelham `is_active` em `profiles` após alterar o ban no Auth.
+
+### Testes
+
+- `deactivateUser`: descrição do teste atualizada para refletir o espelhamento de `is_active`.
+- `reactivateUser`: idem.
+- 19 testes passando em `users.test.ts`.
+
+---
+
 ## [4.3.0] — 2026-04-08 — UI Sweep: ações de status em Farmácias, Médicos e Produtos + testes
 
 ### Funcionalidades adicionadas
