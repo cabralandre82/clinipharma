@@ -213,7 +213,6 @@ describe('registerConsultantTransfer', () => {
   })
 
   it('returns error when atomic claim finds no commissions (already paid or error)', async () => {
-    // The atomic UPDATE ... .select() chain returns error
     const selectMock = vi.fn().mockResolvedValue({ data: null, error: { message: 'not found' } })
     const eqMock2 = vi.fn().mockReturnValue({ select: selectMock })
     const eqMock1 = vi.fn().mockReturnValue({ eq: eqMock2 })
@@ -228,7 +227,6 @@ describe('registerConsultantTransfer', () => {
   })
 
   it('returns error when atomic claim returns empty array (all already claimed)', async () => {
-    // The atomic UPDATE ... .select() returns empty array
     const selectMock = vi.fn().mockResolvedValue({ data: [], error: null })
     const eqMock2 = vi.fn().mockReturnValue({ select: selectMock })
     const eqMock1 = vi.fn().mockReturnValue({ eq: eqMock2 })
@@ -240,5 +238,83 @@ describe('registerConsultantTransfer', () => {
 
     const result = await registerConsultantTransfer('cons-1', ['comm-1'], 'REF-001')
     expect(result.error).toBe('Comissões não encontradas ou já estão sendo processadas')
+  })
+
+  it('returns error when transfer insert fails (rollback path)', async () => {
+    // claim succeeds, transfer insert fails
+    const claimSelect = vi.fn().mockResolvedValue({
+      data: [{ id: 'comm-1', commission_amount: 100 }],
+      error: null,
+    })
+    const claimEq2 = vi.fn().mockReturnValue({ select: claimSelect })
+    const claimEq1 = vi.fn().mockReturnValue({ eq: claimEq2 })
+    const claimIn = vi.fn().mockReturnValue({ eq: claimEq1 })
+    const claimUpdate = vi.fn().mockReturnValue({ in: claimIn })
+
+    // transfer insert fails
+    const transferSingle = vi.fn().mockResolvedValue({ data: null, error: { message: 'fail' } })
+    const transferSelect = vi.fn().mockReturnValue({ single: transferSingle })
+    const transferInsert = vi.fn().mockReturnValue({ select: transferSelect })
+
+    // rollback update (commissions → PENDING)
+    const rollbackQb = makeQueryBuilder(null, null)
+
+    let consultantQbUsed = false
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'consultant_commissions' && !consultantQbUsed) {
+          consultantQbUsed = true
+          return { update: claimUpdate }
+        }
+        if (table === 'consultant_transfers') {
+          return { insert: transferInsert }
+        }
+        return rollbackQb
+      }),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await registerConsultantTransfer('cons-1', ['comm-1'], 'REF-001')
+    expect(result.error).toBe('Erro ao registrar repasse')
+  })
+
+  it('returns id on successful transfer', async () => {
+    const claimSelect = vi.fn().mockResolvedValue({
+      data: [{ id: 'comm-1', commission_amount: 150 }],
+      error: null,
+    })
+    const claimEq2 = vi.fn().mockReturnValue({ select: claimSelect })
+    const claimEq1 = vi.fn().mockReturnValue({ eq: claimEq2 })
+    const claimIn = vi.fn().mockReturnValue({ eq: claimEq1 })
+    const claimUpdate = vi.fn().mockReturnValue({ in: claimIn })
+
+    const transferSingle = vi.fn().mockResolvedValue({ data: { id: 'transfer-99' }, error: null })
+    const transferSelect = vi.fn().mockReturnValue({ single: transferSingle })
+    const transferInsert = vi.fn().mockReturnValue({ select: transferSelect })
+
+    const genericQb = makeQueryBuilder(null, null)
+
+    let consultantCommUsed = false
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'consultant_commissions' && !consultantCommUsed) {
+          consultantCommUsed = true
+          return { update: claimUpdate }
+        }
+        if (table === 'consultant_transfers') {
+          return { insert: transferInsert }
+        }
+        return genericQb
+      }),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await registerConsultantTransfer('cons-1', ['comm-1'], 'REF-001')
+    expect(result.id).toBe('transfer-99')
+    expect(result.error).toBeUndefined()
+  })
+
+  it('returns Sem permissão when FORBIDDEN', async () => {
+    vi.mocked(rbacModule.requireRole).mockRejectedValue(new Error('FORBIDDEN'))
+    const result = await registerConsultantTransfer('cons-1', ['comm-1'], 'REF-001')
+    expect(result.error).toBe('Sem permissão')
   })
 })

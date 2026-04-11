@@ -180,3 +180,74 @@ describe('toggleProductActive', () => {
     expect(result.error).toBeUndefined()
   })
 })
+
+describe('updateProduct', () => {
+  it('updates product successfully', async () => {
+    const qb = makeQueryBuilder({ id: 'prod-1', name: 'Old' }, null)
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(qb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await updateProduct('prod-1', { name: 'New' })
+    expect(result.error).toBeUndefined()
+  })
+
+  it('returns error when update fails', async () => {
+    const qb = makeQueryBuilder(null, null)
+    qb.single = vi.fn().mockResolvedValue({ data: { id: 'prod-1' }, error: null })
+    qb.update = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: { message: 'db error' } }),
+    })
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(qb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await updateProduct('prod-1', { name: 'New' })
+    expect(result.error).toBe('Erro ao atualizar produto')
+  })
+
+  it('returns Erro interno on exception', async () => {
+    vi.mocked(adminModule.createAdminClient).mockImplementation(() => {
+      throw new Error('db down')
+    })
+
+    const result = await updateProduct('prod-1', { name: 'New' })
+    expect(result.error).toBe('Erro interno')
+  })
+})
+
+describe('createProduct — validation failure', () => {
+  it('returns error when schema validation fails', async () => {
+    const { productSchema } = await import('@/lib/validators')
+    vi.mocked(productSchema.safeParse).mockReturnValueOnce({
+      success: false,
+      error: { issues: [{ message: 'Nome obrigatório' }] },
+    } as ReturnType<typeof productSchema.safeParse>)
+
+    const qb = makeQueryBuilder(null, null)
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(qb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await createProduct({} as Parameters<typeof createProduct>[0])
+    expect(result.error).toBe('Nome obrigatório')
+  })
+})
+
+describe('updateProductPrice — validation failure', () => {
+  it('returns error when priceUpdateSchema fails', async () => {
+    const { priceUpdateSchema } = await import('@/lib/validators')
+    vi.mocked(priceUpdateSchema.safeParse).mockReturnValueOnce({
+      success: false,
+      error: { issues: [{ message: 'Preço inválido' }] },
+    } as ReturnType<typeof priceUpdateSchema.safeParse>)
+
+    const qb = makeQueryBuilder(null, null)
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(qb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await updateProductPrice('prod-1', { new_price: -1, reason: '' })
+    expect(result.error).toBe('Preço inválido')
+  })
+})

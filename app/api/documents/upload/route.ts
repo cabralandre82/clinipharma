@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { getCurrentUser } from '@/lib/auth/session'
 import { rateLimit } from '@/lib/rate-limit'
+import { logger } from '@/lib/logger'
 
 const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'image/webp']
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
       .upload(fileName, buffer, { contentType: file.type })
 
     if (uploadError || !uploadData) {
-      console.error('Storage upload error:', uploadError)
+      logger.error('Storage upload error', { error: uploadError, file: file.name })
       return NextResponse.json({ error: 'Erro ao fazer upload' }, { status: 500 })
     }
 

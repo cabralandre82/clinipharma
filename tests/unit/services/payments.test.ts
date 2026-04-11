@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { makeQueryBuilder, mockSupabaseAdmin } from '../../setup'
+import { makeQueryBuilder } from '../../setup'
 import * as adminModule from '@/lib/db/admin'
 import * as rbacModule from '@/lib/rbac'
 import * as auditModule from '@/lib/audit'
@@ -67,8 +67,6 @@ describe('confirmPayment', () => {
   })
 
   it('returns error when order not found after payment', async () => {
-    const singleCount = 0
-
     // Build separate query builders per table so mocks don't collide
     const paymentQb = makeQueryBuilder(null, null)
     paymentQb.single = vi.fn().mockResolvedValue({
@@ -161,5 +159,51 @@ describe('completeTransfer', () => {
 
     const result = await completeTransfer('tr-1', 'REF-001')
     expect(result.error).toBe('Erro interno')
+  })
+
+  it('succeeds and returns empty object for valid transfer', async () => {
+    const { mockSupabaseAdmin } = await import('../../setup')
+    const admin = mockSupabaseAdmin()
+    const transferQb = makeQueryBuilder(
+      { id: 'tr-1', order_id: 'ord-1', status: 'PENDING', net_amount: 400, pharmacy_id: 'ph-1' },
+      null
+    )
+    const genericQb = makeQueryBuilder(null, null)
+    let callCount = 0
+    admin.from = vi.fn().mockImplementation(() => {
+      callCount++
+      if (callCount === 1) return transferQb
+      return genericQb
+    })
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      admin as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+    const result = await completeTransfer('tr-1', 'REF-001', 'notas')
+    expect(result.error).toBeUndefined()
+  })
+})
+
+describe('confirmPayment — claim racing', () => {
+  it('returns error when payment claim returns empty (race condition)', async () => {
+    const { mockSupabaseAdmin } = await import('../../setup')
+    const admin = mockSupabaseAdmin()
+    const paymentQb = makeQueryBuilder(
+      { id: 'pay-1', order_id: 'ord-1', gross_amount: 500, status: 'PENDING' },
+      null
+    )
+    const claimQb = makeQueryBuilder()
+    claimQb.then = (resolve: (v: unknown) => void) => resolve({ data: [], error: null })
+
+    let callCount = 0
+    admin.from = vi.fn().mockImplementation(() => {
+      callCount++
+      if (callCount === 1) return paymentQb
+      return claimQb
+    })
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      admin as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+    const result = await confirmPayment({ paymentId: 'pay-1', paymentMethod: 'PIX' })
+    expect(result.error).toBe('Pagamento já está sendo processado')
   })
 })

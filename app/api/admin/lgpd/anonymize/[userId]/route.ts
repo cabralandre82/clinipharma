@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/db/admin'
 import { requireRole } from '@/lib/rbac'
 import { createAuditLog, AuditAction, AuditEntity } from '@/lib/audit'
 import { revokeAllUserTokens } from '@/lib/token-revocation'
+import { logger } from '@/lib/logger'
 
 /**
  * POST /api/admin/lgpd/anonymize/:userId
@@ -104,7 +105,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ use
         { status: 403, headers: { 'X-Request-ID': requestId } }
       )
     }
-    console.error('[lgpd/anonymize] error:', err)
+    logger.error('[lgpd/anonymize] error', { error: err, requestId })
     return NextResponse.json(
       { error: 'Erro interno' },
       { status: 500, headers: { 'X-Request-ID': requestId } }

@@ -32,16 +32,16 @@ Não existe paciente final no fluxo. Tudo é B2B. A entrega é sempre para a cl�
 
 ## Stack
 
-| Camada       | Tecnologia                             |
-| ------------ | -------------------------------------- |
-| Frontend     | Next.js 15, TypeScript, App Router     |
-| UI           | Tailwind CSS v4, shadcn/ui, Lucide     |
-| Backend/BaaS | Supabase (PostgreSQL + Auth + Storage) |
-| Validação    | Zod v4                                 |
-| Formulários  | React Hook Form                        |
-| Estado       | Zustand                                |
-| Testes       | Vitest (unit) + Playwright (e2e)       |
-| Deploy       | Vercel (frontend) + Supabase (backend) |
+| Camada       | Tecnologia                                             |
+| ------------ | ------------------------------------------------------ |
+| Frontend     | Next.js 15, TypeScript, App Router                     |
+| UI           | Tailwind CSS v4, shadcn/ui, Lucide                     |
+| Backend/BaaS | Supabase (PostgreSQL + Auth + Storage)                 |
+| Validação    | Zod v4                                                 |
+| Formulários  | React Hook Form                                        |
+| Estado       | Zustand                                                |
+| Testes       | Vitest (unit, 644 testes) + Playwright (e2e, 5 suítes) |
+| Deploy       | Vercel (frontend) + Supabase (backend)                 |
 
 ---
 
@@ -124,7 +124,10 @@ npm run lint             # ESLint
 npm run lint:fix         # ESLint com correção automática
 npm run format           # Prettier
 npm run test             # Vitest (unit tests)
-npm run test:e2e         # Playwright (e2e tests)
+npm run test:coverage    # Vitest com relatório de cobertura
+npm run test:e2e         # Playwright (e2e — requer BASE_URL)
+npm run test:e2e:smoke   # Playwright smoke tests rápidos
+npm run test:e2e:ui      # Playwright com interface visual
 npx tsx scripts/setup-production.ts   # Setup inicial de produção
 ```
 
@@ -143,6 +146,12 @@ npx tsx scripts/setup-production.ts   # Setup inicial de produção
 | [USER_FLOWS.md](./USER_FLOWS.md)                                                       | Fluxos operacionais por papel   |
 | [DEPLOY.md](./DEPLOY.md)                                                               | Guia completo de deploy         |
 | [CHANGELOG.md](./CHANGELOG.md)                                                         | Histórico de versões            |
+| [docs/roadmap-90pts.md](./docs/roadmap-90pts.md)                                       | Roadmap de qualidade pré-launch |
+| [docs/slos.md](./docs/slos.md)                                                         | Service Level Objectives        |
+| [docs/disaster-recovery.md](./docs/disaster-recovery.md)                               | Plano de Disaster Recovery      |
+| [docs/lgpd-registro-atividades.md](./docs/lgpd-registro-atividades.md)                 | Registro de atividades LGPD     |
+| [docs/staging-environment.md](./docs/staging-environment.md)                           | Ambiente de staging             |
+| [docs/scale-1000-clinics.md](./docs/scale-1000-clinics.md)                             | Plano de escala 1000+ clínicas  |
 | [docs/setup-supabase.md](./docs/setup-supabase.md)                                     | Configuração do Supabase        |
 | [docs/seed-users.md](./docs/seed-users.md)                                             | Credenciais dos usuários seed   |
 | [docs/go-live-checklist.md](./docs/go-live-checklist.md)                               | Checklist de go-live            |
@@ -156,4 +165,4 @@ npx tsx scripts/setup-production.ts   # Setup inicial de produção
 
 ## Versão
 
-`0.7.0` — Paginação, notificações in-app, busca global, exportação CSV/Excel, documentos por tipo, relatórios enriquecidos + Cloudflare e Resend verificados em produção
+`4.0.0` — Roadmap 90pts concluído: Session Revocation, Circuit Breaker, Compliance Engine, Inngest Background Jobs, PII Encryption (AES-256-GCM), Portal LGPD, Structured Logging, SLOs, PWA, E2E Playwright + CI/CD — **644 testes | 84% cobertura**

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/db/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { Resend } from 'resend'
+import { logger } from '@/lib/logger'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const APP_URL = 'https://clinipharma.com.br'
@@ -276,7 +277,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return NextResponse.json({ error: 'Ação inválida' }, { status: 400 })
   } catch (err) {
-    console.error('[registration/action]', err)
+    logger.error('[registration/action] unexpected error', { error: err })
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }

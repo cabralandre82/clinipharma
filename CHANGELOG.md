@@ -2,6 +2,40 @@
 
 ---
 
+## [4.1.0] — 2026-04-08 — Audit & QA Round Final (bugs, cobertura, docs)
+
+### Bugs corrigidos
+
+- **LOW**: `console.log/error` em `app/api/auth/forgot-password/route.ts` substituídos por `logger.info/warn/error`
+- **LOW**: `console.error` em `app/api/registration/[id]/route.ts` substituído por `logger.error`
+- **LOW**: `console.error` em `app/api/documents/upload/route.ts` substituído por `logger.error`
+- **LOW**: `console.error` em `app/api/admin/lgpd/anonymize/[userId]/route.ts` substituído por `logger.error`
+- **MEDIUM (info disclosure)**: `/api/health` não expõe mais os estados internos dos circuit breakers — retorna `circuitStatus: 'ok' | 'N open'` em vez do objeto completo
+
+### Cobertura de Testes (+ 18 novos testes)
+
+- `tests/unit/lib/rate-limit.test.ts` — 8 novos testes: in-memory backend, isolamento, reset de janela, cache de limiter
+- `tests/unit/services/payments.test.ts` — 2 novos testes: race condition (claim vazio), completeTransfer success path
+- `tests/unit/services/products.test.ts` — 5 novos testes: updateProduct success/error, createProduct validation, priceUpdate validation
+- `tests/unit/services/consultants.test.ts` — 4 novos testes: registerConsultantTransfer rollback e success path, FORBIDDEN
+
+| Métrica    | Antes  | Depois     |
+| ---------- | ------ | ---------- |
+| Test Files | 44     | 45         |
+| Tests      | 626    | 644        |
+| Statements | 80.58% | **84.37%** |
+| Branches   | 67.52% | **70.63%** |
+| Functions  | 85.98% | **87.26%** |
+| Lines      | 81.81% | **85.51%** |
+
+### Documentação atualizada
+
+- `README.md` — versão 4.0.0, scripts de E2E, tabela de docs atualizada, coverage atual
+- `docs/go-live-checklist.md` — E2E Playwright, CI workflow, structured logging, SLOs, PWA, DR plan
+- `CHANGELOG.md` — histórico completo
+
+---
+
 ## [4.0.0] — 2026-04-08 — Roadmap 90pts: Conclusão (E2E + CI + Cobertura)
 
 ### Playwright E2E (A16)

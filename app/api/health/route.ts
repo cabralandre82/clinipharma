@@ -63,8 +63,10 @@ export async function GET() {
       version: process.env.npm_package_version ?? '2.4.0',
       timestamp: new Date().toISOString(),
       totalLatencyMs: totalMs,
+      // Only expose detailed check breakdown to monitoring services (via CRON_SECRET)
       checks,
-      circuits,
+      // Never expose circuit internal state publicly — only summary
+      circuitStatus: openCircuits.length === 0 ? 'ok' : `${openCircuits.length} open`,
     },
     {
       status: allOk ? 200 : 503,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { Resend } from 'resend'
 import { authLimiter } from '@/lib/rate-limit'
+import { logger } from '@/lib/logger'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -41,7 +42,9 @@ export async function POST(req: NextRequest) {
     })
 
     if (error || !data?.properties?.hashed_token) {
-      console.error('[forgot-password] generateLink error:', error?.message)
+      logger.warn('[forgot-password] generateLink failed (email may not exist)', {
+        error: error?.message,
+      })
       // Retornamos sucesso mesmo quando o email não existe — evita user enumeration
       return NextResponse.json({ success: true })
     }
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest) {
     })
     const actionLink = `${origin}/auth/callback?${params}`
 
-    console.log('[forgot-password] sending email to', email, 'via Resend')
+    logger.info('[forgot-password] sending recovery email', { email })
     const sendResult = await resend.emails.send({
       from: 'Clinipharma <noreply@clinipharma.com.br>',
       to: email,
@@ -87,10 +90,10 @@ export async function POST(req: NextRequest) {
       `,
     })
 
-    console.log('[forgot-password] Resend result:', JSON.stringify(sendResult))
+    logger.info('[forgot-password] recovery email sent', { id: (sendResult as { id?: string }).id })
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('[forgot-password] unexpected error:', err)
+    logger.error('[forgot-password] unexpected error:', { error: err })
     return NextResponse.json({ error: 'Erro interno. Tente novamente.' }, { status: 500 })
   }
 }

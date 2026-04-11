@@ -213,9 +213,12 @@
 
 ## Build e Deploy
 
-- [x] `npm run build` passa sem erros (v1.6.0 auditoria round 2 ✅)
-- [x] `npm run lint` passa sem warnings críticos
-- [x] Testes unitários passando (155 testes, 9 suítes)
+- [x] `npm run build` passa sem erros ✅
+- [x] `npm run lint` passa sem warnings críticos ✅
+- [x] TypeScript `tsc --noEmit` sem erros ✅
+- [x] Testes unitários passando — **644 testes, 45 suítes, cobertura 84.37% stmts / 85.51% lines** ✅
+- [x] Testes E2E Playwright configurados (`tests/e2e/`, 5 suítes, pronto para staging) ✅
+- [x] GitHub Actions CI workflow (`.github/workflows/ci.yml`) — unit + lint + TypeScript + E2E smoke ✅
 - [x] Deploy na Vercel bem-sucedido (status: Ready)
 - [x] URL de produção acessível (`https://clinipharma.com.br`)
 - [x] Repositório GitHub conectado (auto-deploy no push para `main`)
@@ -276,7 +279,11 @@
 - [x] **Rate limiter Redis-ready** — `lib/rate-limit.ts` detecta automaticamente `UPSTASH_REDIS_REST_URL`. ✅ Upstash ativo.
 - [x] **Upstash Redis** — `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` configuradas. Rate limit multi-instância ativo.
 - [x] **Sentry 100% operacional** — DSN + org (`cabralandre82s-org`) + project (`clinipharma`) + auth token configurados. Source maps e error tracking ativos.
-- [x] **`/api/health` endpoint** — verificação de Supabase + env vars. Configurar UptimeRobot/Better Uptime para monitorar.
+- [x] **`/api/health` endpoint** — verificação de Supabase + env vars + circuit breakers. Configurar UptimeRobot/Better Uptime para monitorar.
+- [x] **Structured logging** — `lib/logger.ts` com JSON logs em todos os services críticos. `console.log/error` substituídos nas API routes.
+- [x] **SLOs documentados** — `docs/slos.md` com targets de disponibilidade, latência, error rate e alertas de negócio.
+- [x] **PWA manifest** — `public/manifest.json` ativo, shortcuts "Novo Pedido" e "Meus Pedidos".
+- [x] **Disaster Recovery Plan** — `docs/disaster-recovery.md` com cenários, RTO/RPO e checklist de restore.
 
 ## Email transacional
 
