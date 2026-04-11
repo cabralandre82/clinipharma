@@ -2,6 +2,46 @@
 
 ---
 
+## [4.7.0] — 2026-04-08 — UX: explicações contextuais de SKU, Slug e Variantes na edição de produto
+
+### Funcionalidade
+
+Adicionadas explicações visuais diretamente na página de criação/edição de produto para os três campos que causavam confusão:
+
+#### Glossário visual (topo da seção Identificação)
+
+Card azul com três painéis lado a lado explicando cada conceito com linguagem simples e exemplos farmacêuticos reais:
+
+- **SKU** (`Stock Keeping Unit`) — código interno de controle de estoque, livre para definir. Ex: `SEMA-10MG · OZEM-500`
+- **Slug** (URL amigável) — identificador do produto no endereço da página. Gerado automaticamente a partir do nome. Ex: `/produtos/semaglutida-10mg`
+- **Variantes** — versões do mesmo produto com concentração/quantidade diferentes, cada uma com preço próprio. Ex: Ozempic 0,5mg vs 1mg vs 2mg
+
+#### Preview de URL ao vivo no campo Slug
+
+Enquanto o usuário edita o slug, aparece abaixo do campo o endereço real da página: `clinipharma.com.br/produtos/[slug-digitado]`.
+
+#### Campo SKU
+
+Adicionado placeholder (`Ex: SEMA-10MG`) e hint de rodapé explicando que o formato é livre.
+
+#### Callout "Quando usar variantes?" (seção Variantes)
+
+Acordeão âmbar colapsável antes do gerenciador de variantes com:
+
+- Quando usar variantes (exemplos reais: Ozempic 0,5mg / 1mg / 2mg; frascos 10mL / 20mL)
+- Quando NÃO usar (criar produtos separados): medicamentos diferentes, fabricantes distintos
+- Nota sobre variante Padrão
+
+#### Seção Variantes com título próprio
+
+Movida para `<section>` com cabeçalho "VARIANTES" no mesmo estilo das outras seções.
+
+### Cobertura de testes
+
+Mudanças exclusivamente em componentes React client (`product-form.tsx`, `product-variants-manager.tsx`) — sem lógica de negócio. Cobertura por E2E/visual. Testes unitários: 654 passando (inalterado).
+
+---
+
 ## [4.6.0] — 2026-04-08 — Correção dos silent failures MEDIUM + cobertura de testes
 
 ### Contexto

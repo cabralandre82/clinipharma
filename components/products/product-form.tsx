@@ -22,7 +22,7 @@ import { productSchema, type ProductFormData } from '@/lib/validators'
 import { createProduct, updateProduct } from '@/services/products'
 import { slugify, formatCurrency } from '@/lib/utils'
 import type { ProductWithRelations, ProductCategory, Pharmacy } from '@/types'
-import { AlertTriangle, TrendingUp } from 'lucide-react'
+import { AlertTriangle, TrendingUp, Info, Link2, Tag, Layers } from 'lucide-react'
 
 interface ProductFormProps {
   product?: ProductWithRelations
@@ -72,6 +72,7 @@ export function ProductForm({ product, categories, pharmacies, consultantRate }:
   })
 
   const nameValue = watch('name')
+  const slugValue = watch('slug') ?? ''
   const priceValue = watch('price_current') ?? 0
   const pharmacyCostValue = watch('pharmacy_cost') ?? 0
 
@@ -123,6 +124,67 @@ export function ProductForm({ product, categories, pharmacies, consultantRate }:
         <h3 className="mb-4 text-sm font-semibold tracking-wider text-gray-700 uppercase">
           Identificação
         </h3>
+
+        {/* Glossário dos campos técnicos */}
+        <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Info className="h-4 w-4 shrink-0 text-blue-500" />
+            <span className="text-sm font-semibold text-blue-800">Entenda os campos técnicos</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-blue-100 bg-white p-3">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <Tag className="h-3.5 w-3.5 text-blue-500" />
+                <span className="text-xs font-bold text-slate-700">SKU</span>
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
+                  Stock Keeping Unit
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-slate-600">
+                Código interno único que identifica este produto no estoque. Você quem define — pode
+                ser qualquer código que faça sentido para a farmácia.
+              </p>
+              <p className="mt-1.5 font-mono text-[11px] text-blue-600">
+                Ex: SEMA-10MG · OZEM-500 · MED-001
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-blue-100 bg-white p-3">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <Link2 className="h-3.5 w-3.5 text-blue-500" />
+                <span className="text-xs font-bold text-slate-700">Slug</span>
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
+                  URL amigável
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-slate-600">
+                Identificador do produto no endereço da página. Gerado automaticamente a partir do
+                nome — use letras minúsculas, números e hífens.
+              </p>
+              <p className="mt-1.5 font-mono text-[11px] text-blue-600">
+                /produtos/<strong>semaglutida-10mg</strong>
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-blue-100 bg-white p-3">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5 text-blue-500" />
+                <span className="text-xs font-bold text-slate-700">Variantes</span>
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
+                  versões do produto
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-slate-600">
+                Versões do mesmo produto com concentração, apresentação ou quantidade diferente —
+                cada uma com preço próprio.
+              </p>
+              <p className="mt-1.5 text-[11px] text-blue-600">
+                Ex: Ozempic <strong>0,5mg</strong> vs <strong>1mg</strong> vs <strong>2mg</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="category_id">Categoria *</Label>
@@ -171,8 +233,11 @@ export function ProductForm({ product, categories, pharmacies, consultantRate }:
 
           <div className="space-y-2">
             <Label htmlFor="sku">SKU *</Label>
-            <Input id="sku" {...register('sku')} />
+            <Input id="sku" placeholder="Ex: SEMA-10MG" {...register('sku')} />
             {errors.sku && <p className="text-sm text-red-500">{errors.sku.message}</p>}
+            <p className="text-xs text-slate-400">
+              Código único de controle — livre para definir o formato que preferir.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -185,6 +250,19 @@ export function ProductForm({ product, categories, pharmacies, consultantRate }:
             <Label htmlFor="slug">Slug *</Label>
             <Input id="slug" {...register('slug')} />
             {errors.slug && <p className="text-sm text-red-500">{errors.slug.message}</p>}
+            {slugValue ? (
+              <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                <Link2 className="h-3 w-3 shrink-0 text-slate-400" />
+                <span className="truncate">
+                  clinipharma.com.br/produtos/
+                  <strong className="text-slate-700">{slugValue}</strong>
+                </span>
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400">
+                Gerado automaticamente ao digitar o nome do produto.
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -424,13 +502,16 @@ export function ProductForm({ product, categories, pharmacies, consultantRate }:
 
       {/* Variant manager — shown only for existing products */}
       {isEditing && product && (
-        <div>
+        <section>
+          <h3 className="mb-4 text-sm font-semibold tracking-wider text-gray-700 uppercase">
+            Variantes
+          </h3>
           <ProductVariantsManager
             productId={product.id}
             basePrice={watch('price_current') ?? 0}
             basePharmacyCost={watch('pharmacy_cost') ?? 0}
           />
-        </div>
+        </section>
       )}
 
       <div className="flex gap-3">
