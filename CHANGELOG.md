@@ -2,6 +2,34 @@
 
 ---
 
+## [4.3.0] — 2026-04-08 — UI Sweep: ações de status em Farmácias, Médicos e Produtos + testes
+
+### Funcionalidades adicionadas
+
+- **Farmácias — Alterar status**: botão dropdown "Alterar status" na página de detalhe da farmácia, idêntico ao de clínicas. Usa `updatePharmacyStatus` (já existia no serviço, sem exposição na UI). Novo componente: `components/pharmacies/pharmacy-status-actions.tsx`.
+- **Médicos — Alterar status**: botão dropdown "Alterar status" na página de detalhe do médico. Usa `updateDoctorStatus` (já existia no serviço, sem exposição na UI). Novo componente: `components/doctors/doctor-status-actions.tsx`.
+- **Produtos — Ativar/Desativar**: botão "Ativar / Desativar" na página de detalhe do produto. Usa `toggleProductActive` (já existia no serviço, sem exposição na UI). Novo componente: `components/products/toggle-product-active.tsx`.
+- **Usuários — Reativar**: nova server action `reactivateUser` em `services/users.ts` (desbanir via `ban_duration: 'none'`). O `DeactivateUserDialog` alterna entre desativar e reativar conforme o status atual.
+- **Usuários — Proteção auto-desativação**: `deactivateUser` agora retorna erro ao tentar desativar a própria conta.
+
+### Cobertura de Testes (+5 testes)
+
+- `deactivateUser — self-deactivation guard`: valida que o ator não pode se autodesativar.
+- `reactivateUser — removes ban`: verifica chamada `ban_duration: 'none'`.
+- `reactivateUser — auth unban fails`: cobre caminho de erro.
+- Total: 19 testes em `tests/unit/services/users.test.ts` (era 14).
+
+### Varredura de funcionalidades ausentes
+
+| Página             | Serviço existia           | UI existia | Ação                                    |
+| ------------------ | ------------------------- | ---------- | --------------------------------------- |
+| `/pharmacies/[id]` | `updatePharmacyStatus` ✅ | ❌         | Adicionado `PharmacyStatusActions`      |
+| `/doctors/[id]`    | `updateDoctorStatus` ✅   | ❌         | Adicionado `DoctorStatusActions`        |
+| `/products/[id]`   | `toggleProductActive` ✅  | ❌         | Adicionado `ToggleProductActive`        |
+| `/users/[id]`      | `reactivateUser` ❌       | ❌         | Criado serviço + `DeactivateUserDialog` |
+
+---
+
 ## [4.2.0] — 2026-04-08 — Hotfix: Dashboard crash (unstable_cache + coluna inexistente)
 
 ### Bugs corrigidos (CRÍTICO)

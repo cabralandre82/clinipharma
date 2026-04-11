@@ -5,6 +5,7 @@ import { createServerClient } from '@/lib/db/server'
 import { formatCNPJ, formatPhone, formatDate, formatCurrency } from '@/lib/utils'
 import { EntityStatusBadge } from '@/components/shared/status-badge'
 import { ButtonLink } from '@/components/ui/button-link'
+import { PharmacyStatusActions } from '@/components/pharmacies/pharmacy-status-actions'
 import type { Pharmacy, EntityStatus } from '@/types'
 
 export const metadata = { title: 'Detalhe da Farmácia | Clinipharma' }
@@ -66,9 +67,15 @@ export default async function PharmacyDetailPage({ params }: PageProps) {
           <h1 className="mt-1 text-2xl font-bold text-gray-900">{typedPharmacy.trade_name}</h1>
           <p className="text-sm text-gray-500">{typedPharmacy.corporate_name}</p>
         </div>
-        <ButtonLink href={`/pharmacies/${id}/edit`} variant="outline">
-          Editar
-        </ButtonLink>
+        <div className="flex gap-2">
+          <PharmacyStatusActions
+            pharmacyId={id}
+            currentStatus={typedPharmacy.status as EntityStatus}
+          />
+          <ButtonLink href={`/pharmacies/${id}/edit`} variant="outline">
+            Editar
+          </ButtonLink>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

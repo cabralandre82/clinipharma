@@ -7,6 +7,7 @@ import * as auditModule from '@/lib/audit'
 import {
   resetUserPassword,
   deactivateUser,
+  reactivateUser,
   updateOwnProfile,
   updateUserProfile,
   assignUserRole,
@@ -189,6 +190,50 @@ describe('deactivateUser', () => {
 
     const result = await deactivateUser('user-1')
     expect(result.error).toBe('Erro ao desativar usuário')
+  })
+})
+
+describe('deactivateUser — self-deactivation guard', () => {
+  it('returns error when actor tries to deactivate their own account', async () => {
+    // actorMock.id === 'admin-1'
+    const result = await deactivateUser('admin-1')
+    expect(result.error).toBe('Você não pode desativar sua própria conta')
+  })
+})
+
+describe('reactivateUser', () => {
+  it('removes ban and returns no error', async () => {
+    const admin = mockSupabaseAdmin()
+    vi.mocked(admin.auth.admin.updateUserById).mockResolvedValue({
+      data: {},
+      error: null,
+    } as ReturnType<typeof admin.auth.admin.updateUserById>)
+    const qb = makeQueryBuilder(null, null)
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      ...admin,
+      from: vi.fn().mockReturnValue(qb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await reactivateUser('user-1')
+    expect(result.error).toBeUndefined()
+    expect(vi.mocked(admin.auth.admin.updateUserById)).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ ban_duration: 'none' })
+    )
+  })
+
+  it('returns error when auth unban fails', async () => {
+    const admin = mockSupabaseAdmin()
+    vi.mocked(admin.auth.admin.updateUserById).mockResolvedValue({
+      data: {},
+      error: { message: 'unban fail' },
+    } as ReturnType<typeof admin.auth.admin.updateUserById>)
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      admin as ReturnType<typeof adminModule.createAdminClient>
+    )
+
+    const result = await reactivateUser('user-1')
+    expect(result.error).toBe('Erro ao reativar usuário')
   })
 })
 

@@ -5,6 +5,7 @@ import { createServerClient } from '@/lib/db/server'
 import { formatPhone, formatDate } from '@/lib/utils'
 import { EntityStatusBadge } from '@/components/shared/status-badge'
 import { ButtonLink } from '@/components/ui/button-link'
+import { DoctorStatusActions } from '@/components/doctors/doctor-status-actions'
 import type { Doctor, EntityStatus } from '@/types'
 
 export const metadata = { title: 'Detalhe do Médico | Clinipharma' }
@@ -50,9 +51,12 @@ export default async function DoctorDetailPage({ params }: PageProps) {
             CRM {typedDoctor.crm}/{typedDoctor.crm_state}
           </p>
         </div>
-        <ButtonLink href={`/doctors/${id}/edit`} variant="outline">
-          Editar
-        </ButtonLink>
+        <div className="flex gap-2">
+          <DoctorStatusActions doctorId={id} currentStatus={typedDoctor.status as EntityStatus} />
+          <ButtonLink href={`/doctors/${id}/edit`} variant="outline">
+            Editar
+          </ButtonLink>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

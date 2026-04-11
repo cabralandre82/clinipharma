@@ -6,6 +6,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { ButtonLink } from '@/components/ui/button-link'
 import { PriceUpdateForm } from '@/components/products/price-update-form'
 import { PharmacyCostUpdateForm } from '@/components/products/pharmacy-cost-update-form'
+import { ToggleProductActive } from '@/components/products/toggle-product-active'
 import { Badge } from '@/components/ui/badge'
 import { Package } from 'lucide-react'
 import type { ProductWithRelations, ProductCategory, Pharmacy, ProductPriceHistory } from '@/types'
@@ -211,12 +212,15 @@ export default async function ProductDetailAdminPage({ params }: PageProps) {
               </Badge>
               {product.featured && <Badge className="bg-amber-100 text-amber-800">Destaque</Badge>}
             </div>
-            {isSuperAdmin && (
-              <div className="flex flex-wrap gap-2 pt-2">
-                <PriceUpdateForm productId={id} currentPrice={product.price_current} />
-                <PharmacyCostUpdateForm productId={id} currentCost={product.pharmacy_cost ?? 0} />
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2 pt-2">
+              <ToggleProductActive productId={id} active={product.active} />
+              {isSuperAdmin && (
+                <>
+                  <PriceUpdateForm productId={id} currentPrice={product.price_current} />
+                  <PharmacyCostUpdateForm productId={id} currentCost={product.pharmacy_cost ?? 0} />
+                </>
+              )}
+            </div>
           </div>
 
           <MarginBreakdown
