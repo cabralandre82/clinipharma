@@ -141,11 +141,12 @@ export function ProductForm({ product, categories, pharmacies, consultantRate }:
                 </span>
               </div>
               <p className="text-xs leading-relaxed text-slate-600">
-                Código interno único que identifica este produto no estoque. Você quem define — pode
-                ser qualquer código que faça sentido para a farmácia.
+                Código único que identifica o produto no estoque. Gerado{' '}
+                <strong>automaticamente</strong> no formato{' '}
+                <span className="font-mono">[Categoria]-[Farmácia]-[Número]</span>.
               </p>
               <p className="mt-1.5 font-mono text-[11px] text-blue-600">
-                Ex: SEMA-10MG · OZEM-500 · MED-001
+                Ex: HOR-FAR-0001 · VIT-FAR-0002
               </p>
             </div>
 
@@ -231,14 +232,27 @@ export function ProductForm({ product, categories, pharmacies, consultantRate }:
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="sku">SKU *</Label>
-            <Input id="sku" placeholder="Ex: SEMA-10MG" {...register('sku')} />
-            {errors.sku && <p className="text-sm text-red-500">{errors.sku.message}</p>}
-            <p className="text-xs text-slate-400">
-              Código único de controle — livre para definir o formato que preferir.
-            </p>
-          </div>
+          {isEditing ? (
+            <div className="space-y-2">
+              <Label>SKU</Label>
+              <div className="flex items-center gap-2 rounded-md border bg-slate-50 px-3 py-2 font-mono text-sm text-slate-700">
+                <Tag className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                {product!.sku}
+              </div>
+              <p className="text-xs text-slate-400">O SKU é imutável após a criação do produto.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>SKU</Label>
+              <div className="flex items-center gap-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400 italic">
+                <Tag className="h-3.5 w-3.5 shrink-0" />
+                Gerado automaticamente — ex: HOR-FAR-0001
+              </div>
+              <p className="text-xs text-slate-400">
+                Formato: <span className="font-mono">[Categoria]-[Farmácia]-[Sequencial]</span>
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="name">Nome do Produto *</Label>

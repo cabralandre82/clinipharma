@@ -2,6 +2,51 @@
 
 ---
 
+## [4.8.0] — 2026-04-11 — SKU gerado automaticamente no formato [CAT]-[FAR]-[NNNN]
+
+### Funcionalidade
+
+O campo SKU deixa de ser preenchido manualmente e passa a ser gerado automaticamente pelo backend
+no momento da criação do produto.
+
+**Formato**: `[CAT3]-[FAR3]-[NNNN]`
+
+- `CAT3` — 3 primeiras letras da categoria, sem acento, maiúsculas (ex: "Hormônios" → `HOR`)
+- `FAR3` — 3 primeiras letras da farmácia, sem acento, maiúsculas (ex: "FarmaMag SP" → `FAR`)
+- `NNNN` — contador sequencial de produtos da farmácia, zero-padded de 4 dígitos
+
+**Exemplos**: `HOR-FAR-0001`, `VIT-FAR-0002`, `ANA-CLI-0001`
+
+### Comportamento
+
+- **Criação**: campo SKU não aparece mais no formulário — é exibida uma prévia do formato com a mensagem "Gerado automaticamente — ex: HOR-FAR-0001"
+- **Edição**: SKU exibido como read-only com ícone de etiqueta — imutável após criação
+- **Colisão** (raro): se dois produtos geram o mesmo SKU simultaneamente, o backend retenta automaticamente com sufixo aleatório de 4 caracteres (ex: `HOR-FAR-0001-A3F2`)
+- **Fallback**: se a categoria ou farmácia não forem encontradas, usa `PRD` e `FRM` como prefixo
+
+### Arquivos alterados
+
+| Arquivo                                | Mudança                                                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `lib/validators/index.ts`              | `sku` agora é `optional()` no `productSchema`                                                                            |
+| `services/products.ts`                 | Adicionado `generateSKU()` (exportado); `createProduct` chama-o se `sku` não fornecido; retorna `sku` gerado na resposta |
+| `components/products/product-form.tsx` | Campo SKU removido do formulário de criação; exibido read-only na edição; glossário atualizado                           |
+
+### Cobertura de testes
+
+| Teste                                          | O que valida                                         |
+| ---------------------------------------------- | ---------------------------------------------------- |
+| `generateSKU > generates correct format`       | `HOR-FAR-0001` para Hormônios + FarmaMag com count=0 |
+| `generateSKU > sequential counter`             | `VIT-CLI-0015` para count=14                         |
+| `generateSKU > strips accents`                 | `ANA-PHA-0001` para Analgésicos + Phármácia          |
+| `generateSKU > fallback PRD/FRM`               | quando queries retornam null                         |
+| `createProduct > retries on 23505`             | sucesso no retry com sufixo aleatório                |
+| `createProduct > error when both inserts fail` | retorna "Erro ao criar produto"                      |
+
+**659 testes passando** (eram 654).
+
+---
+
 ## [4.7.0] — 2026-04-08 — UX: explicações contextuais de SKU, Slug e Variantes na edição de produto
 
 ### Funcionalidade

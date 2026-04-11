@@ -9,6 +9,7 @@ import {
   updateProductPrice,
   updatePharmacyCost,
   toggleProductActive,
+  generateSKU,
 } from '@/services/products'
 
 vi.mock('@/lib/db/admin', () => ({ createAdminClient: vi.fn() }))
@@ -63,8 +64,102 @@ beforeEach(() => {
   vi.mocked(auditModule.createAuditLog).mockResolvedValue(undefined)
 })
 
+describe('generateSKU', () => {
+  it('generates correct format from category and pharmacy names', async () => {
+    const mockClient = {
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'product_categories')
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: { name: 'Hormônios' }, error: null }),
+          }
+        if (table === 'pharmacies')
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: { trade_name: 'FarmaMag SP' }, error: null }),
+          }
+        // products count
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
+        }
+      }),
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sku = await generateSKU('cat-id', 'far-id', mockClient as any)
+    expect(sku).toBe('HOR-FAR-0001')
+  })
+
+  it('uses sequential counter based on existing product count', async () => {
+    const mockClient = {
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'product_categories')
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: { name: 'Vitaminas' }, error: null }),
+          }
+        if (table === 'pharmacies')
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: { trade_name: 'Clinipharma' }, error: null }),
+          }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({ count: 14, error: null }),
+        }
+      }),
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sku = await generateSKU('cat-id', 'far-id', mockClient as any)
+    expect(sku).toBe('VIT-CLI-0015')
+  })
+
+  it('strips accents and normalizes to uppercase', async () => {
+    const mockClient = {
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'product_categories')
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: { name: 'Analgésicos' }, error: null }),
+          }
+        if (table === 'pharmacies')
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: { trade_name: 'Phármácia' }, error: null }),
+          }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({ count: 0, error: null }),
+        }
+      }),
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sku = await generateSKU('cat-id', 'far-id', mockClient as any)
+    expect(sku).toBe('ANA-PHA-0001')
+  })
+
+  it('falls back to PRD/FRM when queries fail', async () => {
+    const mockClient = {
+      from: vi.fn().mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      })),
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sku = await generateSKU('cat-id', 'far-id', mockClient as any)
+    expect(sku).toMatch(/^PRD-FRM-\d{4}$/)
+  })
+})
+
 describe('createProduct', () => {
-  it('returns product id on success', async () => {
+  it('returns product id and sku on success (sku provided in validator mock)', async () => {
     const qb = makeQueryBuilder({ id: 'prod-1' }, null)
     qb.single = vi.fn().mockResolvedValue({ data: { id: 'prod-1' }, error: null })
     vi.mocked(adminModule.createAdminClient).mockReturnValue({
@@ -73,9 +168,33 @@ describe('createProduct', () => {
 
     const result = await createProduct({} as Parameters<typeof createProduct>[0])
     expect(result.id).toBe('prod-1')
+    expect(result.sku).toBe('SKU-1') // sku from validator mock
   })
 
-  it('returns SKU error on duplicate', async () => {
+  it('retries with random suffix on 23505 collision and succeeds', async () => {
+    let insertCallCount = 0
+    const adminMock = {
+      from: vi.fn().mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockReturnThis(),
+        single: vi.fn().mockImplementation(() => {
+          insertCallCount++
+          if (insertCallCount === 1)
+            return Promise.resolve({ data: null, error: { code: '23505', message: 'sku dup' } })
+          return Promise.resolve({ data: { id: 'prod-retry' }, error: null })
+        }),
+      })),
+    }
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      adminMock as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+    const result = await createProduct({} as Parameters<typeof createProduct>[0])
+    expect(result.id).toBe('prod-retry')
+    expect(result.sku).toMatch(/^SKU-1-[A-Z0-9]{4}$/)
+  })
+
+  it('returns error when both insert attempts fail', async () => {
     const qb = makeQueryBuilder(null, null)
     qb.single = vi.fn().mockResolvedValue({ data: null, error: { code: '23505', message: 'sku' } })
     vi.mocked(adminModule.createAdminClient).mockReturnValue({
@@ -83,7 +202,7 @@ describe('createProduct', () => {
     } as unknown as ReturnType<typeof adminModule.createAdminClient>)
 
     const result = await createProduct({} as Parameters<typeof createProduct>[0])
-    expect(result.error).toBe('SKU ou slug já existente')
+    expect(result.error).toBe('Erro ao criar produto')
   })
 
   it('returns Sem permissão when FORBIDDEN', async () => {

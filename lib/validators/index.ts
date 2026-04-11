@@ -93,7 +93,7 @@ export type PharmacyFormData = z.infer<typeof pharmacySchema>
 export const productSchema = z.object({
   category_id: z.string().uuid('Categoria inválida'),
   pharmacy_id: z.string().uuid('Farmácia inválida'),
-  sku: z.string().min(2, 'SKU é obrigatório'),
+  sku: z.string().min(2).optional(), // gerado automaticamente no backend se omitido
   name: z.string().min(2, 'Nome é obrigatório'),
   slug: z.string().min(2, 'Slug é obrigatório'),
   concentration: z.string().min(1, 'Concentração é obrigatória'),

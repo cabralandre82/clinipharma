@@ -7,10 +7,52 @@ import { requireRole } from '@/lib/rbac'
 import { productSchema, priceUpdateSchema } from '@/lib/validators'
 import type { ProductFormData, PriceUpdateFormData } from '@/lib/validators'
 import { slugify } from '@/lib/utils'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+/**
+ * Removes accents and keeps only alphanumeric chars, uppercased.
+ * "Hormônios" → "HOR", "FarmaMag SP" → "FAR"
+ */
+function toAbbrev(text: string, len: number): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .slice(0, len)
+    .toUpperCase()
+    .padEnd(len, 'X')
+}
+
+/**
+ * Generates a unique SKU in the format [CAT3]-[FAR3]-[NNNN].
+ * NNNN = total products for this pharmacy + 1 (zero-padded).
+ * Falls back with a random hex suffix if a collision occurs.
+ */
+export async function generateSKU(
+  categoryId: string,
+  pharmacyId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adminClient: SupabaseClient<any>
+): Promise<string> {
+  const [{ data: cat }, { data: pharma }, { count }] = await Promise.all([
+    adminClient.from('product_categories').select('name').eq('id', categoryId).single(),
+    adminClient.from('pharmacies').select('trade_name').eq('id', pharmacyId).single(),
+    adminClient
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .eq('pharmacy_id', pharmacyId),
+  ])
+
+  const catPart = toAbbrev((cat as { name: string } | null)?.name ?? 'PRD', 3)
+  const farPart = toAbbrev((pharma as { trade_name: string } | null)?.trade_name ?? 'FRM', 3)
+  const seq = String((count ?? 0) + 1).padStart(4, '0')
+
+  return `${catPart}-${farPart}-${seq}`
+}
 
 export async function createProduct(
   data: ProductFormData
-): Promise<{ id?: string; error?: string }> {
+): Promise<{ id?: string; error?: string; sku?: string }> {
   try {
     const user = await requireRole(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
     const parsed = productSchema.safeParse(data)
@@ -19,10 +61,17 @@ export async function createProduct(
     const adminClient = createAdminClient()
 
     const slug = parsed.data.slug || slugify(parsed.data.name)
+
+    // Auto-generate SKU if not provided
+    const sku =
+      parsed.data.sku ||
+      (await generateSKU(parsed.data.category_id, parsed.data.pharmacy_id, adminClient))
+
     const { data: product, error } = await adminClient
       .from('products')
       .insert({
         ...parsed.data,
+        sku,
         slug,
         active: parsed.data.status !== 'inactive',
         status: parsed.data.status ?? 'active',
@@ -32,7 +81,34 @@ export async function createProduct(
       .single()
 
     if (error) {
-      if (error.code === '23505') return { error: 'SKU ou slug já existente' }
+      if (error.code === '23505') {
+        // Rare collision — retry with random suffix
+        const fallbackSku = `${sku}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+        const { data: retryProduct, error: retryError } = await adminClient
+          .from('products')
+          .insert({
+            ...parsed.data,
+            sku: fallbackSku,
+            slug,
+            active: parsed.data.status !== 'inactive',
+            status: parsed.data.status ?? 'active',
+            featured: parsed.data.featured ?? false,
+          })
+          .select('id')
+          .single()
+        if (retryError) return { error: 'Erro ao criar produto' }
+        await createAuditLog({
+          actorUserId: user.id,
+          actorRole: user.roles[0],
+          entityType: AuditEntity.PRODUCT,
+          entityId: retryProduct.id,
+          action: AuditAction.CREATE,
+          newValues: { ...parsed.data, sku: fallbackSku } as Record<string, unknown>,
+        })
+        revalidatePath('/products')
+        revalidatePath('/catalog')
+        return { id: retryProduct.id, sku: fallbackSku }
+      }
       return { error: 'Erro ao criar produto' }
     }
 
@@ -42,12 +118,12 @@ export async function createProduct(
       entityType: AuditEntity.PRODUCT,
       entityId: product.id,
       action: AuditAction.CREATE,
-      newValues: parsed.data as Record<string, unknown>,
+      newValues: { ...parsed.data, sku } as Record<string, unknown>,
     })
 
     revalidatePath('/products')
     revalidatePath('/catalog')
-    return { id: product.id }
+    return { id: product.id, sku }
   } catch (err) {
     if (err instanceof Error && err.message === 'FORBIDDEN') return { error: 'Sem permissão' }
     return { error: 'Erro interno' }
