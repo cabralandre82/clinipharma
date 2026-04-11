@@ -258,13 +258,27 @@
 
 **Problema:** Sem testes de interface. Deploys podem quebrar fluxos críticos silenciosamente.
 
-- [ ] Configurar Playwright no projeto
-- [ ] Fluxo 1: login → criar pedido → confirmar pagamento
-- [ ] Fluxo 2: admin aprova cadastro de clínica
-- [ ] Fluxo 3: farmácia atualiza status de pedido
-- [ ] Integrar no CI (Vercel Preview build check)
+- [x] Configurar Playwright no projeto (`playwright.config.ts`, `tests/e2e/`)
+- [x] Auth setup: salva sessão SUPER_ADMIN para reusar em todos os testes (`auth.setup.ts`)
+- [x] Fluxo 1: login, auth redirect, smoke de rotas autenticadas (`01-auth.test.ts`)
+- [x] Fluxo 2: admin aprova cadastro de clínica (`02-admin-clinic-approval.test.ts`)
+- [x] Fluxo 3: ciclo de vida de pedido + atualização de status de farmácia (`03-order-lifecycle.test.ts`)
+- [x] Portal de privacidade LGPD (`04-profile-privacy.test.ts`)
+- [x] Smoke tests rápidos (Desktop + Mobile) para cada deploy (`smoke.test.ts`)
+- [x] Page Object Models: LoginPage, OrdersPage, AdminPage (`tests/e2e/pages/`)
+- [x] GitHub Actions CI workflow (`.github/workflows/ci.yml`): unit + lint + E2E smoke
+- [x] Scripts npm: `test:e2e`, `test:e2e:smoke`, `test:e2e:ui`, `test:e2e:report`
 
-**Esforço:** 3 dias | **Status:** ⬜ pendente
+**Arquivos:** `playwright.config.ts`, `tests/e2e/**`, `.github/workflows/ci.yml`
+
+**Para ativar no staging:**
+
+```bash
+E2E_SUPER_ADMIN_EMAIL=xxx E2E_SUPER_ADMIN_PASSWORD=yyy \
+  BASE_URL=https://staging.clinipharma.com.br npx playwright test
+```
+
+**Esforço:** 3 dias | **Status:** ✅ concluído
 
 ---
 
@@ -277,7 +291,25 @@
 - [ ] Corrigir todos os findings críticos e altos antes do go-live comercial
 - [ ] Obter relatório formal para apresentar a investidores e parceiros regulados
 
-**Esforço:** 2–3 semanas (externo) | **Status:** ⬜ pendente (contratar assim que possível)
+**Empresas recomendadas (Brasil):**
+| Empresa | Site | Foco |
+|---------|------|------|
+| Tempest | tempest.com.br | Pentest, Red Team, AppSec |
+| Conviso | conviso.com.br | DevSecOps, AppSec |
+| Kondado | kondado.com.br | Segurança de dados, LGPD |
+| Claranet | claranet.com.br | Cloud security, pentest |
+
+**Escopo mínimo a contratar:**
+
+- Autenticação e gerenciamento de sessão (JWT, revogação, RLS)
+- IDOR em endpoints de pedidos, clínicas, comissões
+- Injeção SQL / noSQL (mesmo com ORM)
+- Lógica de negócio: escalação de privilégio, bypass de compliance
+- Configuração de infra: headers HTTP, CORS, Supabase policies
+- Revisão de variáveis de ambiente e segredos no Vercel
+
+**Esforço:** 2–3 semanas (externo) | **Custo estimado:** R$ 8.000 – R$ 20.000
+**Status:** ⬜ pendente — contratar antes do go-live comercial com clientes regulados
 
 ---
 

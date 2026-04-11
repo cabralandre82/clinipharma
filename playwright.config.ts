@@ -1,27 +1,73 @@
 import { defineConfig, devices } from '@playwright/test'
 
+/**
+ * Playwright E2E Configuration for Clinipharma.
+ *
+ * Run against staging:
+ *   BASE_URL=https://staging.clinipharma.com.br npx playwright test
+ *
+ * Run against local dev server:
+ *   npx playwright test  (starts Next.js dev server automatically)
+ *
+ * Run with UI mode:
+ *   npx playwright test --ui
+ */
+
+const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000'
+const IS_CI = !!process.env.CI
+
 export default defineConfig({
   testDir: './tests/e2e',
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  fullyParallel: false, // E2E tests share state — run sequentially
+  forbidOnly: IS_CI,
+  retries: IS_CI ? 2 : 0,
+  workers: IS_CI ? 1 : 1,
+  reporter: IS_CI ? 'github' : 'list',
+
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    actionTimeout: 15_000,
+    navigationTimeout: 30_000,
   },
+
   projects: [
+    // Setup: authenticate and save session state
+    {
+      name: 'setup',
+      testMatch: '**/auth.setup.ts',
+    },
+    // E2E flows (depend on auth setup)
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'tests/e2e/.auth/super-admin.json',
+      },
+      dependencies: ['setup'],
+    },
+    // Mobile viewport — smoke test main flows
+    {
+      name: 'mobile-chrome',
+      use: {
+        ...devices['Pixel 5'],
+        storageState: 'tests/e2e/.auth/super-admin.json',
+      },
+      dependencies: ['setup'],
+      testMatch: '**/smoke.test.ts',
     },
   ],
-  webServer: process.env.CI
-    ? undefined
-    : {
-        command: 'npm run dev',
-        url: 'http://localhost:3000',
-        reuseExistingServer: true,
-      },
+
+  // Start local Next.js dev server when not targeting external BASE_URL
+  webServer:
+    BASE_URL === 'http://localhost:3000'
+      ? {
+          command: 'npm run dev',
+          url: 'http://localhost:3000',
+          reuseExistingServer: !IS_CI,
+          timeout: 120_000,
+        }
+      : undefined,
 })

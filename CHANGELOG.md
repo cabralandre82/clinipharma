@@ -2,6 +2,35 @@
 
 ---
 
+## [4.0.0] — 2026-04-08 — Roadmap 90pts: Conclusão (E2E + CI + Cobertura)
+
+### Playwright E2E (A16)
+
+- Configurado `playwright.config.ts` com projetos Desktop Chrome, Mobile Chrome e setup de autenticação
+- `tests/e2e/auth.setup.ts` — login único com sessão persistida (sem repetição de auth entre testes)
+- `tests/e2e/01-auth.test.ts` — fluxos de autenticação: login inválido, redirecionamento, link de reset
+- `tests/e2e/02-admin-clinic-approval.test.ts` — painel admin: aprovação de cadastros, navegação de rotas
+- `tests/e2e/03-order-lifecycle.test.ts` — ciclo de vida de pedido + farmácia atualizando status
+- `tests/e2e/04-profile-privacy.test.ts` — portal de privacidade LGPD (export, solicitação de exclusão)
+- `tests/e2e/smoke.test.ts` — smoke tests rápidos para Deploy checks (Desktop + Mobile)
+- Page Object Models: `LoginPage`, `OrdersListPage`, `NewOrderPage`, `RegistrationRequestsPage`
+- `.github/workflows/ci.yml` — GitHub Actions: unit tests + lint + TypeScript check + E2E smoke
+- Scripts npm: `test:e2e`, `test:e2e:smoke`, `test:e2e:ui`, `test:e2e:report`
+- `.gitignore` atualizado: `tests/e2e/.auth/` e `blob-report/` excluídos do controle de versão
+
+### Pentest Externo (A17) — documentado
+
+- `docs/roadmap-90pts.md` atualizado com escopo completo de pentest, empresas recomendadas e custo estimado
+
+### Cobertura de Testes
+
+- `tests/unit/services/orders.test.ts` — 8 novos testes: compliance block, success path admin, pharmacy membership denial, notify triggers, rollback on items error
+- `orders.ts` coverage: **37% → 71.5% (statements)**, **46% → 76.9% (functions)**
+- Coverage geral: Statements **76.72% → 80.58%**, Lines **77.69% → 81.81%**, Functions **83.56% → 85.98%**
+- Total: **636 testes passando** (eram 618)
+
+---
+
 ## [3.0.0] — 2026-04-08 — Roadmap 90pts: Semana 1–2 (Segurança + API + Compliance)
 
 ### Security — Session Revocation (Camadas 3 e 6)

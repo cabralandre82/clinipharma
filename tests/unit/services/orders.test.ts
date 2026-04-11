@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { makeQueryBuilder, mockSupabaseClient } from '../../setup'
+import { makeQueryBuilder, mockSupabaseAdmin, mockSupabaseClient } from '../../setup'
 import * as adminModule from '@/lib/db/admin'
 import * as serverModule from '@/lib/db/server'
 import * as sessionModule from '@/lib/auth/session'
@@ -17,12 +17,9 @@ vi.mock('@/lib/audit', () => ({
 vi.mock('@/lib/orders/status-machine', () => ({
   isValidTransition: vi.fn().mockReturnValue(true),
 }))
-
-// Valid UUIDs for test inputs
-const CLINIC_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
-const DOCTOR_ID = 'b1eec100-0d1c-5fg9-cc7e-7cc0ce491b22'.replace('f', 'e').replace('g', 'f')
-const PRODUCT_ID = 'c2ffd211-1e2d-4a0e-dd8f-8dd1df502c33'.replace(/[g-z]/gi, '0')
-const ORDER_ID = 'd3fee322-2f3e-5b1f-ee90-9ee2eg613d44'.replace(/[g-z]/gi, '0')
+vi.mock('@/lib/compliance', () => ({
+  canPlaceOrder: vi.fn().mockResolvedValue({ allowed: true }),
+}))
 
 // Use crypto-safe UUIDs
 const CID = '11111111-1111-4111-a111-111111111111'
@@ -224,5 +221,285 @@ describe('updateOrderStatus', () => {
     vi.mocked(sessionModule.requireAuth).mockRejectedValue(new Error('UNAUTHORIZED'))
     const result = await updateOrderStatus(OID, 'AWAITING_PAYMENT', 'note')
     expect(result.error).toBe('Erro interno')
+  })
+
+  it('returns error when update query fails', async () => {
+    vi.mocked(sessionModule.requireAuth).mockResolvedValue(adminMock)
+
+    const qb = makeQueryBuilder(
+      { id: OID, order_status: 'DRAFT', pharmacy_id: 'ph-1', created_by_user_id: 'user-x' },
+      null
+    )
+    // Override update to chain into error
+    const updateBuilder = makeQueryBuilder(null, { message: 'update failed' })
+    qb.update = vi.fn().mockReturnValue(updateBuilder)
+
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(qb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await updateOrderStatus(OID, 'AWAITING_PAYMENT', 'note')
+    expect(result.error).toBe('Erro ao atualizar status')
+  })
+
+  it('succeeds and returns empty object for admin', async () => {
+    vi.mocked(sessionModule.requireAuth).mockResolvedValue(adminMock)
+    vi.mocked(auditModule.createAuditLog).mockResolvedValue(undefined)
+
+    const admin = mockSupabaseAdmin()
+    const orderQb = makeQueryBuilder(
+      {
+        id: OID,
+        order_status: 'AWAITING_PAYMENT',
+        pharmacy_id: 'ph-1',
+        created_by_user_id: 'user-x',
+      },
+      null
+    )
+    const updateQb = makeQueryBuilder(null, null)
+    const insertHistQb = makeQueryBuilder(null, null)
+    const notifyQb = makeQueryBuilder(null, null)
+
+    let callCount = 0
+    admin.from = vi.fn().mockImplementation(() => {
+      callCount++
+      if (callCount === 1) return orderQb // fetch order
+      if (callCount === 2) return updateQb // update order status
+      if (callCount === 3) return insertHistQb // insert history
+      return notifyQb // notification queries
+    })
+
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      admin as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+
+    const result = await updateOrderStatus(OID, 'AWAITING_PAYMENT', 'note')
+    expect(result.error).toBeUndefined()
+  })
+
+  it('pharmacy admin without membership is denied', async () => {
+    const pharmacyUser = {
+      ...adminMock,
+      roles: ['PHARMACY_ADMIN'] as ['PHARMACY_ADMIN'],
+    }
+    vi.mocked(sessionModule.requireAuth).mockResolvedValue(pharmacyUser)
+
+    const orderQb = makeQueryBuilder(
+      { id: OID, order_status: 'DRAFT', pharmacy_id: 'ph-99', created_by_user_id: 'user-x' },
+      null
+    )
+    const membershipQb = makeQueryBuilder()
+    membershipQb.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
+
+    let callCount = 0
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockImplementation(() => {
+        callCount++
+        if (callCount === 1) return orderQb
+        return membershipQb
+      }),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await updateOrderStatus(OID, 'SHIPPED', 'note')
+    expect(result.error).toContain('outra farmácia')
+  })
+
+  it('notifies when status is a notify-trigger status', async () => {
+    vi.mocked(sessionModule.requireAuth).mockResolvedValue(adminMock)
+
+    const admin = mockSupabaseAdmin()
+    const orderQb = makeQueryBuilder(
+      { id: OID, order_status: 'READY', pharmacy_id: 'ph-1', created_by_user_id: 'user-x' },
+      null
+    )
+    const updateQb = makeQueryBuilder(null, null)
+
+    // Notify path: fetch full order
+    const fullOrderQb = makeQueryBuilder(
+      {
+        code: 'ORD-001',
+        clinic_id: CID,
+        clinics: { email: 'clinic@test.com' },
+        order_items: [{ products: { name: 'Produto A' } }],
+      },
+      null
+    )
+
+    let callCount = 0
+    admin.from = vi.fn().mockImplementation(() => {
+      callCount++
+      if (callCount === 1) return orderQb
+      if (callCount === 2) return updateQb
+      if (callCount === 3) return makeQueryBuilder(null, null) // insert history
+      return fullOrderQb // fetch for notification
+    })
+
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      admin as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+
+    const result = await updateOrderStatus(OID, 'SHIPPED', undefined)
+    expect(result.error).toBeUndefined()
+  })
+})
+
+describe('createOrder — compliance check', () => {
+  it('blocks order when compliance check fails', async () => {
+    const { canPlaceOrder } = await import('@/lib/compliance')
+    vi.mocked(canPlaceOrder).mockResolvedValueOnce({
+      allowed: false,
+      reason: 'CNPJ da farmácia inativo',
+    })
+
+    const products = [
+      {
+        id: PID,
+        pharmacy_id: 'ph-1',
+        price_current: 100,
+        name: 'Prod A',
+        estimated_deadline_days: 3,
+        active: true,
+      },
+    ]
+
+    const supabase = mockSupabaseClient()
+    const qb = makeQueryBuilder(products, null)
+    supabase.from = vi.fn().mockReturnValue(qb)
+    vi.mocked(serverModule.createClient).mockResolvedValue(
+      supabase as ReturnType<typeof mockSupabaseClient>
+    )
+
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      mockSupabaseAdmin() as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+
+    const result = await createOrder({
+      clinic_id: CID,
+      doctor_id: DID,
+      items: [{ product_id: PID, quantity: 1 }],
+    })
+
+    expect(result.error).toContain('CNPJ da farmácia inativo')
+  })
+
+  it('uses generic reason when compliance.reason is undefined', async () => {
+    const { canPlaceOrder } = await import('@/lib/compliance')
+    vi.mocked(canPlaceOrder).mockResolvedValueOnce({ allowed: false })
+
+    const products = [
+      {
+        id: PID,
+        pharmacy_id: 'ph-1',
+        price_current: 100,
+        name: 'Prod A',
+        estimated_deadline_days: 3,
+        active: true,
+      },
+    ]
+
+    const supabase = mockSupabaseClient()
+    const qb = makeQueryBuilder(products, null)
+    supabase.from = vi.fn().mockReturnValue(qb)
+    vi.mocked(serverModule.createClient).mockResolvedValue(
+      supabase as ReturnType<typeof mockSupabaseClient>
+    )
+
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      mockSupabaseAdmin() as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+
+    const result = await createOrder({
+      clinic_id: CID,
+      doctor_id: DID,
+      items: [{ product_id: PID, quantity: 1 }],
+    })
+
+    expect(result.error).toContain('compliance')
+  })
+})
+
+describe('createOrder — insertion errors', () => {
+  const validProducts = [
+    {
+      id: PID,
+      pharmacy_id: 'ph-1',
+      price_current: 100,
+      name: 'Prod A',
+      estimated_deadline_days: 3,
+      active: true,
+    },
+  ]
+
+  beforeEach(async () => {
+    // Reset compliance to allowed
+    const { canPlaceOrder } = await import('@/lib/compliance')
+    vi.mocked(canPlaceOrder).mockResolvedValue({ allowed: true })
+  })
+
+  it('returns error when order insert fails', async () => {
+    const supabase = mockSupabaseClient()
+    const productsQb = makeQueryBuilder(validProducts, null)
+    supabase.from = vi.fn().mockReturnValue(productsQb)
+    vi.mocked(serverModule.createClient).mockResolvedValue(
+      supabase as ReturnType<typeof mockSupabaseClient>
+    )
+
+    const admin = mockSupabaseAdmin()
+    const insertFailQb = makeQueryBuilder()
+    insertFailQb.single = vi.fn().mockResolvedValue({ data: null, error: { message: 'DB error' } })
+    admin.from = vi.fn().mockReturnValue(insertFailQb)
+
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      admin as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+
+    const result = await createOrder({
+      clinic_id: CID,
+      doctor_id: DID,
+      items: [{ product_id: PID, quantity: 1 }],
+    })
+
+    expect(result.error).toBe('Erro ao criar pedido. Tente novamente.')
+  })
+
+  it('returns error and rollback when items insert fails', async () => {
+    const supabase = mockSupabaseClient()
+    const productsQb = makeQueryBuilder(validProducts, null)
+    supabase.from = vi.fn().mockReturnValue(productsQb)
+    vi.mocked(serverModule.createClient).mockResolvedValue(
+      supabase as ReturnType<typeof mockSupabaseClient>
+    )
+
+    const admin = mockSupabaseAdmin()
+
+    // call 1: orders insert → success
+    const orderInsertQb = makeQueryBuilder({ id: OID, code: 'ORD-001' }, null)
+    // call 2: order_items insert → error (but chained, so override builder)
+    const itemsFailQb = makeQueryBuilder()
+    itemsFailQb.then = (resolve: (v: unknown) => void) =>
+      resolve({ data: null, error: { message: 'items error' } })
+
+    // call 3+: cleanup delete and further calls
+    const cleanupQb = makeQueryBuilder(null, null)
+
+    let callCount = 0
+    admin.from = vi.fn().mockImplementation(() => {
+      callCount++
+      if (callCount === 1) return orderInsertQb
+      if (callCount === 2) return itemsFailQb
+      return cleanupQb
+    })
+
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      admin as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+
+    const result = await createOrder({
+      clinic_id: CID,
+      doctor_id: DID,
+      items: [{ product_id: PID, quantity: 1 }],
+    })
+
+    expect(result.error).toBe('Erro ao registrar itens do pedido.')
   })
 })
