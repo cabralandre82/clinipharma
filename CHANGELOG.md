@@ -12,12 +12,21 @@
 - **Usuários — Reativar**: nova server action `reactivateUser` em `services/users.ts` (desbanir via `ban_duration: 'none'`). O `DeactivateUserDialog` alterna entre desativar e reativar conforme o status atual.
 - **Usuários — Proteção auto-desativação**: `deactivateUser` agora retorna erro ao tentar desativar a própria conta.
 
-### Cobertura de Testes (+5 testes)
+### Cobertura de Testes
 
-- `deactivateUser — self-deactivation guard`: valida que o ator não pode se autodesativar.
-- `reactivateUser — removes ban`: verifica chamada `ban_duration: 'none'`.
-- `reactivateUser — auth unban fails`: cobre caminho de erro.
-- Total: 19 testes em `tests/unit/services/users.test.ts` (era 14).
+**Serviços — todos cobertos por testes unitários existentes ou novos:**
+
+| Serviço                | Arquivo de teste     | Casos                                            |
+| ---------------------- | -------------------- | ------------------------------------------------ |
+| `updatePharmacyStatus` | `pharmacies.test.ts` | 2 (ACTIVE, INACTIVE) — já existiam               |
+| `updateDoctorStatus`   | `doctors.test.ts`    | 1 (success) — já existia                         |
+| `toggleProductActive`  | `products.test.ts`   | 2 (true, false) — já existiam                    |
+| `deactivateUser`       | `users.test.ts`      | 3 (success, error, self-guard) — self-guard novo |
+| `reactivateUser`       | `users.test.ts`      | 2 (success, error) — novos                       |
+
+**Componentes de UI** (`PharmacyStatusActions`, `DoctorStatusActions`, `ToggleProductActive`, `DeactivateUserDialog`): wrappers thin client-side sem lógica de negócio — cobertos por testes E2E (não unitários), padrão adotado no projeto.
+
+**Total de testes unitários em `users.test.ts`: 19** (era 14 antes desta versão).
 
 ### Varredura de funcionalidades ausentes
 
