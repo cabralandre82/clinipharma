@@ -135,31 +135,32 @@ npx tsx scripts/setup-production.ts   # Setup inicial de produção
 
 ## Documentação
 
-| Arquivo                                                                                | Conteúdo                        |
-| -------------------------------------------------------------------------------------- | ------------------------------- |
-| [PRODUCT_OVERVIEW.md](./PRODUCT_OVERVIEW.md)                                           | Visão geral do produto          |
-| [PRD.md](./PRD.md)                                                                     | Requisitos detalhados           |
-| [ARCHITECTURE.md](./ARCHITECTURE.md)                                                   | Arquitetura técnica e estrutura |
-| [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)                                             | Schema do banco de dados        |
-| [RBAC_MATRIX.md](./RBAC_MATRIX.md)                                                     | Matriz de permissões por papel  |
-| [BUSINESS_RULES.md](./BUSINESS_RULES.md)                                               | Regras de negócio obrigatórias  |
-| [USER_FLOWS.md](./USER_FLOWS.md)                                                       | Fluxos operacionais por papel   |
-| [DEPLOY.md](./DEPLOY.md)                                                               | Guia completo de deploy         |
-| [CHANGELOG.md](./CHANGELOG.md)                                                         | Histórico de versões            |
-| [docs/roadmap-90pts.md](./docs/roadmap-90pts.md)                                       | Roadmap de qualidade pré-launch |
-| [docs/slos.md](./docs/slos.md)                                                         | Service Level Objectives        |
-| [docs/disaster-recovery.md](./docs/disaster-recovery.md)                               | Plano de Disaster Recovery      |
-| [docs/lgpd-registro-atividades.md](./docs/lgpd-registro-atividades.md)                 | Registro de atividades LGPD     |
-| [docs/staging-environment.md](./docs/staging-environment.md)                           | Ambiente de staging             |
-| [docs/scale-1000-clinics.md](./docs/scale-1000-clinics.md)                             | Plano de escala 1000+ clínicas  |
-| [docs/setup-supabase.md](./docs/setup-supabase.md)                                     | Configuração do Supabase        |
-| [docs/seed-users.md](./docs/seed-users.md)                                             | Credenciais dos usuários seed   |
-| [docs/go-live-checklist.md](./docs/go-live-checklist.md)                               | Checklist de go-live            |
-| [docs/known-limitations.md](./docs/known-limitations.md)                               | Limitações conhecidas do MVP    |
-| [docs/manual-payment-confirmation-flow.md](./docs/manual-payment-confirmation-flow.md) | Fluxo de pagamento manual       |
-| [docs/manual-transfer-flow.md](./docs/manual-transfer-flow.md)                         | Fluxo de repasse manual         |
-| [docs/manual-price-update-flow.md](./docs/manual-price-update-flow.md)                 | Atualização de preços           |
-| [docs/setup-email.md](./docs/setup-email.md)                                           | Configuração de email (Resend)  |
+| Arquivo                                                                                | Conteúdo                            |
+| -------------------------------------------------------------------------------------- | ----------------------------------- |
+| [PRODUCT_OVERVIEW.md](./PRODUCT_OVERVIEW.md)                                           | Visão geral do produto              |
+| [PRD.md](./PRD.md)                                                                     | Requisitos detalhados               |
+| [ARCHITECTURE.md](./ARCHITECTURE.md)                                                   | Arquitetura técnica e estrutura     |
+| [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)                                             | Schema do banco de dados            |
+| [RBAC_MATRIX.md](./RBAC_MATRIX.md)                                                     | Matriz de permissões por papel      |
+| [BUSINESS_RULES.md](./BUSINESS_RULES.md)                                               | Regras de negócio obrigatórias      |
+| [USER_FLOWS.md](./USER_FLOWS.md)                                                       | Fluxos operacionais por papel       |
+| [DEPLOY.md](./DEPLOY.md)                                                               | Guia completo de deploy             |
+| [CHANGELOG.md](./CHANGELOG.md)                                                         | Histórico de versões                |
+| [docs/roadmap-90pts.md](./docs/roadmap-90pts.md)                                       | Roadmap de qualidade pré-launch     |
+| [docs/slos.md](./docs/slos.md)                                                         | Service Level Objectives            |
+| [docs/disaster-recovery.md](./docs/disaster-recovery.md)                               | Plano de Disaster Recovery          |
+| [docs/lgpd-registro-atividades.md](./docs/lgpd-registro-atividades.md)                 | Registro de atividades LGPD         |
+| [docs/staging-environment.md](./docs/staging-environment.md)                           | Ambiente de staging                 |
+| [docs/scale-1000-clinics.md](./docs/scale-1000-clinics.md)                             | Plano de escala 1000+ clínicas      |
+| [docs/PENDING.md](./docs/PENDING.md)                                                   | **Lista consolidada de pendências** |
+| [docs/setup-supabase.md](./docs/setup-supabase.md)                                     | Configuração do Supabase            |
+| [docs/seed-users.md](./docs/seed-users.md)                                             | Credenciais dos usuários seed       |
+| [docs/go-live-checklist.md](./docs/go-live-checklist.md)                               | Checklist de go-live                |
+| [docs/known-limitations.md](./docs/known-limitations.md)                               | Limitações conhecidas do MVP        |
+| [docs/manual-payment-confirmation-flow.md](./docs/manual-payment-confirmation-flow.md) | Fluxo de pagamento manual           |
+| [docs/manual-transfer-flow.md](./docs/manual-transfer-flow.md)                         | Fluxo de repasse manual             |
+| [docs/manual-price-update-flow.md](./docs/manual-price-update-flow.md)                 | Atualização de preços               |
+| [docs/setup-email.md](./docs/setup-email.md)                                           | Configuração de email (Resend)      |
 
 ---
 

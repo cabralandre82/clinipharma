@@ -63,6 +63,32 @@
 ## Segurança
 
 - ~~Sem histórico de acesso~~ ✅ **v1.4.0**: `access_logs` com detecção de novo dispositivo, alerta in-app, visualização no perfil.
+- ~~Sem revogação de sessão~~ ✅ **v3.0.0**: JWT blacklist (`revoked_tokens`). Sessões revogadas imediatamente em desativação de usuário.
+- ~~Sem circuit breaker~~ ✅ **v3.0.0**: Asaas + Clicksign protegidos contra cascade failure.
+- ~~Sem rate limit distribuído~~ ✅ **v3.0.0**: Upstash Redis — multi-instância, sem race condition.
+- **Pentest externo não realizado**: auditoria interna concluída, nenhum critical encontrado. Pentest por empresa especializada obrigatório antes de clientes regulados.
+- **2FA não implementado**: autenticação em dois fatores não planejada para MVP.
+
+## LGPD / Privacidade
+
+- ~~Sem portal de privacidade~~ ✅ **v3.0.0**: `/profile/privacy` com exportação e solicitação de exclusão (LGPD Art. 18).
+- ~~Sem política de retenção técnica~~ ✅ **v3.0.0**: cron mensal anonimiza PII (5 anos) e preserva financeiros (10 anos).
+- ~~Sem encriptação de PII~~ ✅ **v3.0.0**: colunas `*_encrypted` criadas com AES-256-GCM. **⚠️ PENDENTE:** migrar dados existentes de plaintext.
+- **DPA formal pendente**: elaborar com advogado LGPD e assinar com farmácias/clínicas antes do go-live comercial.
+- **Política de Privacidade / Termos de Uso**: páginas `/privacy` e `/terms` não desenvolvidas.
+
+## Observabilidade
+
+- ~~Sem logging estruturado~~ ✅ **v3.0.0**: `lib/logger.ts` com JSON logs em todos os services críticos.
+- ~~Sem SLOs definidos~~ ✅ **v3.0.0**: `docs/slos.md` com targets, error budgets e alertas de negócio.
+- **UptimeRobot não configurado**: monitoramento de `/api/health` a cada 1 min — configuração manual no painel.
+- **Log Drain não configurado**: logs do Vercel não persistidos externamente. Avaliar Logtail ou Axiom.
+
+## Testes
+
+- ~~Sem testes E2E~~ ✅ **v4.0.0**: Playwright configurado com 5 suítes de testes (auth, admin, orders, privacy, smoke). Pronto para executar contra staging.
+- ~~Sem CI/CD~~ ✅ **v4.0.0**: GitHub Actions workflow (`.github/workflows/ci.yml`) — unit + lint + TypeScript + E2E smoke.
+- **Testes Inngest**: jobs excluídos do unit coverage por design (requerem Inngest Dev Server). Testar localmente com `npx inngest-cli@latest dev`.
 
 ## Mobile
 
@@ -72,6 +98,9 @@
 
 - ~~`CRON_SECRET`~~ ✅ Configurado no Vercel (Production + Preview + Development)
 - ~~Migration 013~~ ✅ Aplicada em produção (fcm_tokens, asaas_fields, contracts)
+- ~~Migration 023~~ ✅ Aplicada em produção (colunas PII encrypted)
+- **Staging não provisionado**: `clinipharma-staging` no Supabase ainda não criado. Ver `docs/staging-environment.md`.
+- **Cloudflare WAF não ativo**: OWASP Core Ruleset + rate limit 100 req/min em `/api/` — configuração manual no painel Cloudflare.
 
 ---
 
