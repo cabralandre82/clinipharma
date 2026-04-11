@@ -1,5 +1,5 @@
 import { unstable_cache } from 'next/cache'
-import { createClient } from '@/lib/db/server'
+import { createAdminClient } from '@/lib/db/admin'
 
 /**
  * Admin dashboard metrics — cached for 5 minutes (300s).
@@ -15,13 +15,15 @@ import { createClient } from '@/lib/db/server'
  */
 export const getAdminDashboardData = unstable_cache(
   async () => {
-    const supabase = await createClient()
+    // Use admin client — unstable_cache cannot use cookies() (request-scoped).
+    // Dashboard data is aggregate/non-sensitive; page-level auth guards access.
+    const supabase = createAdminClient()
 
     // All 6 queries run in parallel — single round-trip to DB per cache miss
     const [orders, payments, transfers, products, clinics, pharmacies] = await Promise.all([
       supabase
         .from('orders')
-        .select('id, order_status, total_price, created_at, order_code')
+        .select('id, order_status, total_price, created_at, code')
         .order('created_at', { ascending: false })
         .limit(200),
       supabase.from('payments').select('id, status, gross_amount'),
