@@ -283,6 +283,8 @@ export async function resetUserPassword(
 export async function deactivateUser(userId: string): Promise<{ error?: string }> {
   try {
     const actor = await requireRole(['SUPER_ADMIN'])
+    if (actor.id === userId) return { error: 'Você não pode desativar sua própria conta' }
+
     const adminClient = createAdminClient()
 
     const { error } = await adminClient.auth.admin.updateUserById(userId, {
@@ -290,7 +292,6 @@ export async function deactivateUser(userId: string): Promise<{ error?: string }
     })
     if (error) return { error: 'Erro ao desativar usuário' }
 
-    // Revoke all active sessions immediately — JWT is stateless so we blacklist
     await revokeAllUserTokens(userId)
 
     await createAuditLog({
@@ -303,6 +304,34 @@ export async function deactivateUser(userId: string): Promise<{ error?: string }
     })
 
     revalidatePath('/users')
+    revalidatePath(`/users/${userId}`)
+    return {}
+  } catch {
+    return { error: 'Erro interno' }
+  }
+}
+
+export async function reactivateUser(userId: string): Promise<{ error?: string }> {
+  try {
+    const actor = await requireRole(['SUPER_ADMIN'])
+    const adminClient = createAdminClient()
+
+    const { error } = await adminClient.auth.admin.updateUserById(userId, {
+      ban_duration: 'none',
+    })
+    if (error) return { error: 'Erro ao reativar usuário' }
+
+    await createAuditLog({
+      actorUserId: actor.id,
+      actorRole: actor.roles[0],
+      entityType: AuditEntity.PROFILE,
+      entityId: userId,
+      action: AuditAction.STATUS_CHANGE,
+      newValues: { active: true },
+    })
+
+    revalidatePath('/users')
+    revalidatePath(`/users/${userId}`)
     return {}
   } catch {
     return { error: 'Erro interno' }

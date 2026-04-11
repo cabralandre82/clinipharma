@@ -3,9 +3,11 @@ import Link from 'next/link'
 import { requireRolePage } from '@/lib/rbac'
 import { getCurrentUser } from '@/lib/auth/session'
 import { createServerClient } from '@/lib/db/server'
+import { createAdminClient } from '@/lib/db/admin'
 import { formatDate, formatPhone } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { ResetPasswordDialog } from '@/components/users/reset-password-dialog'
+import { DeactivateUserDialog } from '@/components/users/deactivate-user-dialog'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Detalhe do Usuário | Clinipharma' }
@@ -36,8 +38,10 @@ export default async function UserDetailPage({ params }: PageProps) {
 
   const currentUser = await getCurrentUser()
   const isSuperAdmin = currentUser?.roles.includes('SUPER_ADMIN') ?? false
+  const isSelf = currentUser?.id === id
 
   const supabase = await createServerClient()
+  const adminClient = createAdminClient()
 
   const { data: profileRaw } = await supabase
     .from('profiles')
@@ -46,6 +50,10 @@ export default async function UserDetailPage({ params }: PageProps) {
     .single()
 
   if (!profileRaw) notFound()
+
+  // Fetch auth user to check ban status — requires admin client
+  const { data: authUserData } = await adminClient.auth.admin.getUserById(id)
+  const isBanned = !!(authUserData?.user?.banned_until && authUserData.user.banned_until !== 'none')
 
   const profile = profileRaw as unknown as {
     id: string
@@ -99,9 +107,15 @@ export default async function UserDetailPage({ params }: PageProps) {
                 {ROLE_LABELS[r.role] ?? r.role}
               </Badge>
             ))}
+            {isBanned && <Badge className="bg-red-100 text-red-700">Desativado</Badge>}
           </div>
         </div>
-        <ResetPasswordDialog userId={id} userName={profile.full_name} />
+        <div className="flex items-center gap-2">
+          <ResetPasswordDialog userId={id} userName={profile.full_name} />
+          {isSuperAdmin && !isSelf && (
+            <DeactivateUserDialog userId={id} userName={profile.full_name} isBanned={isBanned} />
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
