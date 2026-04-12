@@ -84,11 +84,21 @@
 - **UptimeRobot não configurado**: monitoramento de `/api/health` a cada 1 min — configuração manual no painel.
 - **Log Drain não configurado**: logs do Vercel não persistidos externamente. Avaliar Logtail ou Axiom.
 
+## Inteligência Artificial
+
+- ~~Sem IA na plataforma~~ ✅ **v6.0.0**: 8 features de IA integradas (veja `docs/ai-aplicacoes-estudo.md`).
+- **Custo variável**: features de IA usam OpenAI (GPT-4o-mini e GPT-4o Vision). Todos os calls têm circuit breaker — falha graciosa se a API estiver indisponível. Monitorar custo no OpenAI Dashboard.
+- **`product_associations` vazia inicialmente**: tabela criada na migration 029. O job semanal popula automaticamente com o algoritmo Apriori após acumular pedidos históricos (mínimo 3 pares co-ocorrentes).
+- **OCR limitado a 5 documentos por análise**: por custo e latência, o endpoint OCR processa no máximo 5 arquivos por chamada (GPT-4o Vision).
+- **Churn e reorder internos**: detecção de churn e alertas de recompra são visíveis apenas para consultores e super admin — não expostos às clínicas.
+- **Classificação de tickets assíncrona**: o GPT classifica o ticket em background após criação. Há um breve intervalo em que `category = GENERAL` e `priority = NORMAL` enquanto a IA processa.
+- **`pgvector` não ativado**: busca semântica (H2 do roadmap de IA) requer `CREATE EXTENSION vector` no Supabase e embedding por produto — não implementado no MVP.
+
 ## Testes
 
 - ~~Sem testes E2E~~ ✅ **v4.0.0**: Playwright configurado com 5 suítes de testes (auth, admin, orders, privacy, smoke). Pronto para executar contra staging. **v5.1.4**: cobertura de regressão adicionada para acesso público a `/terms` e `/privacy` (`smoke.test.ts` + `01-auth.test.ts`).
 - ~~Sem CI/CD~~ ✅ **v4.0.0**: GitHub Actions workflow (`.github/workflows/ci.yml`) — unit + lint + TypeScript + E2E smoke.
-- **Testes Inngest**: jobs excluídos do unit coverage por design (requerem Inngest Dev Server). Testar localmente com `npx inngest-cli@latest dev`.
+- **Testes Inngest**: jobs têm cobertura unitária de registro e lógica de filtros/cálculos (`tests/unit/lib/jobs/`). Para testar o fluxo completo de eventos Inngest, rodar localmente com `npx inngest-cli@latest dev`.
 
 ## Padrões arquiteturais — atenção
 
@@ -103,6 +113,11 @@
 - ~~`CRON_SECRET`~~ ✅ Configurado no Vercel (Production + Preview + Development)
 - ~~Migration 013~~ ✅ Aplicada em produção (fcm_tokens, asaas_fields, contracts)
 - ~~Migration 023~~ ✅ Aplicada em produção (colunas PII encrypted)
+- ~~Migration 026~~ ✅ Aplicada em produção (`registration_drafts` — captura de leads)
+- ~~Migration 027~~ ✅ Aplicada em produção (`coupons`, `order_items` com campos de desconto)
+- ~~Migration 028~~ ✅ Aplicada em produção (`used_count` em coupons, trigger atômico)
+- ~~Migration 029~~ ✅ Aplicada em produção (`ai_classified` em support_tickets, `sentiment` em support_messages, `product_associations`)
+- ~~`OPENAI_API_KEY`~~ ✅ Configurada no Vercel (Production + Preview) — 2026-04-12
 - **Staging não provisionado**: `clinipharma-staging` no Supabase ainda não criado. Ver `docs/staging-environment.md`.
 - **Cloudflare WAF não ativo**: OWASP Core Ruleset + rate limit 100 req/min em `/api/` — configuração manual no painel Cloudflare.
 

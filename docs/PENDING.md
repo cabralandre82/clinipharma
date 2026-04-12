@@ -1,7 +1,12 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-12 | Versão da plataforma: **5.2.1** | **701 testes unitários** | cobertura atualizada
+> Gerado em: 2026-04-12 | Versão da plataforma: **6.0.1** | **767 testes** | cobertura atualizada
 >
+> **v6.0.1:** Cobertura completa para features de IA — 44 novos testes (lead-score, lib/ai, 4 jobs Inngest, OCR route, recommendations route, 3 crons). Migration 029 aplicada em produção. `OPENAI_API_KEY` configurada no Vercel (Production + Preview). 767 testes passando.
+> **v6.0.0:** Integração de IA com 8 features em produção: score de leads, detecção de churn, alerta preditivo de recompra, triagem automática de tickets (GPT-4o-mini), análise de sentimento em suporte, geração automática de contratos, OCR de documentos (GPT-4o Vision), recomendações de produtos (Apriori SQL). Migration 029 criada. 3 novos crons.
+> **v5.3.2:** Fix erro `'use server'` em `services/coupons.ts` (exportação de schema Zod violava restrição do App Router). Sidebar "Cupons" reposicionado para posição 4. Teste de conformidade `use server` adicionado.
+> **v5.3.1:** Melhorias na feature de cupons — UX admin com `SearchableSelect`, `used_count` atômico, resumo financeiro em pedidos, alertas de expiração (cron diário). 14 novos testes.
+> **v5.3.0:** Cupons de desconto por produto e por clínica — admin cria, clínica ativa uma vez, auto-aplica por unidade, plataforma absorve. Migrations 027 e 028.
 > **v5.2.1:** Migration 026 aplicada em produção. 21 novos testes unitários + 2 E2E. Fix da suite vitest (Node.js 18 compatível). 701 testes passando.
 > **v5.2.0:** Captura de leads de cadastro — rascunhos anônimos + envio sem documentos (PENDING_DOCS). Admin vê 3 camadas: interesses incompletos, sem docs, completos.
 > **v5.1.4:** `/terms` adicionado às `PUBLIC_ROUTES` do middleware (Termos de Uso inacessível sem autenticação). Cobertura E2E adicionada: 3 novos testes em `smoke.test.ts` e `01-auth.test.ts` previnem regressão.
@@ -87,10 +92,19 @@ Sem impacto no go-live mas reduzem risco operacional e dívida técnica.
 
 ### Cobertura de testes
 
-| #   | Pendência                        | Detalhe                                                                                                                         |
-| --- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| 30  | **Testes Inngest (integration)** | Rodar com `npx inngest-cli@latest dev` localmente — jobs excluídos do unit coverage por design                                  |
-| 31  | **Cobertura de branches**        | `branches: 70.63%` — melhorar cobertura de branches em `compliance.ts`, `rate-limit.ts` (Redis path), `services/consultants.ts` |
+| #   | Pendência                        | Detalhe                                                                                                                        |
+| --- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 30  | **Testes Inngest (integration)** | Jobs têm cobertura de registro e lógica de filtros em unit tests. Testar com `npx inngest-cli@latest dev` para fluxo completo. |
+| 31  | **Cobertura de branches**        | `branches: 73.8%` — melhorar cobertura de branches em `compliance.ts`, `rate-limit.ts` (Redis path), `services/consultants.ts` |
+
+### Inteligência Artificial
+
+| #   | Pendência                          | Detalhe                                                                                                                                                 |
+| --- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 32  | **`OPENAI_API_KEY` no Staging**    | Variável configurada em Production e Preview. Quando o projeto Supabase staging for criado, adicionar também ao ambiente de desenvolvimento.            |
+| 33  | **`pgvector` — busca semântica**   | Extensão não ativada. Habilitada quando Feature H2 (busca semântica de produtos) for implementada — requer `CREATE EXTENSION vector` no Supabase.       |
+| 34  | **Custo OpenAI em escala**         | Monitorar via OpenAI Usage Dashboard. Configurar alerta de gasto mensal. Ver `docs/ai-aplicacoes-estudo.md` seção 6 para projeções.                     |
+| 35  | **Product associations populadas** | Tabela `product_associations` criada mas vazia — o job semanal (`/api/cron/product-recommendations`) popula automaticamente após 5+ pedidos históricos. |
 
 ---
 
@@ -129,26 +143,31 @@ Itens do roadmap que dependem de CNPJ ativo para implementar:
 | ------------------------------------- | ------ | ------------------------- |
 | 🔴 Bloqueantes (pré-primeiro-cliente) | 7      | Fundador + Jurídico + Dev |
 | 🟡 Importantes (30 dias)              | 13     | Dev + Fundador            |
-| 🟠 Recomendados (próximo sprint)      | 12     | Dev                       |
+| 🟠 Recomendados (próximo sprint)      | 16     | Dev                       |
 | 🟢 Onboarding (após go-live)          | 7      | Comercial + Fundador      |
-| **Total**                             | **39** |                           |
+| **Total**                             | **43** |                           |
 
-### Funcionalidades entregues (v4.7.0 → v5.0.0)
+### Funcionalidades entregues (v4.7.0 → v6.0.1)
 
-| Versão | Feature                                                         | Testes |
-| ------ | --------------------------------------------------------------- | ------ |
-| 4.7.0  | Explicações contextuais de SKU, Slug e Variantes no form        | ✅     |
-| 4.8.0  | SKU gerado automaticamente no formato `[CAT]-[FAR]-[NNNN]`      | ✅     |
-| 4.9.0  | Página de gerenciamento de categorias de produtos               | ✅     |
-| 5.0.0  | Sistema de suporte por tickets conversacional                   | ✅     |
-| 5.0.1  | Revisão completa do suporte: polling, UI otimista, busca        | ✅     |
-| 5.1.0  | Política de Privacidade e Termos de Uso (LGPD + ANVISA)         | —      |
-| 5.1.1  | Página `/profile` — corrige erro ao clicar no nome no header    | ✅     |
-| 5.1.4  | Fix middleware: `/terms` público + cobertura E2E (TC-11, TC-12) | ✅     |
-| 5.2.0  | Captura de leads: drafts anônimos + PENDING_DOCS + painel admin | ✅     |
-| 5.2.1  | Migration aplicada + 21 unit tests + 2 E2E + fix suite (701 ok) | ✅     |
+| Versão | Feature                                                                                                    | Testes |
+| ------ | ---------------------------------------------------------------------------------------------------------- | ------ |
+| 4.7.0  | Explicações contextuais de SKU, Slug e Variantes no form                                                   | ✅     |
+| 4.8.0  | SKU gerado automaticamente no formato `[CAT]-[FAR]-[NNNN]`                                                 | ✅     |
+| 4.9.0  | Página de gerenciamento de categorias de produtos                                                          | ✅     |
+| 5.0.0  | Sistema de suporte por tickets conversacional                                                              | ✅     |
+| 5.0.1  | Revisão completa do suporte: polling, UI otimista, busca                                                   | ✅     |
+| 5.1.0  | Política de Privacidade e Termos de Uso (LGPD + ANVISA)                                                    | —      |
+| 5.1.1  | Página `/profile` — corrige erro ao clicar no nome no header                                               | ✅     |
+| 5.1.4  | Fix middleware: `/terms` público + cobertura E2E (TC-11, TC-12)                                            | ✅     |
+| 5.2.0  | Captura de leads: drafts anônimos + PENDING_DOCS + painel admin                                            | ✅     |
+| 5.2.1  | Migration 026 + 21 unit tests + 2 E2E + fix Vitest Node 18 (701 testes)                                    | ✅     |
+| 5.3.0  | Cupons de desconto por produto/clínica — auto-aplica por unidade                                           | ✅     |
+| 5.3.1  | Melhorias cupons: SearchableSelect, used_count, resumo financeiro, alertas                                 | ✅     |
+| 5.3.2  | Fix `'use server'` coupons + sidebar Cupons reposicionado (posição 4)                                      | ✅     |
+| 6.0.0  | IA integrada: 8 features (churn, recompra, triagem, sentimento, OCR, contratos, recomendações, lead score) | ✅     |
+| 6.0.1  | Cobertura IA: 44 novos testes + migration 029 aplicada + OPENAI_API_KEY Vercel                             | ✅     |
 
-**O que está 100% pronto:** plataforma técnica, autenticação, pedidos, pagamentos sandbox, notificações (push/email), LGPD portal, auditoria, compliance CNPJ, suporte por tickets, gerenciamento de categorias, SKU automático, Política de Privacidade, Termos de Uso, E2E tests, CI/CD, documentação.
+**O que está 100% pronto:** plataforma técnica, autenticação, pedidos, pagamentos sandbox, notificações (push/email/SMS/push), LGPD portal, auditoria, compliance CNPJ, suporte por tickets com IA, cupons de desconto, gerenciamento de categorias, SKU automático, Política de Privacidade, Termos de Uso, E2E tests, CI/CD, documentação, **8 features de IA em produção**.
 
 **O que bloqueia lançamento comercial:** CNPJ da empresa → Asaas produção → NF-e → DPA/LGPD (itens 1–5 e 7).
 

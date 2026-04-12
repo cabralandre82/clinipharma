@@ -4,8 +4,8 @@
 
 **Controlador:** Clinipharma (CNPJ pendente)
 **DPO:** André Cabral — privacidade@clinipharma.com.br
-**Última atualização:** 2026-04-08
-**Versão:** 1.0
+**Última atualização:** 2026-04-12
+**Versão:** 1.1
 
 ---
 
@@ -113,7 +113,10 @@
 | Contratos assinados                 | 10 anos                       | Valor jurídico             |
 | Tokens de sessão revogados          | 2 horas                       | Segurança operacional      |
 
-**Implementação técnica:** Cron mensal (`/api/cron/enforce-retention`, todo dia 1 às 02h UTC) executa anonymização e purge automático conforme tabela acima.
+| Rascunhos de cadastro (registration_drafts) | 7 dias (purge automático) | Legítimo interesse (lead capture) |
+| Mensagens de suporte (sentimento IA) | 5 anos | Legítimo interesse (segurança) |
+
+**Implementação técnica:** Cron mensal (`/api/cron/enforce-retention`, todo dia 1 às 02h UTC) executa anonymização e purge automático conforme tabela acima. Cron diário (`/api/cron/purge-drafts`, às 03:30 UTC) remove rascunhos expirados.
 
 ---
 
@@ -141,27 +144,45 @@
 - ✅ Autenticação multifator disponível via Supabase Auth
 - ✅ Logs de auditoria para todas as operações sensíveis
 - ✅ Rate limiting por IP e por usuário
-- ✅ Circuit breaker para integrações externas
+- ✅ Circuit breaker para integrações externas (incluindo OpenAI — falha graciosa)
 - ✅ Headers de segurança HTTP (CSP, HSTS, X-Frame-Options)
+- ✅ Tratamento de IA com dados mínimos — sem envio de PII sensível à OpenAI
 - ⬜ Pentest externo (contratar antes go-live comercial)
 - ⬜ DPA formal com farmácias e clínicas (elaborar com advogado LGPD)
+- ⬜ Cláusula de tratamento automatizado (Art. 20) a incluir no DPA e nos Termos de Uso
 
 ---
 
 ## 6. Suboperadores (Processadores)
 
-| Processador       | Serviço                | País   | Instrumento           |
-| ----------------- | ---------------------- | ------ | --------------------- |
-| Supabase          | Banco de dados + Auth  | EUA    | DPA padrão Supabase   |
-| Vercel            | Hospedagem             | EUA    | DPA padrão Vercel     |
-| Cloudflare        | CDN + DNS              | EUA    | DPA padrão Cloudflare |
-| Resend            | E-mail transacional    | EUA    | DPA disponível        |
-| Asaas             | Gateway de pagamento   | Brasil | Contrato bilateral    |
-| Clicksign         | Assinatura eletrônica  | Brasil | Contrato bilateral    |
-| Twilio            | SMS                    | EUA    | DPA padrão Twilio     |
-| Firebase (Google) | Push notifications     | EUA    | DPA padrão Google     |
-| Sentry            | Monitoramento de erros | EUA    | DPA padrão Sentry     |
-| Inngest           | Background jobs        | EUA    | DPA padrão Inngest    |
+| Processador       | Serviço                   | País   | Instrumento                                                                                                                                                                                                          |
+| ----------------- | ------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Supabase          | Banco de dados + Auth     | EUA    | DPA padrão Supabase                                                                                                                                                                                                  |
+| Vercel            | Hospedagem                | EUA    | DPA padrão Vercel                                                                                                                                                                                                    |
+| Cloudflare        | CDN + DNS                 | EUA    | DPA padrão Cloudflare                                                                                                                                                                                                |
+| Resend            | E-mail transacional       | EUA    | DPA disponível                                                                                                                                                                                                       |
+| Asaas             | Gateway de pagamento      | Brasil | Contrato bilateral                                                                                                                                                                                                   |
+| Clicksign         | Assinatura eletrônica     | Brasil | Contrato bilateral                                                                                                                                                                                                   |
+| Twilio            | SMS                       | EUA    | DPA padrão Twilio                                                                                                                                                                                                    |
+| Firebase (Google) | Push notifications        | EUA    | DPA padrão Google                                                                                                                                                                                                    |
+| Sentry            | Monitoramento de erros    | EUA    | DPA padrão Sentry                                                                                                                                                                                                    |
+| Inngest           | Background jobs           | EUA    | DPA padrão Inngest                                                                                                                                                                                                   |
+| OpenAI            | Modelos de linguagem (IA) | EUA    | DPA padrão OpenAI — dados enviados: texto de tickets, mensagens de suporte, imagens de documentos de cadastro, dados de entidades para contratos. **Nenhum PII sensível (CPF, dados bancários) é enviado à OpenAI.** |
+
+---
+
+## 7A. Atividades de Tratamento com IA (adicionado em v6.0.0)
+
+As features de IA da plataforma envolvem processamento de dados pessoais por modelos externos:
+
+| Feature                   | Dados enviados à OpenAI                                   | Base legal                       | Medidas de proteção                                   |
+| ------------------------- | --------------------------------------------------------- | -------------------------------- | ----------------------------------------------------- |
+| **Triagem de tickets**    | Título e corpo do ticket (texto livre do usuário)         | Legítimo interesse (eficiência)  | Sem CPF, e-mail ou dados bancários                    |
+| **Sentimento em suporte** | Texto das mensagens de suporte                            | Legítimo interesse (segurança)   | Sem identificadores diretos na requisição             |
+| **OCR de documentos**     | Imagens de documentos enviados no cadastro (URL assinada) | Execução de contrato (Art. 7, V) | URL expira em 2 min; acesso restrito a SUPER_ADMIN    |
+| **Geração de contratos**  | Nome, tipo de entidade, cidade, especialidade (sem CPF)   | Execução de contrato (Art. 7, V) | Dados mínimos — apenas o necessário para personalizar |
+
+> **Nota LGPD:** O uso de IA para classificação, sentimento e OCR enquadra-se como tratamento automatizado (Art. 20). Os titulares têm direito a revisão humana das decisões. Incluir no DPA formal com farmácias/clínicas.
 
 ---
 
