@@ -23,6 +23,7 @@ export const ALL_REQUESTABLE_DOCS = [
 ]
 
 export const REGISTRATION_STATUS_LABELS: Record<string, string> = {
+  INCOMPLETE: 'Interesse incompleto',
   PENDING: 'Aguardando análise',
   PENDING_DOCS: 'Documentos pendentes',
   APPROVED: 'Aprovado',
@@ -30,6 +31,7 @@ export const REGISTRATION_STATUS_LABELS: Record<string, string> = {
 }
 
 export const REGISTRATION_STATUS_COLORS: Record<string, string> = {
+  INCOMPLETE: 'bg-slate-100 text-slate-600',
   PENDING: 'bg-amber-100 text-amber-800',
   PENDING_DOCS: 'bg-orange-100 text-orange-800',
   APPROVED: 'bg-green-100 text-green-800',

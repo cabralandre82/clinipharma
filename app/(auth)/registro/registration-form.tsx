@@ -10,7 +10,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Building2, Stethoscope, Upload, CheckCircle2, Loader2, X, FileText } from 'lucide-react'
+import {
+  Building2,
+  Stethoscope,
+  Upload,
+  CheckCircle2,
+  Loader2,
+  X,
+  FileText,
+  AlertTriangle,
+} from 'lucide-react'
 import { CLINIC_REQUIRED_DOCS, DOCTOR_REQUIRED_DOCS } from '@/lib/registration-constants'
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
@@ -72,16 +81,18 @@ export function RegistrationForm() {
   const [step, setStep] = useState<Step>('type')
   const [regType, setRegType] = useState<RegType>('CLINIC')
   const [loading, setLoading] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
   const [uploads, setUploads] = useState<UploadedFile[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [activeDocType, setActiveDocType] = useState<{ type: string; label: string } | null>(null)
+  const [draftId, setDraftId] = useState<string | null>(null)
 
   const requiredDocs = regType === 'CLINIC' ? CLINIC_REQUIRED_DOCS : DOCTOR_REQUIRED_DOCS
+  const missingDocs = requiredDocs.filter((d) => !uploads.find((u) => u.docType === d.type))
+  const hasDocs = missingDocs.length === 0
 
-  // ── Clinic form ──
   const clinicForm = useForm<ClinicFormData>({ resolver: zodResolver(clinicSchema) })
   const doctorForm = useForm<DoctorFormData>({ resolver: zodResolver(doctorSchema) })
-
   const activeForm = regType === 'CLINIC' ? clinicForm : doctorForm
 
   // ── Step 1: choose type ──
@@ -124,7 +135,7 @@ export function RegistrationForm() {
     )
   }
 
-  // ── Step 3: done ──
+  // ── Step: done ──
   if (step === 'done') {
     return (
       <div className="flex flex-col items-center gap-4 py-6 text-center">
@@ -134,6 +145,12 @@ export function RegistrationForm() {
           Criamos seu acesso. Você já pode entrar na plataforma — seu cadastro ficará em{' '}
           <strong>análise</strong> até a aprovação da nossa equipe.
         </p>
+        {!hasDocs && (
+          <p className="max-w-sm rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Sua solicitação foi recebida <strong>sem documentos</strong>. Nossa equipe entrará em
+            contato para orientá-lo sobre o envio.
+          </p>
+        )}
         <Button onClick={() => router.push('/login')} className="mt-2">
           Ir para o login
         </Button>
@@ -141,10 +158,28 @@ export function RegistrationForm() {
     )
   }
 
-  // ── Step 2: form ──
+  // ── Step 2 → step 3: save draft silently ──
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function handleFormNext(_data: ClinicFormData | DoctorFormData) {
-    setStep('docs')
+    setSavingDraft(true)
+    try {
+      const formData = activeForm.getValues()
+      const res = await fetch('/api/registration/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: regType, form_data: formData }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        setDraftId(json.draft_id ?? null)
+      }
+      // Draft save failure is silent — doesn't block the user
+    } catch {
+      // noop
+    } finally {
+      setSavingDraft(false)
+      setStep('docs')
+    }
   }
 
   // ── Step 3: docs + submit ──
@@ -160,12 +195,7 @@ export function RegistrationForm() {
       const filtered = prev.filter((u) => u.docType !== activeDocType.type)
       return [
         ...filtered,
-        {
-          docType: activeDocType.type,
-          label: activeDocType.label,
-          file,
-          preview: file.name,
-        },
+        { docType: activeDocType.type, label: activeDocType.label, file, preview: file.name },
       ]
     })
     e.target.value = ''
@@ -176,20 +206,14 @@ export function RegistrationForm() {
   }
 
   async function handleSubmit() {
-    const missingRequired = requiredDocs.filter((d) => !uploads.find((u) => u.docType === d.type))
-    if (missingRequired.length > 0) {
-      toast.error(
-        `Envie os documentos obrigatórios: ${missingRequired.map((d) => d.label).join(', ')}`
-      )
-      return
-    }
-
     setLoading(true)
     try {
       const formData = activeForm.getValues()
       const fd = new FormData()
       fd.append('type', regType)
       fd.append('form_data', JSON.stringify(formData))
+      if (draftId) fd.append('draft_id', draftId)
+
       uploads.forEach((u) => {
         fd.append(`doc_${u.docType}`, u.file)
         fd.append(`doc_${u.docType}_label`, u.label)
@@ -350,19 +374,39 @@ export function RegistrationForm() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full">
-            Continuar para documentos →
+          <Button type="submit" className="w-full" disabled={savingDraft}>
+            {savingDraft ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Preparando...
+              </>
+            ) : (
+              'Continuar para documentos →'
+            )}
           </Button>
         </form>
       )}
 
       {step === 'docs' && (
         <div className="space-y-5">
+          {/* Warning when no docs uploaded */}
+          {!hasDocs && (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <div>
+                <p className="text-sm font-medium text-amber-800">Documentos obrigatórios</p>
+                <p className="mt-0.5 text-xs text-amber-700">
+                  Você pode enviar sua solicitação sem documentos — mas o processo de aprovação só
+                  inicia após o envio. Nossa equipe entrará em contato.
+                </p>
+              </div>
+            </div>
+          )}
+
           <p className="text-sm text-gray-600">
             Envie os documentos abaixo. Arquivos aceitos: PDF, JPG, PNG (máx. 10 MB cada).
           </p>
 
-          {/* Required docs */}
           <div className="space-y-3">
             <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">
               Documentos obrigatórios
@@ -422,8 +466,10 @@ export function RegistrationForm() {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Enviando...
               </>
-            ) : (
+            ) : hasDocs ? (
               'Enviar solicitação'
+            ) : (
+              'Enviar sem documentos por enquanto'
             )}
           </Button>
         </div>

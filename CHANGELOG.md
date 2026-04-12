@@ -2,6 +2,78 @@
 
 ---
 
+## [5.2.0] — 2026-04-12 — Captura de leads de cadastro + envio sem documentos
+
+### Problema
+
+Usuários que preenchiam o formulário de cadastro mas não enviavam documentos eram bloqueados
+pelo frontend e **nenhum registro era criado** — o admin ficava sem visibilidade de quem
+demonstrou interesse na plataforma.
+
+### Solução (Opção C — híbrida)
+
+Três camadas de captura, do mais precoce ao mais completo:
+
+| Momento                             | O que acontece                                | Status no admin          |
+| ----------------------------------- | --------------------------------------------- | ------------------------ |
+| Usuário avança para a etapa de docs | Rascunho salvo anonimamente (sem criar conta) | **Interesse incompleto** |
+| Usuário envia sem docs              | Conta criada, solicitação registrada          | **Documentos pendentes** |
+| Usuário envia com docs              | Fluxo normal                                  | **Aguardando análise**   |
+
+### Detalhes técnicos
+
+**Migration `026_registration_drafts`**
+
+- Nova tabela `registration_drafts` — armazena `type` + `form_data` (nome, email, telefone,
+  CNPJ/CRM) sem criar conta no auth. Expira em 7 dias. Sem RLS pública (só service_role).
+
+**API `POST /api/registration/draft`**
+
+- Chamada silenciosa quando o usuário clica em "Continuar para documentos".
+- Retorna `draft_id` guardado no state do form.
+- Em caso de falha, o usuário **não é bloqueado** (fail-open).
+
+**API `POST /api/registration/submit` (atualizada)**
+
+- Sem docs → `status = PENDING_DOCS`. Com docs → `status = PENDING`.
+- E-mail ao admin diferenciado: banner amarelo de alerta para cadastros sem documentos.
+- E-mail ao solicitante adaptado: orienta o envio posterior de docs.
+- `draft_id` passado pelo form → draft deletado após submit bem-sucedido.
+
+**Formulário `/registro` (atualizado)**
+
+- Não bloqueia mais o submit por falta de docs.
+- Exibe banner de aviso âmbar explicando as consequências.
+- Botão muda de label: "Enviar solicitação" ↔ "Enviar sem documentos por enquanto".
+
+**Painel `/registrations` (atualizado)**
+
+- Nova seção **Interesses incompletos** (drafts) com nome, email, tipo e botão "Contatar" via mailto.
+- Tabs: Todos | Interesses incompletos | Aguardando análise | Documentos pendentes | Aprovado | Reprovado.
+- Badges de contagem em tempo real em cada tab.
+
+**Cron `GET /api/cron/purge-drafts`**
+
+- Roda diariamente às 03:30 UTC.
+- Deleta drafts onde `expires_at < now()`.
+- Registrado em `vercel.json`.
+
+### Arquivos
+
+| Arquivo                                           | Mudança                                                     |
+| ------------------------------------------------- | ----------------------------------------------------------- |
+| `supabase/migrations/026_registration_drafts.sql` | Novo: tabela + trigger + RLS                                |
+| `app/api/registration/draft/route.ts`             | Novo: endpoint salva rascunho                               |
+| `app/api/registration/submit/route.ts`            | Atualizado: PENDING_DOCS, draft cleanup, emails adaptativos |
+| `app/(auth)/registro/registration-form.tsx`       | Atualizado: save draft, allow no-doc submit, warning banner |
+| `app/(private)/registrations/page.tsx`            | Atualizado: seção de drafts, tabs com badges                |
+| `app/api/cron/purge-drafts/route.ts`              | Novo: cron de limpeza                                       |
+| `lib/registration-constants.ts`                   | Novo status INCOMPLETE (label + cor)                        |
+| `middleware.ts`                                   | `/api/registration/draft` adicionado às rotas públicas      |
+| `vercel.json`                                     | Cron `purge-drafts` registrado (diário 03:30 UTC)           |
+
+---
+
 ## [5.1.4] — 2026-04-12 — Fix: `/terms` inacessível sem autenticação + cobertura E2E
 
 ### Causa raiz

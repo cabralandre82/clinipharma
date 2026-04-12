@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/enforce-retention",
       "schedule": "0 2 1 * *"
+    },
+    {
+      "path": "/api/cron/purge-drafts",
+      "schedule": "30 3 * * *"
     }
   ]
 }

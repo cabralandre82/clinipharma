@@ -1,7 +1,8 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-12 | Versão da plataforma: **5.1.4** | **685 testes unitários** | cobertura atualizada
+> Gerado em: 2026-04-12 | Versão da plataforma: **5.2.0** | **685 testes unitários** | cobertura atualizada
 >
+> **v5.2.0:** Captura de leads de cadastro — rascunhos anônimos + envio sem documentos (PENDING_DOCS). Admin vê 3 camadas: interesses incompletos, sem docs, completos.
 > **v5.1.4:** `/terms` adicionado às `PUBLIC_ROUTES` do middleware (Termos de Uso inacessível sem autenticação). Cobertura E2E adicionada: 3 novos testes em `smoke.test.ts` e `01-auth.test.ts` previnem regressão.
 > **v5.1.3:** Causa raiz definitiva identificada e corrigida — `DropdownMenuLabel` usava `MenuPrimitive.GroupLabel` do Base UI sem o `Group` context obrigatório, lançando error #31 ao abrir o menu do header.
 > **v5.1.2:** `PrivateLayout` com tratamento defensivo de erros. Página `/profile` restaurada com funcionalidades completas.
@@ -143,6 +144,7 @@ Itens do roadmap que dependem de CNPJ ativo para implementar:
 | 5.1.0  | Política de Privacidade e Termos de Uso (LGPD + ANVISA)         | —      |
 | 5.1.1  | Página `/profile` — corrige erro ao clicar no nome no header    | ✅     |
 | 5.1.4  | Fix middleware: `/terms` público + cobertura E2E (TC-11, TC-12) | ✅     |
+| 5.2.0  | Captura de leads: drafts anônimos + PENDING_DOCS + painel admin | ✅     |
 
 **O que está 100% pronto:** plataforma técnica, autenticação, pedidos, pagamentos sandbox, notificações (push/email), LGPD portal, auditoria, compliance CNPJ, suporte por tickets, gerenciamento de categorias, SKU automático, Política de Privacidade, Termos de Uso, E2E tests, CI/CD, documentação.
 

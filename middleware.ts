@@ -11,6 +11,7 @@ const PUBLIC_ROUTES = [
   '/unauthorized',
   '/api/auth/forgot-password',
   '/api/registration/submit',
+  '/api/registration/draft',
   // Webhook endpoints — verified by their own secrets, no session needed
   '/api/payments/asaas/webhook',
   '/api/contracts/webhook',
