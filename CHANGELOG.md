@@ -2,6 +2,33 @@
 
 ---
 
+## [5.3.2] — 2026-04-12 — Fix crítico: erro `'use server'` em services/coupons + Cupons no sidebar
+
+### Problema resolvido
+
+- `services/coupons.ts` estava exportando `createCouponSchema` (objeto Zod) em um arquivo `'use server'`
+- O App Router do Next.js exige que apenas **async functions** sejam exportadas de arquivos `'use server'`
+- O módulo falhava em carregar silenciosamente em runtime, impedindo a renderização da página `/coupons` e ocultando o item "Cupons" no sidebar
+
+### Alterações
+
+- `services/coupons.ts`: removido `export` de `createCouponSchema` (permanece interno ao módulo)
+- `components/layout/sidebar.tsx`: removidos `console.log` de debug; item "Cupons" fixado na posição 4 (após "Pedidos")
+
+### Cobertura de testes adicionada
+
+- Novo teste `TC-COUP-SRV-01` em `tests/unit/services/coupons-use-server.test.ts`
+- Importa o módulo real (sem mock) e verifica que todos os exports runtime são `AsyncFunction`
+- Protege contra regressão do mesmo tipo em qualquer `'use server'` em `services/`
+
+### Arquivos alterados
+
+- `services/coupons.ts`
+- `components/layout/sidebar.tsx`
+- `tests/unit/services/coupons-use-server.test.ts` _(novo)_
+
+---
+
 ## [5.3.1] — 2026-04-12 — Melhorias e correções na feature de cupons
 
 ### Problemas resolvidos
