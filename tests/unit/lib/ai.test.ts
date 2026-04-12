@@ -1,0 +1,195 @@
+// @vitest-environment node
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+// Mock all server-only dependencies before importing lib/ai
+vi.mock('server-only', () => ({}))
+vi.mock('@/lib/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}))
+
+// Mock circuit breaker to pass through the function call
+vi.mock('@/lib/circuit-breaker', () => ({
+  withCircuitBreaker: vi.fn().mockImplementation(async (fn: () => unknown) => fn()),
+  CircuitOpenError: class CircuitOpenError extends Error {},
+}))
+
+// Mock OpenAI SDK
+const mockCreate = vi.fn()
+vi.mock('openai', () => ({
+  default: vi.fn().mockImplementation(() => ({
+    chat: {
+      completions: {
+        create: mockCreate,
+      },
+    },
+  })),
+}))
+
+import { classifyTicket, analyzeSentiment, extractDocumentData } from '@/lib/ai'
+
+function makeOpenAIResponse(content: string) {
+  return {
+    choices: [{ message: { content } }],
+  }
+}
+
+describe('classifyTicket', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('TC-AI-01: classifica ticket de pedido corretamente', async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeOpenAIResponse(
+        JSON.stringify({ category: 'ORDER', priority: 'HIGH', reasoning: 'Problema com pedido' })
+      )
+    )
+
+    const result = await classifyTicket(
+      'Pedido atrasado',
+      'Meu pedido ORD-001 está há 3 dias em processamento'
+    )
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe('ORDER')
+    expect(result!.priority).toBe('HIGH')
+    expect(result!.reasoning).toBeTruthy()
+  })
+
+  it('TC-AI-02: classifica ticket de pagamento como URGENT', async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeOpenAIResponse(
+        JSON.stringify({ category: 'PAYMENT', priority: 'URGENT', reasoning: 'Cobrança duplicada' })
+      )
+    )
+
+    const result = await classifyTicket(
+      'Fui cobrado duas vezes',
+      'Minha clínica foi debitada em duplicidade'
+    )
+    expect(result!.category).toBe('PAYMENT')
+    expect(result!.priority).toBe('URGENT')
+  })
+
+  it('TC-AI-03: retorna null se OpenAI falhar', async () => {
+    mockCreate.mockRejectedValueOnce(new Error('OpenAI timeout'))
+    const result = await classifyTicket('Título', 'Descrição')
+    expect(result).toBeNull()
+  })
+
+  it('TC-AI-04: retorna null se categoria inválida for retornada', async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeOpenAIResponse(
+        JSON.stringify({ category: 'INVALID_CAT', priority: 'NORMAL', reasoning: 'x' })
+      )
+    )
+    const result = await classifyTicket('Título', 'Descrição')
+    expect(result).toBeNull()
+  })
+
+  it('TC-AI-05: retorna null se prioridade inválida for retornada', async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeOpenAIResponse(
+        JSON.stringify({ category: 'GENERAL', priority: 'SUPER_HIGH', reasoning: 'x' })
+      )
+    )
+    const result = await classifyTicket('Título', 'Descrição')
+    expect(result).toBeNull()
+  })
+})
+
+describe('analyzeSentiment', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('TC-AI-06: detecta sentimento negativo com risco de churn', async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeOpenAIResponse(
+        JSON.stringify({
+          sentiment: 'very_negative',
+          churnRisk: true,
+          shouldEscalate: true,
+          reasoning: 'Ameaça de cancelamento',
+        })
+      )
+    )
+
+    const result = await analyzeSentiment('Vou cancelar minha conta, isso é um absurdo!')
+    expect(result).not.toBeNull()
+    expect(result!.sentiment).toBe('very_negative')
+    expect(result!.churnRisk).toBe(true)
+    expect(result!.shouldEscalate).toBe(true)
+  })
+
+  it('TC-AI-07: detecta sentimento neutro sem risco de churn', async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeOpenAIResponse(
+        JSON.stringify({
+          sentiment: 'neutral',
+          churnRisk: false,
+          shouldEscalate: false,
+          reasoning: 'Pergunta técnica simples',
+        })
+      )
+    )
+
+    const result = await analyzeSentiment('Como faço para atualizar meu cadastro?')
+    expect(result!.sentiment).toBe('neutral')
+    expect(result!.churnRisk).toBe(false)
+    expect(result!.shouldEscalate).toBe(false)
+  })
+
+  it('TC-AI-08: retorna null se OpenAI falhar', async () => {
+    mockCreate.mockRejectedValueOnce(new Error('Network error'))
+    const result = await analyzeSentiment('mensagem')
+    expect(result).toBeNull()
+  })
+})
+
+describe('extractDocumentData', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('TC-AI-09: extrai dados de documento com alta confiança', async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeOpenAIResponse(
+        JSON.stringify({
+          cnpj: '12.345.678/0001-90',
+          razao_social: 'Farmácia Exemplo Ltda',
+          validade: '31/12/2027',
+          tipo_documento: 'Alvará Sanitário',
+          responsavel_tecnico: 'Dr. Carlos Souza',
+          municipio: 'São Paulo',
+          uf: 'SP',
+          raw_confidence: 'high',
+        })
+      )
+    )
+
+    const result = await extractDocumentData('https://storage.example.com/doc.pdf')
+    expect(result).not.toBeNull()
+    expect(result!.cnpj).toBe('12.345.678/0001-90')
+    expect(result!.razao_social).toBe('Farmácia Exemplo Ltda')
+    expect(result!.raw_confidence).toBe('high')
+    expect(result!.tipo_documento).toBe('Alvará Sanitário')
+  })
+
+  it('TC-AI-10: retorna null se OpenAI Vision falhar', async () => {
+    mockCreate.mockRejectedValueOnce(new Error('Vision API error'))
+    const result = await extractDocumentData('https://storage.example.com/doc.pdf')
+    expect(result).toBeNull()
+  })
+
+  it('TC-AI-11: lida com documento ilegível (low confidence)', async () => {
+    mockCreate.mockResolvedValueOnce(
+      makeOpenAIResponse(
+        JSON.stringify({
+          cnpj: null,
+          razao_social: null,
+          validade: null,
+          tipo_documento: null,
+          raw_confidence: 'low',
+        })
+      )
+    )
+
+    const result = await extractDocumentData('https://storage.example.com/blurry.jpg')
+    expect(result!.raw_confidence).toBe('low')
+    expect(result!.cnpj).toBeNull()
+  })
+})

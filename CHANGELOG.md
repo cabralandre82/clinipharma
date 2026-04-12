@@ -2,6 +2,32 @@
 
 ---
 
+## [6.0.1] — 2026-04-12 — Cobertura de testes para features de IA + migration 029
+
+### Testes adicionados
+
+- **`tests/unit/lib/lead-score.test.ts`** — 9 casos cobrindo scoring HOT/WARM/COLD, penalidade de telefone,
+  bônus de CNPJ ativo, email corporativo vs. gratuito, estado de alto potencial e limite 0–100
+- **`tests/unit/lib/ai.test.ts`** — 11 casos cobrindo `classifyTicket` (válido, inválido, falha OpenAI),
+  `analyzeSentiment` (negativo com churn, neutro, falha) e `extractDocumentData` (alta confiança, baixa, falha)
+- **`tests/unit/lib/jobs/ai-jobs.test.ts`** — 10 casos cobrindo os 4 jobs Inngest: churn-detection,
+  reorder-alerts, product-recommendations e contract-auto-send (registro, lógica de filtros, cálculos)
+- **`tests/unit/api/ai-routes.test.ts`** — 14 casos cobrindo:
+  - `POST /api/admin/registrations/[id]/ocr` — 401 sem auth, 404 sem docs, análise completa com match de CNPJ, fallback de falha de OCR
+  - `GET /api/products/[id]/recommendations` — 401, listagem ativa, filtro de produtos inativos, lista vazia
+  - Crons `churn-check`, `reorder-alerts`, `product-recommendations` — 401 e disparo correto de eventos Inngest
+
+### Banco de dados
+
+- **`029_ai_features.sql` aplicado** ao Supabase remoto (produção)
+  - Coluna `ai_classified boolean` em `support_tickets`
+  - Coluna `sentiment text` em `support_messages`
+  - Tabela `product_associations` com índices e RLS
+
+### Total de testes: 767 passando (0 falhas)
+
+---
+
 ## [6.0.0] — 2026-04-12 — Inteligência Artificial integrada à plataforma
 
 ### Visão geral
