@@ -129,14 +129,15 @@ Itens do roadmap que dependem de CNPJ ativo para implementar:
 
 ### Funcionalidades entregues (v4.7.0 → v5.0.0)
 
-| Versão | Feature                                                    | Testes |
-| ------ | ---------------------------------------------------------- | ------ |
-| 4.7.0  | Explicações contextuais de SKU, Slug e Variantes no form   | ✅     |
-| 4.8.0  | SKU gerado automaticamente no formato `[CAT]-[FAR]-[NNNN]` | ✅     |
-| 4.9.0  | Página de gerenciamento de categorias de produtos          | ✅     |
-| 5.0.0  | Sistema de suporte por tickets conversacional              | ✅     |
-| 5.0.1  | Revisão completa do suporte: polling, UI otimista, busca   | ✅     |
-| 5.1.0  | Política de Privacidade e Termos de Uso (LGPD + ANVISA)    | —      |
+| Versão | Feature                                                      | Testes |
+| ------ | ------------------------------------------------------------ | ------ |
+| 4.7.0  | Explicações contextuais de SKU, Slug e Variantes no form     | ✅     |
+| 4.8.0  | SKU gerado automaticamente no formato `[CAT]-[FAR]-[NNNN]`   | ✅     |
+| 4.9.0  | Página de gerenciamento de categorias de produtos            | ✅     |
+| 5.0.0  | Sistema de suporte por tickets conversacional                | ✅     |
+| 5.0.1  | Revisão completa do suporte: polling, UI otimista, busca     | ✅     |
+| 5.1.0  | Política de Privacidade e Termos de Uso (LGPD + ANVISA)      | —      |
+| 5.1.1  | Página `/profile` — corrige erro ao clicar no nome no header | ✅     |
 
 **O que está 100% pronto:** plataforma técnica, autenticação, pedidos, pagamentos sandbox, notificações (push/email), LGPD portal, auditoria, compliance CNPJ, suporte por tickets, gerenciamento de categorias, SKU automático, Política de Privacidade, Termos de Uso, E2E tests, CI/CD, documentação.
 

@@ -2,6 +2,30 @@
 
 ---
 
+## [5.1.1] — 2026-04-08 — Página de perfil do usuário
+
+### Correção
+
+Ao clicar no nome no canto superior direito → "Meu perfil", a plataforma redirecionava para `/profile`
+que não existia, causando uma página em branco com modal de erro inesperado.
+
+**Criado `app/(private)/profile/page.tsx`** com:
+
+- Card de resumo: avatar com iniciais, nome, e-mail, papéis com badges coloridos, status ativo/inativo, data de cadastro
+- Formulário editável (nome completo e telefone) via `updateOwnProfile` — botão "Salvar" só ativo quando há mudanças
+- Seção de privacidade com link para Política de Privacidade e e-mail do DPO
+
+**Cobertura de testes:** `updateOwnProfile` já coberto por 3 testes (IDOR, permissão, sucesso) em `tests/unit/services/users.test.ts`. Nenhum teste novo necessário.
+
+### Arquivos
+
+| Arquivo                               | Mudança                   |
+| ------------------------------------- | ------------------------- |
+| `app/(private)/profile/page.tsx`      | Novo: página de perfil    |
+| `components/profile/profile-form.tsx` | Novo: formulário editável |
+
+---
+
 ## [5.1.0] — 2026-04-08 — Política de Privacidade e Termos de Uso
 
 ### Conformidade legal (Pendência #6)
