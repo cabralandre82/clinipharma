@@ -2,7 +2,36 @@
 
 ---
 
-## [5.1.2] — 2026-04-12 — Correção definitiva do erro inesperado na página /profile
+## [5.1.3] — 2026-04-12 — Correção do crash Base UI error #31 no header
+
+### Causa raiz definitiva
+
+O `DropdownMenuLabel` em `components/ui/dropdown-menu.tsx` usava `MenuPrimitive.GroupLabel`
+do `@base-ui/react`, que **exige** estar dentro de um `MenuPrimitive.Group`. No header, ele
+era usado diretamente dentro de `MenuPrimitive.Popup` sem esse wrapper. Como o conteúdo do
+menu só é renderizado quando aberto (lazy), o crash acontecia exatamente no `onMouseDown`
+ao clicar no nome do usuário — lançando Base UI error #31 e exibindo o `global-error.tsx`.
+
+Evidência: console do browser mostrava
+`Error: Base UI error #31; visit https://base-ui.com/production-error?code=31`
+
+### Correção
+
+`DropdownMenuLabel` convertido de `MenuPrimitive.GroupLabel` para `<div>` HTML simples.
+Visualmente idêntico, sem dependência de contexto do Base UI.
+
+**Cobertura de testes:** componente UI puro (sem lógica de negócio). 685/685 passando,
+nenhum teste novo necessário.
+
+### Arquivos
+
+| Arquivo                           | Mudança                                            |
+| --------------------------------- | -------------------------------------------------- |
+| `components/ui/dropdown-menu.tsx` | `DropdownMenuLabel`: GroupLabel → div HTML simples |
+
+---
+
+## [5.1.2] — 2026-04-12 — Correção defensiva do layout privado + página /profile completa
 
 ### Causa raiz identificada
 

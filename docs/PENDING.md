@@ -1,8 +1,9 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-12 | Versão da plataforma: **5.1.2** | **685 testes** | cobertura atualizada
+> Gerado em: 2026-04-12 | Versão da plataforma: **5.1.3** | **685 testes** | cobertura atualizada
 >
-> **v5.1.2:** Corrigido erro inesperado ("Erro inesperado") ao clicar no nome no header — `PrivateLayout` agora possui tratamento defensivo de erros. Página `/profile` restaurada com funcionalidades completas.
+> **v5.1.3:** Causa raiz definitiva identificada e corrigida — `DropdownMenuLabel` usava `MenuPrimitive.GroupLabel` do Base UI sem o `Group` context obrigatório, lançando error #31 ao abrir o menu do header.
+> **v5.1.2:** `PrivateLayout` com tratamento defensivo de erros. Página `/profile` restaurada com funcionalidades completas.
 > **v5.1.1:** Página `/profile` criada (versão inicial).
 > **v5.1.0:** Política de Privacidade (`/privacy`) e Termos de Uso (`/terms`) implementados — LGPD, ANVISA, Marco Civil. Pendência #6 concluída. 685 testes passando.
 
