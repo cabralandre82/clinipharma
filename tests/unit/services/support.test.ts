@@ -20,6 +20,19 @@ vi.mock('@/lib/notifications', () => ({
   createNotificationForRole: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/rbac', () => ({ requireRole: vi.fn() }))
+vi.mock('@/lib/ai', () => ({
+  classifyTicket: vi
+    .fn()
+    .mockResolvedValue({ category: 'GENERAL', priority: 'NORMAL', reasoning: 'test' }),
+  analyzeSentiment: vi
+    .fn()
+    .mockResolvedValue({
+      sentiment: 'neutral',
+      churnRisk: false,
+      shouldEscalate: false,
+      reasoning: 'test',
+    }),
+}))
 
 const clientMock = {
   id: 'user-client',

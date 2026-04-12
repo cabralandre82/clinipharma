@@ -6,11 +6,12 @@ import { requireAuth } from '@/lib/auth/session'
 import { requireRole } from '@/lib/rbac'
 import { createNotification, createNotificationForRole } from '@/lib/notifications'
 import { logger } from '@/lib/logger'
+import { classifyTicket, analyzeSentiment } from '@/lib/ai'
 import { z } from 'zod'
 
+// Category is now optional — AI auto-classifies after creation
 const createTicketSchema = z.object({
   title: z.string().min(5, 'Título deve ter ao menos 5 caracteres').max(120),
-  category: z.enum(['ORDER', 'PAYMENT', 'TECHNICAL', 'GENERAL', 'COMPLAINT']),
   body: z.string().min(10, 'Descreva o problema com ao menos 10 caracteres'),
 })
 
@@ -32,12 +33,15 @@ export async function createTicket(
 
     const adminClient = createAdminClient()
 
+    // Insert with defaults — AI will update category/priority asynchronously
     const { data: ticket, error } = await adminClient
       .from('support_tickets')
       .insert({
         title: parsed.data.title,
-        category: parsed.data.category,
+        category: 'GENERAL', // default, will be overwritten by AI
+        priority: 'NORMAL', // default, will be overwritten by AI
         created_by_user_id: user.id,
+        ai_classified: false,
       })
       .select('id, code')
       .single()
@@ -56,17 +60,39 @@ export async function createTicket(
     })
     if (msgError) logger.error('[createTicket] first message failed', { error: msgError })
 
-    // Notify all admins (SUPER_ADMIN and PLATFORM_ADMIN)
+    // AI classification (non-blocking — runs in background, failure is graceful)
+    classifyTicket(parsed.data.title, parsed.data.body)
+      .then(async (classification) => {
+        if (!classification) return
+        const { error: aiErr } = await adminClient
+          .from('support_tickets')
+          .update({
+            category: classification.category,
+            priority: classification.priority,
+            ai_classified: true,
+          })
+          .eq('id', ticket.id)
+        if (aiErr) logger.error('[createTicket] AI classification update failed', { error: aiErr })
+        else
+          logger.info('[createTicket] AI classified ticket', {
+            id: ticket.id,
+            ...classification,
+          })
+      })
+      .catch((err) => logger.error('[createTicket] AI classification error', { err }))
+
+    // Notify admins — include URGENT badge if AI pre-classified (best-effort)
+    const notifTitle = `Novo ticket: ${ticket.code}`
     await Promise.all([
       createNotificationForRole('SUPER_ADMIN', {
         type: 'SUPPORT_TICKET',
-        title: `Novo ticket: ${ticket.code}`,
+        title: notifTitle,
         message: parsed.data.title,
         link: `/support/${ticket.id}`,
       }),
       createNotificationForRole('PLATFORM_ADMIN', {
         type: 'SUPPORT_TICKET',
-        title: `Novo ticket: ${ticket.code}`,
+        title: notifTitle,
         message: parsed.data.title,
         link: `/support/${ticket.id}`,
       }),
@@ -111,15 +137,58 @@ export async function addMessage(data: {
     if (!isAdmin && ['RESOLVED', 'CLOSED'].includes(ticket.status))
       return { error: 'Este ticket já foi encerrado' }
 
-    const { error: msgError } = await adminClient.from('support_messages').insert({
-      ticket_id: parsed.data.ticket_id,
-      sender_id: user.id,
-      body: parsed.data.body,
-      is_internal: parsed.data.is_internal ?? false,
-    })
+    const { data: newMsg, error: msgError } = await adminClient
+      .from('support_messages')
+      .insert({
+        ticket_id: parsed.data.ticket_id,
+        sender_id: user.id,
+        body: parsed.data.body,
+        is_internal: parsed.data.is_internal ?? false,
+      })
+      .select('id')
+      .single()
     if (msgError) {
       logger.error('[addMessage] insert failed', { error: msgError })
       return { error: 'Erro ao enviar mensagem' }
+    }
+
+    // Sentiment analysis for client messages (non-blocking)
+    if (!isAdmin && !parsed.data.is_internal) {
+      analyzeSentiment(parsed.data.body)
+        .then(async (sentiment) => {
+          if (!sentiment) return
+
+          // Persist sentiment on message
+          await adminClient
+            .from('support_messages')
+            .update({ sentiment: sentiment.sentiment })
+            .eq('id', newMsg.id)
+
+          // Escalate ticket if churn risk detected
+          if (sentiment.shouldEscalate) {
+            const { error: escalateErr } = await adminClient
+              .from('support_tickets')
+              .update({ priority: 'URGENT', updated_at: new Date().toISOString() })
+              .eq('id', parsed.data.ticket_id)
+              .not('priority', 'eq', 'URGENT') // avoid redundant writes
+
+            if (!escalateErr) {
+              logger.info('[addMessage] Ticket escalated to URGENT by sentiment analysis', {
+                ticket_id: parsed.data.ticket_id,
+                sentiment: sentiment.sentiment,
+                churnRisk: sentiment.churnRisk,
+              })
+
+              await createNotificationForRole('SUPER_ADMIN', {
+                type: 'SUPPORT_TICKET',
+                title: `🚨 Ticket escalado — ${ticket.code}`,
+                message: `Cliente em risco de churn. Sentimento: ${sentiment.sentiment}. "${ticket.title}"`,
+                link: `/support/${ticket.id}`,
+              })
+            }
+          }
+        })
+        .catch((err) => logger.error('[addMessage] sentiment analysis error', { err }))
     }
 
     // Auto-assign first admin to reply

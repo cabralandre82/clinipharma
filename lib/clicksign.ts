@@ -122,11 +122,13 @@ interface ContractParty {
   email?: string
 }
 
-/** Generate a simple contract PDF and return base64 string. */
+/** Generate a contract PDF and return base64 string.
+ * Uses aiGeneratedBody if provided, otherwise falls back to static template text. */
 export async function generateContractPdf(params: {
   type: ContractType
   party: ContractParty
   date?: string
+  aiGeneratedBody?: string
 }): Promise<string> {
   const pdfDoc = await PDFDocument.create()
   const page = pdfDoc.addPage([595, 842]) // A4
@@ -214,12 +216,32 @@ export async function generateContractPdf(params: {
   page.drawText(`CONTRATADA: Clinipharma Ltda.`, { x: 50, y, font, size: 10 })
   y -= 25
 
-  // Body
+  // Body — prefer AI-generated personalized text, fall back to static template
   page.drawText('OBJETO E CONDIÇÕES:', { x: 50, y, font: boldFont, size: 10 })
   y -= 16
-  for (const line of BODIES[type]) {
+  const bodyLines = params.aiGeneratedBody
+    ? params.aiGeneratedBody.split('\n').flatMap((line) => {
+        // Wrap long lines at ~90 chars to fit A4 width
+        const words = line.split(' ')
+        const wrapped: string[] = []
+        let current = ''
+        for (const word of words) {
+          if ((current + ' ' + word).length > 90) {
+            wrapped.push(current)
+            current = word
+          } else {
+            current = current ? current + ' ' + word : word
+          }
+        }
+        if (current) wrapped.push(current)
+        return wrapped
+      })
+    : BODIES[type]
+
+  for (const line of bodyLines) {
     page.drawText(line, { x: 50, y, font, size: 10, color: rgb(0.2, 0.2, 0.2) })
     y -= 15
+    if (y < 100) break // safety: avoid overflow
   }
 
   y -= 20
@@ -269,13 +291,20 @@ export async function generateContractPdf(params: {
 /**
  * Generate contract PDF, upload to Clicksign, add signers and notify.
  * Returns { documentKey, signerKey }.
+ * Accepts an optional aiGeneratedBody to replace the static contract text.
  */
 export async function createAndSendContract(params: {
   type: ContractType
   party: ContractParty
   clinipharmaRepEmail?: string
+  /** AI-generated personalized contract body text */
+  aiGeneratedBody?: string
 }): Promise<{ documentKey: string; signerKey: string }> {
-  const pdfBase64 = await generateContractPdf({ type: params.type, party: params.party })
+  const pdfBase64 = await generateContractPdf({
+    type: params.type,
+    party: params.party,
+    aiGeneratedBody: params.aiGeneratedBody,
+  })
   const filename = `contrato_${params.type.toLowerCase()}_${Date.now()}.pdf`
   const deadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/db/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { Resend } from 'resend'
 import { logger } from '@/lib/logger'
+import { inngest } from '@/lib/inngest'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const APP_URL = 'https://clinipharma.com.br'
@@ -180,6 +181,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
       // Send welcome email with password link
       await sendWelcomeEmail(email, fullName, origin)
+
+      // Auto-send contract via Inngest (async — does not block the response)
+      if (entityId && (request.type === 'CLINIC' || request.type === 'DOCTOR')) {
+        inngest
+          .send({
+            name: 'registration/contract.auto-send',
+            data: {
+              entityType: request.type as 'CLINIC' | 'DOCTOR',
+              entityId,
+              registrationId: id,
+            },
+          })
+          .catch((err) =>
+            logger.error('[registration/approve] contract auto-send trigger failed', { err })
+          )
+      }
 
       return NextResponse.json({ success: true })
     }

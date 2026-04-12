@@ -3,13 +3,41 @@ import Link from 'next/link'
 import { requireRolePage } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/db/admin'
 import { formatDate } from '@/lib/utils'
-import { Building2, Stethoscope, Clock, FileQuestion, Mail } from 'lucide-react'
+import {
+  Building2,
+  Stethoscope,
+  Clock,
+  FileQuestion,
+  Mail,
+  Flame,
+  Thermometer,
+  Snowflake,
+} from 'lucide-react'
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper'
 import { parsePage, paginationRange } from '@/lib/utils'
 import {
   REGISTRATION_STATUS_LABELS,
   REGISTRATION_STATUS_COLORS,
 } from '@/lib/registration-constants'
+import { calculateLeadScore, type LeadLevel } from '@/lib/lead-score'
+
+const LEAD_BADGE: Record<LeadLevel, { label: string; icon: React.ReactNode; className: string }> = {
+  hot: {
+    label: 'Quente',
+    icon: <Flame className="h-3 w-3" />,
+    className: 'bg-red-50 text-red-700 border border-red-200',
+  },
+  warm: {
+    label: 'Morno',
+    icon: <Thermometer className="h-3 w-3" />,
+    className: 'bg-amber-50 text-amber-700 border border-amber-200',
+  },
+  cold: {
+    label: 'Frio',
+    icon: <Snowflake className="h-3 w-3" />,
+    className: 'bg-slate-50 text-slate-500 border border-slate-200',
+  },
+}
 
 export const metadata: Metadata = { title: 'Solicitações de cadastro | Clinipharma' }
 
@@ -168,59 +196,78 @@ export default async function RegistrationsPage({ searchParams }: PageProps) {
                 <tr>
                   <th className="px-4 py-3 text-left">Interessado</th>
                   <th className="px-4 py-3 text-left">Tipo</th>
+                  <th className="px-4 py-3 text-left">Lead score</th>
                   <th className="px-4 py-3 text-left">Iniciado em</th>
                   <th className="px-4 py-3 text-left">Expira em</th>
                   <th className="px-4 py-3 text-left"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {(drafts ?? []).map((draft) => {
-                  const fd = draft.form_data as Record<string, string>
-                  const name = fd.full_name ?? '—'
-                  const email = fd.email ?? ''
-                  const sub =
-                    draft.type === 'CLINIC'
-                      ? fd.trade_name
-                      : `CRM ${fd.crm ?? ''}/${fd.crm_state ?? ''}`
-                  return (
-                    <tr key={draft.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900">{name}</p>
-                        <p className="text-xs text-gray-400">{sub || email}</p>
-                        {email && sub && <p className="text-xs text-gray-400">{email}</p>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {draft.type === 'CLINIC' ? (
-                            <Building2 className="h-3.5 w-3.5 text-blue-500" />
-                          ) : (
-                            <Stethoscope className="h-3.5 w-3.5 text-purple-500" />
+                {(drafts ?? [])
+                  .map((draft) => ({
+                    draft,
+                    leadScore: calculateLeadScore(draft.form_data as Record<string, string>),
+                  }))
+                  .sort((a, b) => b.leadScore.score - a.leadScore.score)
+                  .map(({ draft, leadScore }) => {
+                    const fd = draft.form_data as Record<string, string>
+                    const name = fd.full_name ?? '—'
+                    const email = fd.email ?? ''
+                    const sub =
+                      draft.type === 'CLINIC'
+                        ? fd.trade_name
+                        : `CRM ${fd.crm ?? ''}/${fd.crm_state ?? ''}`
+                    const badge = LEAD_BADGE[leadScore.level]
+                    return (
+                      <tr key={draft.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-gray-900">{name}</p>
+                          <p className="text-xs text-gray-400">{sub || email}</p>
+                          {email && sub && <p className="text-xs text-gray-400">{email}</p>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            {draft.type === 'CLINIC' ? (
+                              <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                            ) : (
+                              <Stethoscope className="h-3.5 w-3.5 text-purple-500" />
+                            )}
+                            <span className="text-xs text-gray-600">
+                              {draft.type === 'CLINIC' ? 'Clínica' : 'Médico'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1">
+                            <div
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${badge.className}`}
+                              title={leadScore.reasons.join(' · ')}
+                            >
+                              {badge.icon}
+                              {badge.label} · {leadScore.score}/100
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500">
+                          {formatDate(draft.created_at)}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500">
+                          {formatDate(draft.expires_at)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {email && (
+                            <a
+                              href={`mailto:${email}?subject=Seu cadastro na Clinipharma&body=Olá ${name}, notamos que você iniciou um cadastro na Clinipharma mas não concluiu o envio. Podemos ajudá-lo?`}
+                              className="flex items-center gap-1 text-xs font-medium text-[hsl(196,91%,36%)] hover:underline"
+                            >
+                              <Mail className="h-3 w-3" />
+                              Contatar
+                            </a>
                           )}
-                          <span className="text-xs text-gray-600">
-                            {draft.type === 'CLINIC' ? 'Clínica' : 'Médico'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">
-                        {formatDate(draft.created_at)}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">
-                        {formatDate(draft.expires_at)}
-                      </td>
-                      <td className="px-4 py-3">
-                        {email && (
-                          <a
-                            href={`mailto:${email}?subject=Seu cadastro na Clinipharma&body=Olá ${name}, notamos que você iniciou um cadastro na Clinipharma mas não concluiu o envio. Podemos ajudá-lo?`}
-                            className="flex items-center gap-1 text-xs font-medium text-[hsl(196,91%,36%)] hover:underline"
-                          >
-                            <Mail className="h-3 w-3" />
-                            Contatar
-                          </a>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
+                        </td>
+                      </tr>
+                    )
+                  })}
               </tbody>
             </table>
           </div>

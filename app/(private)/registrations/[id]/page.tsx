@@ -9,6 +9,7 @@ import {
   REGISTRATION_STATUS_COLORS,
 } from '@/lib/registration-constants'
 import { RegistrationActions } from './registration-actions'
+import { OcrAnalysisButton } from '@/components/registrations/ocr-analysis-button'
 
 export const metadata: Metadata = { title: 'Analisar solicitação | Clinipharma' }
 
@@ -167,6 +168,9 @@ export default async function RegistrationDetailPage({
             </ul>
           </div>
         )}
+
+      {/* OCR Document Analysis */}
+      <OcrAnalysisButton registrationId={id} />
 
       {/* Actions */}
       {request.status !== 'APPROVED' && request.status !== 'REJECTED' && (

@@ -28,6 +28,18 @@
     {
       "path": "/api/cron/coupon-expiry-alerts",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/reorder-alerts",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/churn-check",
+      "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron/product-recommendations",
+      "schedule": "0 4 * * 1"
     }
   ]
 }

@@ -17,6 +17,8 @@ export type NotificationType =
   | 'SUPPORT_REPLY'
   | 'SUPPORT_RESOLVED'
   | 'COUPON_ASSIGNED'
+  | 'REORDER_ALERT'
+  | 'CHURN_RISK'
   | 'GENERIC'
 
 /** Types the user can silence. Critical types are always delivered. */

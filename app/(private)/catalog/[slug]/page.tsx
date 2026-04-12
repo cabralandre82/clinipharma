@@ -1,7 +1,9 @@
 import { Metadata } from 'next'
 import { createClient } from '@/lib/db/server'
+import { createAdminClient } from '@/lib/db/admin'
 import { notFound } from 'next/navigation'
 import { ProductDetail } from '@/components/catalog/product-detail'
+import { ProductRecommendations } from '@/components/catalog/product-recommendations'
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>
@@ -35,5 +37,45 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   if (!product) notFound()
 
-  return <ProductDetail product={product} />
+  // Fetch recommendations (server-side, no extra waterfall)
+  const admin = createAdminClient()
+  const { data: assocData } = await admin
+    .from('product_associations')
+    .select(
+      `product_b_id, support, confidence,
+       product:product_b_id (id, name, slug, price_current, status,
+         category:category_id (name))`
+    )
+    .eq('product_a_id', product.id)
+    .gte('confidence', 0.1)
+    .order('confidence', { ascending: false })
+    .limit(4)
+
+  const recommendations = (assocData ?? [])
+    .map((row) => {
+      const p = row.product as unknown as {
+        id: string
+        name: string
+        slug: string
+        price_current: number
+        status: string
+        category: { name: string } | null
+      } | null
+      if (!p || p.status !== 'active') return null
+      return { ...p, confidence: row.confidence, support: row.support, category: p.category?.name }
+    })
+    .filter(Boolean)
+
+  return (
+    <div className="space-y-6">
+      <ProductDetail product={product} />
+      {recommendations.length > 0 && (
+        <ProductRecommendations
+          recommendations={
+            recommendations as Parameters<typeof ProductRecommendations>[0]['recommendations']
+          }
+        />
+      )}
+    </div>
+  )
 }

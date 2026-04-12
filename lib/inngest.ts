@@ -55,8 +55,36 @@ export type AsaasWebhookEvent = {
   }
 }
 
+export type ChurnCheckEvent = {
+  name: 'cron/churn.check'
+  data: { triggeredAt: string }
+}
+
+export type ReorderAlertsEvent = {
+  name: 'cron/reorder-alerts.check'
+  data: { triggeredAt: string }
+}
+
+export type ProductRecommendationsEvent = {
+  name: 'cron/product-recommendations.rebuild'
+  data: { triggeredAt: string }
+}
+
+export type ContractAutoSendEvent = {
+  name: 'registration/contract.auto-send'
+  data: {
+    entityType: 'CLINIC' | 'DOCTOR' | 'PHARMACY' | 'CONSULTANT'
+    entityId: string
+    registrationId: string
+  }
+}
+
 export type InngestEvents =
   | ExportOrdersEvent
   | ExportCommissionsEvent
   | StaleOrdersEvent
   | AsaasWebhookEvent
+  | ChurnCheckEvent
+  | ReorderAlertsEvent
+  | ProductRecommendationsEvent
+  | ContractAutoSendEvent

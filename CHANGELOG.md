@@ -2,6 +2,131 @@
 
 ---
 
+## [6.0.0] — 2026-04-12 — Inteligência Artificial integrada à plataforma
+
+### Visão geral
+
+Primeira versão da plataforma com IA aplicada em 8 pontos críticos do negócio.
+Todas as features são não-bloqueantes (fallback gracioso se a API falhar), auditáveis e
+respeitam a LGPD (dados anonimizados antes de envio para APIs externas quando necessário).
+
+### Infraestrutura compartilhada
+
+- **`lib/ai.ts`** — cliente OpenAI singleton com circuit breaker integrado, logging estruturado
+  e funções: `classifyTicket()`, `analyzeSentiment()`, `extractDocumentData()`, `generateContractText()`
+- **Dependência adicionada:** `openai` npm package
+- **Variável de ambiente necessária:** `OPENAI_API_KEY` (adicionar no Vercel)
+
+### Feature 1 — Alerta preditivo de recompra
+
+- Job Inngest `reorder-alerts` (diário às 07:00 UTC)
+- Calcula ciclo médio de recompra por `(clinic_id, product_id)` via SQL analítico
+- Requisito: **≥ 5 pedidos** históricos com status COMPLETED/DELIVERED/SHIPPED
+- Dispara notificação push para `CLINIC_ADMIN` quando pedido previsto está dentro de 5 dias
+- Notificação inclui link para `order_template` da clínica se existir
+- Arquivos: `lib/jobs/reorder-alerts.ts`, `app/api/cron/reorder-alerts/route.ts`
+
+### Feature 2 — Detecção de churn
+
+- Job Inngest `churn-detection` (diário às 07:30 UTC)
+- Score por clínica baseado em 5 sinais: dias sem pedido vs. ciclo médio, tendência de frequência,
+  tickets abertos, pagamentos falhos, redução de variedade de produtos
+- Visibilidade **somente interna** (admin e consultor — nunca mostrado para a clínica)
+- Score ≥ 60 → notifica SUPER_ADMIN + consultor responsável
+- Score 30–59 → notifica apenas o consultor
+- Arquivos: `lib/jobs/churn-detection.ts`, `app/api/cron/churn-check/route.ts`
+
+### Feature 3 — Triagem inteligente de tickets de suporte
+
+- `services/support.ts`: removidos campos categoria e prioridade do formulário
+- IA (GPT-4o-mini) classifica automaticamente após criação do ticket
+- Ticket criado com defaults GENERAL/NORMAL → IA atualiza de forma assíncrona e não-bloqueante
+- `support_tickets.ai_classified` (nova coluna — migration 029) rastreia tickets classificados por IA
+- `components/support/new-ticket-form.tsx`: formulário simplificado com banner explicativo da IA
+
+### Feature 4 — Score de qualificação de leads incompletos
+
+- `lib/lead-score.ts`: função `calculateLeadScore()` — 7 critérios (completude, CNPJ, estado,
+  email corporativo, especialidade, endereço, telefone), retorna score 0–100 + nível HOT/WARM/COLD
+- `/registrations` page: drafts ordenados por score decrescente, badge colorido por nível
+- Tooltip mostra os motivos do score ao passar o mouse
+
+### Feature 7 — Recomendação de produtos (Market Basket)
+
+- Migration `029_ai_features.sql`: tabela `product_associations (product_a_id, product_b_id, support, confidence)`
+- Job Inngest `product-recommendations-rebuild` (semanal, segunda às 04:00 UTC)
+- Algoritmo Apriori simplificado em SQL: suporte mínimo 3 co-ocorrências, confiança mínima 10%
+- API `GET /api/products/[id]/recommendations`
+- Componente `ProductRecommendations` exibido no detalhe do produto no catálogo
+- Arquivos: `lib/jobs/product-recommendations.ts`, `components/catalog/product-recommendations.tsx`
+
+### Feature 8 — OCR de documentos no cadastro (sob demanda)
+
+- `lib/ai.ts` → `extractDocumentData()`: GPT-4o Vision — extrai CNPJ, razão social, validade,
+  tipo de documento, responsável técnico, município/UF
+- `POST /api/admin/registrations/[id]/ocr`: analisa todos os documentos do Supabase Storage,
+  compara dados extraídos com o formulário, retorna divergências
+- Componente `OcrAnalysisButton` na tela de revisão de cadastro: botão sob demanda, painel de
+  resultados com badges ✅/⚠️ por campo comparado
+
+### Feature 9 — Análise de sentimento em tickets
+
+- `services/support.ts` → `addMessage()`: analisa sentimento de mensagens do cliente (não admin)
+- GPT-4o-mini detecta: positivo/neutro/negativo/muito negativo + risco de churn
+- Se `shouldEscalate=true` → ticket promovido para URGENT automaticamente + notificação ao SUPER_ADMIN
+- `support_messages.sentiment` (nova coluna — migration 029) armazena o sentimento detectado
+
+### Geração automática de contratos
+
+- `lib/jobs/contract-auto-send.ts`: job Inngest disparado após aprovação de cadastro
+- Contrato enviado via Clicksign de forma assíncrona (não bloqueia o response de aprovação)
+- GPT-4o-mini gera corpo do contrato personalizado com dados da entidade
+- `lib/clicksign.ts`: `generateContractPdf()` e `createAndSendContract()` agora aceitam
+  `aiGeneratedBody` (texto personalizado substitui o template estático)
+- Notificação ao usuário: "Seu contrato foi enviado para assinatura"
+
+### Migration
+
+- `supabase/migrations/029_ai_features.sql`:
+  - `support_tickets.ai_classified BOOLEAN DEFAULT FALSE`
+  - `support_messages.sentiment TEXT` (positivo/neutro/negativo/muito_negativo)
+  - Tabela `product_associations` com índices e RLS
+
+### Crons adicionados ao vercel.json
+
+| Endpoint                            | Schedule          | Feature             |
+| ----------------------------------- | ----------------- | ------------------- |
+| `/api/cron/reorder-alerts`          | 07:00 UTC diário  | Alertas de recompra |
+| `/api/cron/churn-check`             | 07:30 UTC diário  | Detecção de churn   |
+| `/api/cron/product-recommendations` | 04:00 UTC segunda | Recomendações       |
+
+### Arquivos criados
+
+- `lib/ai.ts` — cliente OpenAI compartilhado
+- `lib/lead-score.ts` — scoring de leads
+- `lib/jobs/churn-detection.ts`
+- `lib/jobs/reorder-alerts.ts`
+- `lib/jobs/contract-auto-send.ts`
+- `lib/jobs/product-recommendations.ts`
+- `app/api/cron/churn-check/route.ts`
+- `app/api/cron/reorder-alerts/route.ts`
+- `app/api/cron/product-recommendations/route.ts`
+- `app/api/admin/registrations/[id]/ocr/route.ts`
+- `app/api/products/[id]/recommendations/route.ts`
+- `components/registrations/ocr-analysis-button.tsx`
+- `components/catalog/product-recommendations.tsx`
+- `supabase/migrations/029_ai_features.sql`
+
+### Custo operacional estimado (OpenAI)
+
+| Clínicas ativas | Custo/mês |
+| --------------- | --------- |
+| 30              | ~R$25     |
+| 200             | ~R$120    |
+| 1.000           | ~R$500    |
+
+---
+
 ## [5.3.2] — 2026-04-12 — Fix crítico: erro `'use server'` em services/coupons + Cupons no sidebar
 
 ### Problema resolvido
