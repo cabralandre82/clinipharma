@@ -2,6 +2,79 @@
 
 ---
 
+## [5.3.1] — 2026-04-12 — Melhorias e correções na feature de cupons
+
+### Problemas resolvidos
+
+- Formulário admin usava campos de UUID brutos (inaceitável em produção)
+- Sem contador de usos por cupom
+- Sem resumo financeiro de desconto no detalhe do pedido
+- Sem filtros, busca ou paginação no painel admin
+- Sem alerta antecipado de vencimento de cupom
+
+### Alterações
+
+#### Migration 028 — `used_count` e trigger atualizado
+
+- Nova coluna `used_count integer NOT NULL DEFAULT 0` em `coupons`
+- Trigger `freeze_order_item_price` atualizado: incrementa `used_count` atomicamente via `UPDATE` na mesma transação do INSERT do `order_item`
+
+#### Formulário admin — selects com busca (SearchableSelect)
+
+- Novo componente `components/coupons/searchable-select.tsx`: combobox com busca por nome, sem dependência externa
+- Produto: busca por nome + SKU
+- Clínica: busca por razão comercial
+- Toggle visual PERCENT / FIXED (substituindo `<select>` antigo)
+- Validação: produto e clínica são obrigatórios antes do submit
+- `app/(private)/coupons/page.tsx`: server component busca `products` e `clinics` e passa como props
+
+#### Painel admin — filtros, busca, paginação e métricas
+
+- Cards de estatísticas: cupons ativos, aguardando ativação, total de usos
+- Barra de busca por clínica, produto ou código (client-side)
+- Tabs de status: Todos / Ativos / Aguardando ativação / Expirados / Cancelados (com contadores)
+- Coluna `Usos` com badge no total de pedidos que usaram cada cupom
+- Badge "Expira em breve" (laranja) para cupons a ≤ 7 dias do vencimento
+- Paginação client-side (20 por página)
+
+#### Detalhe do pedido — resumo financeiro
+
+- Quando há desconto de cupom, exibe breakdown:
+  - Subtotal bruto: valor sem desconto
+  - Desconto aplicado (cupons): valor total descontado (verde)
+  - Total pago: `orders.total_price` (já descontado)
+
+#### Cron — alertas de vencimento
+
+- Novo endpoint `GET /api/cron/coupon-expiry-alerts`
+- Executa todo dia às 09:00 UTC
+- Localiza cupons ativos + ativados que expiram em ≤ 7 dias
+- Notifica todos os membros da clínica (tipo `COUPON_ASSIGNED`)
+- Notifica SUPER_ADMIN com código e clínica
+
+### Arquivos criados
+
+- `supabase/migrations/028_coupon_used_count.sql`
+- `components/coupons/searchable-select.tsx`
+- `app/api/cron/coupon-expiry-alerts/route.ts`
+- `tests/unit/api/coupon-expiry-alerts.test.ts` — 5 novos testes (TC-EXPIRY-01 a 05)
+
+### Arquivos alterados
+
+- `supabase/migrations/027_coupons.sql` → trigger substituído pela versão 028
+- `services/coupons.ts` — `CouponRow` inclui `used_count`
+- `components/coupons/admin-coupon-panel.tsx` — reescrito completamente
+- `app/(private)/coupons/page.tsx` — passa `products` e `clinics` ao painel; alerta "expira em breve" na view de clínica
+- `components/orders/order-detail.tsx` — bloco de resumo com subtotal / desconto / total
+- `vercel.json` — cron `coupon-expiry-alerts` às 09:00 UTC
+
+### Testes
+
+- 5 novos testes unitários (TC-EXPIRY-01 a 05)
+- Suite completa: **720/720 passando**
+
+---
+
 ## [5.3.0] — 2026-04-12 — Cupons de desconto por produto e por clínica
 
 ### Problema resolvido

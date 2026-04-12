@@ -231,14 +231,52 @@ export function OrderDetail({ order, currentUser }: OrderDetailProps) {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t">
-                    <td colSpan={3} className="pt-3 text-sm font-semibold text-gray-700">
-                      Total do pedido
-                    </td>
-                    <td className="pt-3 text-right text-base font-bold text-[hsl(213,75%,24%)]">
-                      {formatCurrency(Number(order.total_price))}
-                    </td>
-                  </tr>
+                  {(() => {
+                    const totalDiscount = orderItems.reduce(
+                      (s, i) => s + Number(i.discount_amount ?? 0),
+                      0
+                    )
+                    const grossSubtotal = orderItems.reduce(
+                      (s, i) =>
+                        s +
+                        (i.original_total_price != null
+                          ? Number(i.original_total_price)
+                          : Number(i.total_price)),
+                      0
+                    )
+                    return (
+                      <>
+                        {totalDiscount > 0 && (
+                          <>
+                            <tr className="border-t">
+                              <td colSpan={3} className="pt-3 text-sm text-gray-500">
+                                Subtotal bruto
+                              </td>
+                              <td className="pt-3 text-right text-sm text-gray-500">
+                                {formatCurrency(grossSubtotal)}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td colSpan={3} className="pt-1 text-sm font-medium text-green-700">
+                                Desconto aplicado (cupons)
+                              </td>
+                              <td className="pt-1 text-right text-sm font-semibold text-green-700">
+                                -{formatCurrency(totalDiscount)}
+                              </td>
+                            </tr>
+                          </>
+                        )}
+                        <tr className={totalDiscount > 0 ? 'border-t border-dashed' : 'border-t'}>
+                          <td colSpan={3} className="pt-3 text-sm font-semibold text-gray-700">
+                            {totalDiscount > 0 ? 'Total pago' : 'Total do pedido'}
+                          </td>
+                          <td className="pt-3 text-right text-base font-bold text-[hsl(213,75%,24%)]">
+                            {formatCurrency(Number(order.total_price))}
+                          </td>
+                        </tr>
+                      </>
+                    )
+                  })()}
                 </tfoot>
               </table>
             </CardContent>

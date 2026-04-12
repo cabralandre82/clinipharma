@@ -3,10 +3,12 @@ import { getCurrentUser } from '@/lib/auth/session'
 import { redirect } from 'next/navigation'
 import { hasAnyRole, hasRole } from '@/lib/rbac'
 import { getClinicCoupons, getAdminCoupons } from '@/services/coupons'
+import { createAdminClient } from '@/lib/db/admin'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Tag, CheckCircle2, Clock, XCircle, AlertCircle } from 'lucide-react'
+import { Tag, CheckCircle2, Clock, XCircle, AlertCircle, AlertTriangle } from 'lucide-react'
 import { CouponActivateForm } from '@/components/coupons/coupon-activate-form'
 import { AdminCouponPanel } from '@/components/coupons/admin-coupon-panel'
+import type { SelectOption } from '@/components/coupons/searchable-select'
 
 export const metadata: Metadata = { title: 'Cupons de desconto | Clinipharma' }
 
@@ -15,11 +17,20 @@ function couponStatus(c: {
   activated_at: string | null
   valid_until: string | null
 }) {
+  const expiringSoon =
+    c.active &&
+    !!c.activated_at &&
+    !!c.valid_until &&
+    new Date(c.valid_until) > new Date() &&
+    new Date(c.valid_until) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
   if (!c.active) return { label: 'Cancelado', color: 'text-red-600 bg-red-50', Icon: XCircle }
   if (!c.activated_at)
     return { label: 'Aguardando ativação', color: 'text-amber-600 bg-amber-50', Icon: Clock }
   if (c.valid_until && new Date(c.valid_until) < new Date())
     return { label: 'Expirado', color: 'text-gray-500 bg-gray-100', Icon: AlertCircle }
+  if (expiringSoon)
+    return { label: 'Expira em breve', color: 'text-orange-600 bg-orange-50', Icon: AlertTriangle }
   return { label: 'Ativo', color: 'text-green-700 bg-green-50', Icon: CheckCircle2 }
 }
 
@@ -32,16 +43,35 @@ export default async function CouponsPage() {
 
   if (!isAdminUser && !isClinicUser) redirect('/unauthorized')
 
+  // ── Admin view ────────────────────────────────────────────────────────────
   if (isAdminUser) {
-    const { coupons = [], error } = await getAdminCoupons()
+    const admin = createAdminClient()
+
+    const [{ coupons = [], error }, { data: productsRaw }, { data: clinicsRaw }] =
+      await Promise.all([
+        getAdminCoupons(),
+        admin.from('products').select('id, name, sku').eq('active', true).order('name'),
+        admin.from('clinics').select('id, trade_name').eq('status', 'ACTIVE').order('trade_name'),
+      ])
+
+    const products: SelectOption[] = (productsRaw ?? []).map((p) => ({
+      id: p.id,
+      label: p.name,
+      sublabel: `SKU: ${p.sku}`,
+    }))
+
+    const clinics: SelectOption[] = (clinicsRaw ?? []).map((c) => ({
+      id: c.id,
+      label: c.trade_name,
+    }))
 
     return (
       <div className="space-y-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Cupons de desconto</h1>
-            <p className="mt-0.5 text-sm text-gray-500">Gerencie cupons por produto e clínica</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Cupons de desconto</h1>
+          <p className="mt-0.5 text-sm text-gray-500">
+            Gerencie cupons por produto e clínica. O desconto é absorvido pela plataforma.
+          </p>
         </div>
 
         {error && (
@@ -50,12 +80,12 @@ export default async function CouponsPage() {
           </div>
         )}
 
-        <AdminCouponPanel coupons={coupons} />
+        <AdminCouponPanel coupons={coupons} products={products} clinics={clinics} />
       </div>
     )
   }
 
-  // CLINIC_ADMIN view
+  // ── Clinic view ───────────────────────────────────────────────────────────
   const { coupons = [], error } = await getClinicCoupons()
 
   return (
@@ -78,7 +108,9 @@ export default async function CouponsPage() {
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="mb-1 text-base font-semibold text-gray-900">Ativar cupom</h2>
         <p className="mb-4 text-sm text-gray-500">
-          Digite o código enviado pelo administrador da plataforma.
+          Digite o código enviado pelo administrador da plataforma. A ativação é feita uma única vez
+          e o desconto passa a ser aplicado automaticamente em todos os pedidos com o produto
+          associado.
         </p>
         <CouponActivateForm />
       </div>

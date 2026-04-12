@@ -24,6 +24,10 @@
     {
       "path": "/api/cron/purge-drafts",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/coupon-expiry-alerts",
+      "schedule": "0 9 * * *"
     }
   ]
 }

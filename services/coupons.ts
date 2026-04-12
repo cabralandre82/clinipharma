@@ -42,6 +42,7 @@ export interface CouponRow {
   valid_until: string | null
   activated_at: string | null
   active: boolean
+  used_count: number
   created_by_user_id: string
   created_at: string
   updated_at: string
