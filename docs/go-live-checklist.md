@@ -51,6 +51,27 @@
 - [x] `CLICKSIGN_ACCESS_TOKEN` (sandbox)
 - [x] `CLICKSIGN_API_URL` = `https://sandbox.clicksign.com/api/v1`
 - [x] `CLICKSIGN_WEBHOOK_SECRET` = `caeed4d59bc4ec8313fc3c9630e3fac0feb86026bda27a46aab055c1c1f14bb9` — ✅ configurada no Vercel. **Ação pendente:** registrar como header `X-Clicksign-Secret` no painel do Clicksign (Sandbox → Produção)
+- [x] `OPENAI_API_KEY` — ✅ configurada no Vercel (Production + Preview) em 2026-04-12 via API REST com token de serviço. Necessária para todas as features de IA (v6.0.0): triagem de tickets, sentimento, OCR, contratos, recomendações.
+
+> **Como gerenciar variáveis via CLI/API (referência):**
+>
+> ```bash
+> # Listar todas as env vars do projeto
+> curl -s "https://api.vercel.com/v10/projects/$PROJECT_ID/env?teamId=$TEAM_ID" \
+>   -H "Authorization: Bearer $VERCEL_TOKEN"
+>
+> # Adicionar nova variável (Production)
+> vercel env add NOME_VAR production --token "$VERCEL_TOKEN" --scope "$TEAM_ID"
+>
+> # Adicionar via API (sem prompts interativos)
+> curl -X POST "https://api.vercel.com/v10/projects/$PROJECT_ID/env?teamId=$TEAM_ID" \
+>   -H "Authorization: Bearer $VERCEL_TOKEN" \
+>   -H "Content-Type: application/json" \
+>   -d '{"key":"NOME_VAR","value":"VALOR","type":"encrypted","target":["production","preview"]}'
+> ```
+>
+> O token de serviço (Vercel API Token) pode ser criado em vercel.com/account/tokens.
+> PROJECT_ID = `prj_AselTmZTlBpnArr0M7zP6GTmNJ16` | TEAM_ID = `team_fccKc8W6hyQmvCcZAGCqV1UK`
 
 ## Segurança (Roadmap 90pts — Semana 1–2)
 
