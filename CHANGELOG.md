@@ -2,20 +2,55 @@
 
 ---
 
-## [5.1.1] — 2026-04-08 — Página de perfil do usuário
+## [5.1.2] — 2026-04-12 — Correção definitiva do erro inesperado na página /profile
+
+### Causa raiz identificada
+
+O `PrivateLayout` não possuía `try/catch` em torno de `getCurrentUser()`. Qualquer exceção inesperada
+em runtime (ex.: falha transitória de rede com o Supabase) propagava pelo layout, bypassava o
+`(private)/error.tsx` e atingia o `global-error.tsx` — exibindo o modal "Erro inesperado" para
+qualquer página do app. A versão simplificada de `/profile` criada em v5.1.1 também sofria do
+mesmo problema.
+
+### Correções
+
+**`app/(private)/layout.tsx`**
+
+- Adicionado `try/catch` defensivo em `getCurrentUser()`: exceções inesperadas em runtime redirecionam
+  para `/login` em vez de crashar o layout global
+- Erros internos do Next.js (`NEXT_REDIRECT`, `Dynamic server usage`, `NEXT_NOT_FOUND`) são
+  re-lançados para o framework tratá-los corretamente
+
+**`app/(private)/profile/page.tsx`**
+
+- Restaurada a versão completa da página com todas as funcionalidades:
+  - Preferências de notificação (silenciáveis vs. críticas)
+  - Histórico de sessões e alertas de novo dispositivo
+  - Upload de documentos pendentes (para cadastros em análise)
+- Adicionado `try/catch` em cada chamada ao banco de dados
+- Fallback defensivo para valores `undefined`/`null` em todos os campos
+
+**Cobertura de testes:** 685/685 testes passando. `updateOwnProfile` coberto por 3 testes existentes. Nenhum novo teste necessário — as alterações são de infraestrutura e tratamento de erro.
+
+### Arquivos
+
+| Arquivo                          | Mudança                                     |
+| -------------------------------- | ------------------------------------------- |
+| `app/(private)/layout.tsx`       | try/catch defensivo em getCurrentUser       |
+| `app/(private)/profile/page.tsx` | Página completa restaurada + error handling |
+
+---
+
+## [5.1.1] — 2026-04-11 — Página de perfil do usuário (versão inicial)
 
 ### Correção
 
 Ao clicar no nome no canto superior direito → "Meu perfil", a plataforma redirecionava para `/profile`
-que não existia, causando uma página em branco com modal de erro inesperado.
+causando uma página em branco com modal de erro inesperado.
 
-**Criado `app/(private)/profile/page.tsx`** com:
+**Criado `app/(private)/profile/page.tsx`** com card de resumo e formulário editável.
 
-- Card de resumo: avatar com iniciais, nome, e-mail, papéis com badges coloridos, status ativo/inativo, data de cadastro
-- Formulário editável (nome completo e telefone) via `updateOwnProfile` — botão "Salvar" só ativo quando há mudanças
-- Seção de privacidade com link para Política de Privacidade e e-mail do DPO
-
-**Cobertura de testes:** `updateOwnProfile` já coberto por 3 testes (IDOR, permissão, sucesso) em `tests/unit/services/users.test.ts`. Nenhum teste novo necessário.
+**Cobertura de testes:** `updateOwnProfile` já coberto por 3 testes em `tests/unit/services/users.test.ts`.
 
 ### Arquivos
 
