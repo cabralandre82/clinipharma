@@ -15,7 +15,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { addMessage, updateTicketStatus, updateTicketPriority } from '@/services/support'
-import { formatDate } from '@/lib/utils'
 
 interface Message {
   id: string

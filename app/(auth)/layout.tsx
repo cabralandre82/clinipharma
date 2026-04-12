@@ -1,6 +1,8 @@
+import Link from 'next/link'
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[hsl(213,75%,24%)] via-[hsl(210,60%,30%)] to-[hsl(196,91%,36%)] p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-[hsl(213,75%,24%)] via-[hsl(210,60%,30%)] to-[hsl(196,91%,36%)] p-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <div className="mb-2 inline-flex items-center gap-2">
@@ -18,6 +20,17 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <p className="text-sm text-blue-100">Plataforma B2B de intermediação médica</p>
         </div>
         <div className="rounded-2xl bg-white p-8 shadow-2xl">{children}</div>
+        <p className="mt-6 text-center text-xs text-blue-200/70">
+          Ao acessar, você concorda com nossos{' '}
+          <Link href="/terms" className="underline hover:text-white">
+            Termos de Uso
+          </Link>{' '}
+          e{' '}
+          <Link href="/privacy" className="underline hover:text-white">
+            Política de Privacidade
+          </Link>
+          .
+        </p>
       </div>
     </div>
   )
