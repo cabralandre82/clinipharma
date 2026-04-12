@@ -80,4 +80,55 @@ test.describe('Authentication', () => {
     await expect(page.locator('input[placeholder*="CRM"]').first()).toBeVisible()
     await expect(page.locator('input[placeholder*="Especialidade"]')).toBeVisible()
   })
+
+  test('TC-AUTH-11: /registro docs step shows warning banner when no docs uploaded', async ({
+    page,
+  }) => {
+    await page.goto('/registro')
+    await page.locator('button', { hasText: 'Clínica / Consultório' }).click()
+
+    // Fill required form fields
+    await page.fill('input[placeholder*="João da Silva"]', 'Teste Admin')
+    await page.fill('input[placeholder*="Clínica Exemplo"]', 'Clínica Teste')
+    await page.fill('input[placeholder*="00.000.000"]', '11222333000181')
+    await page.fill('input[type="email"]', `draft-test-${Date.now()}@test.com`)
+    await page.fill('input[placeholder*="Rua Exemplo"]', 'Rua das Flores, 100')
+    await page.fill('input[placeholder*="São Paulo"]', 'São Paulo')
+    await page.fill('input[placeholder*="SP"]', 'SP')
+    await page.fill('input[type="password"]', 'Senha@1234')
+    await page.fill('input[placeholder*="Repita"]', 'Senha@1234')
+
+    // Advance to docs step
+    await page.click('button:has-text("Continuar para documentos")')
+    await expect(page.locator('text=2/2 — Documentos')).toBeVisible({ timeout: 8_000 })
+
+    // Warning banner must be visible
+    await expect(page.locator('text=Documentos obrigatórios')).toBeVisible()
+    await expect(page.locator('text=Nossa equipe entrará em contato')).toBeVisible()
+  })
+
+  test('TC-AUTH-12: /registro docs step submit button changes label without docs', async ({
+    page,
+  }) => {
+    await page.goto('/registro')
+    await page.locator('button', { hasText: 'Clínica / Consultório' }).click()
+
+    await page.fill('input[placeholder*="João da Silva"]', 'Teste Botão')
+    await page.fill('input[placeholder*="Clínica Exemplo"]', 'Botão Test')
+    await page.fill('input[placeholder*="00.000.000"]', '11222333000181')
+    await page.fill('input[type="email"]', `btn-test-${Date.now()}@test.com`)
+    await page.fill('input[placeholder*="Rua Exemplo"]', 'Av. Teste, 1')
+    await page.fill('input[placeholder*="São Paulo"]', 'Curitiba')
+    await page.fill('input[placeholder*="SP"]', 'PR')
+    await page.fill('input[type="password"]', 'Senha@1234')
+    await page.fill('input[placeholder*="Repita"]', 'Senha@1234')
+
+    await page.click('button:has-text("Continuar para documentos")')
+    await expect(page.locator('text=2/2 — Documentos')).toBeVisible({ timeout: 8_000 })
+
+    // Without docs the button label is different
+    await expect(
+      page.locator('button:has-text("Enviar sem documentos por enquanto")')
+    ).toBeVisible()
+  })
 })

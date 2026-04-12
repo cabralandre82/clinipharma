@@ -2,6 +2,44 @@
 
 ---
 
+## [5.2.1] — 2026-04-12 — Migration aplicada + cobertura de testes + fix suite
+
+### Migration 026 aplicada
+
+`supabase db push` aplicado em produção — tabela `registration_drafts` criada e validada.
+
+### Cobertura de testes adicionada
+
+| Arquivo                                      | Testes | O que valida                                                                                 |
+| -------------------------------------------- | ------ | -------------------------------------------------------------------------------------------- |
+| `tests/unit/api/registration-draft.test.ts`  | 7      | draft_id retornado; 400 sem email/type; 429 rate-limit; 500 DB fail                          |
+| `tests/unit/api/registration-submit.test.ts` | 9      | PENDING com docs; PENDING_DOCS sem docs; draft deletado com draft_id; DOCTOR type; rollbacks |
+| `tests/unit/api/purge-drafts.test.ts`        | 5      | 401 sem secret; 200 com contagem; 200 sem drafts expirados; 500 DB fail                      |
+| `tests/e2e/auth.test.ts`                     | +2     | TC-AUTH-11: warning banner sem docs; TC-AUTH-12: label do botão muda                         |
+
+### Fix da suite de testes (vitest + jsdom — Node.js 18)
+
+Vitest havia sido atualizado para 4.x (requer Node 20). Revertido para 2.1.9 + jsdom fixado
+em 24.1.3 (compatível com Node 18). `vitest.config.ts` com `css.postcss: { plugins: [] }`
+para evitar erro de PostCSS em ambiente de testes. `// @vitest-environment node` adicionado
+aos testes de API (sem DOM) — correção aplicada também ao `lgpd.test.ts` pré-existente.
+
+**Resultado: 701 testes passando** (eram 685 antes da atualização quebrada do vitest).
+
+### Arquivos
+
+| Arquivo                                      | Mudança                                   |
+| -------------------------------------------- | ----------------------------------------- |
+| `tests/unit/api/registration-draft.test.ts`  | Novo                                      |
+| `tests/unit/api/registration-submit.test.ts` | Reescrito + 5 novos cenários              |
+| `tests/unit/api/purge-drafts.test.ts`        | Novo                                      |
+| `tests/unit/api/lgpd.test.ts`                | `@vitest-environment node` adicionado     |
+| `tests/e2e/auth.test.ts`                     | TC-AUTH-11 e TC-AUTH-12 adicionados       |
+| `vitest.config.ts`                           | css.postcss inline + vitest 2.1.9         |
+| `package.json`                               | vitest 2.1.9 + jsdom 24.1.3 + vite 5.4.19 |
+
+---
+
 ## [5.2.0] — 2026-04-12 — Captura de leads de cadastro + envio sem documentos
 
 ### Problema

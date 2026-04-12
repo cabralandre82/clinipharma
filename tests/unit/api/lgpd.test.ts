@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import * as adminModule from '@/lib/db/admin'
@@ -214,12 +215,10 @@ describe('POST /api/admin/lgpd/anonymize/:userId', () => {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        single: vi
-          .fn()
-          .mockResolvedValue({
-            data: { full_name: 'André', email: 'a@a.com', phone: '11999' },
-            error: null,
-          }),
+        single: vi.fn().mockResolvedValue({
+          data: { full_name: 'André', email: 'a@a.com', phone: '11999' },
+          error: null,
+        }),
         update: vi.fn().mockReturnValue(updateChain),
         delete: vi.fn().mockReturnThis(),
         not: vi.fn().mockReturnThis(),

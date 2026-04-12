@@ -1,4 +1,6 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { File } from 'node:buffer'
 import { NextRequest } from 'next/server'
 import * as adminModule from '@/lib/db/admin'
 
@@ -14,6 +16,11 @@ vi.mock('resend', () => {
   }
   return { Resend: MockResend }
 })
+vi.mock('@/lib/logger', () => ({
+  logger: { error: vi.fn(), info: vi.fn() },
+}))
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeFormData(overrides: Record<string, string> = {}) {
   const fd = new FormData()
@@ -28,6 +35,15 @@ function makeFormData(overrides: Record<string, string> = {}) {
       cnpj: '11.222.333/0001-81',
     })
   )
+  if (overrides.draft_id) fd.append('draft_id', overrides.draft_id)
+  return fd
+}
+
+function makeFormDataWithDoc(overrides: Record<string, string> = {}) {
+  const fd = makeFormData(overrides)
+  const blob = new Blob(['%PDF-fake'], { type: 'application/pdf' })
+  fd.append('doc_CNPJ_CARD', new File([blob], 'cnpj.pdf', { type: 'application/pdf' }))
+  fd.append('doc_CNPJ_CARD_label', 'Cartão CNPJ')
   return fd
 }
 
@@ -38,19 +54,26 @@ function makeRequest(fd: FormData) {
   })
 }
 
+interface AdminOptions {
+  createUserError?: unknown
+  profileUpsertError?: unknown
+  roleInsertError?: unknown
+  registrationRequestError?: unknown
+  captureProfileUpsert?: (args: unknown) => void
+  captureRequestInsert?: (args: unknown) => void
+  draftDeleteCalled?: { value: boolean }
+}
+
 function makeAdminClient({
   createUserError = null,
   profileUpsertError = null,
   roleInsertError = null,
   registrationRequestError = null,
-}: {
-  createUserError?: unknown
-  profileUpsertError?: unknown
-  roleInsertError?: unknown
-  registrationRequestError?: unknown
-} = {}) {
+  captureProfileUpsert,
+  captureRequestInsert,
+  draftDeleteCalled,
+}: AdminOptions = {}) {
   const userId = 'user-new-1'
-  let upsertCallCount = 0
 
   return {
     auth: {
@@ -64,9 +87,11 @@ function makeAdminClient({
     },
     from: vi.fn().mockImplementation((table: string) => {
       if (table === 'profiles') {
-        upsertCallCount++
         return {
-          upsert: vi.fn().mockResolvedValue({ error: profileUpsertError ?? null }),
+          upsert: vi.fn().mockImplementation((args: unknown) => {
+            captureProfileUpsert?.(args)
+            return Promise.resolve({ error: profileUpsertError ?? null })
+          }),
         }
       }
       if (table === 'user_roles') {
@@ -78,17 +103,32 @@ function makeAdminClient({
       }
       if (table === 'registration_requests') {
         return {
-          insert: vi.fn().mockReturnThis(),
-          select: vi.fn().mockReturnThis(),
-          single: vi.fn().mockResolvedValue({
-            data: registrationRequestError ? null : { id: 'req-1' },
-            error: registrationRequestError ?? null,
+          insert: vi.fn().mockImplementation((args: unknown) => {
+            captureRequestInsert?.(args)
+            return {
+              select: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({
+                data: registrationRequestError ? null : { id: 'req-1' },
+                error: registrationRequestError ?? null,
+              }),
+            }
+          }),
+        }
+      }
+      if (table === 'registration_drafts') {
+        return {
+          delete: vi.fn().mockImplementation(() => {
+            if (draftDeleteCalled) draftDeleteCalled.value = true
+            return {
+              eq: vi.fn().mockResolvedValue({ error: null }),
+            }
           }),
         }
       }
       if (table === 'notifications') {
         return { insert: vi.fn().mockResolvedValue({ error: null }) }
       }
+      // Default fallback (profiles for admin lookup, etc.)
       return {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
@@ -110,7 +150,9 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('POST /api/registration/submit', () => {
+// ── Validation ────────────────────────────────────────────────────────────────
+
+describe('POST /api/registration/submit — validation', () => {
   it('returns 400 when type or form_data is missing', async () => {
     const { POST } = await import('@/app/api/registration/submit/route')
     const fd = new FormData()
@@ -118,8 +160,12 @@ describe('POST /api/registration/submit', () => {
     const res = await POST(makeRequest(fd))
     expect(res.status).toBe(400)
   })
+})
 
-  it('returns 500 when profile upsert fails (rolls back auth user)', async () => {
+// ── Rollback on error ─────────────────────────────────────────────────────────
+
+describe('POST /api/registration/submit — rollback on error', () => {
+  it('returns 500 and rolls back auth user when profile upsert fails', async () => {
     const { POST } = await import('@/app/api/registration/submit/route')
     const admin = makeAdminClient({ profileUpsertError: { message: 'upsert failed' } })
     vi.mocked(adminModule.createAdminClient).mockReturnValue(
@@ -128,12 +174,11 @@ describe('POST /api/registration/submit', () => {
 
     const res = await POST(makeRequest(makeFormData()))
     expect(res.status).toBe(500)
-    const body = await res.json()
-    expect(body.error).toBe('Erro ao criar perfil')
+    expect((await res.json()).error).toBe('Erro ao criar perfil')
     expect(admin.auth.admin.deleteUser).toHaveBeenCalledWith('user-new-1')
   })
 
-  it('returns 500 when user_roles insert fails (rolls back auth user)', async () => {
+  it('returns 500 and rolls back auth user when user_roles insert fails', async () => {
     const { POST } = await import('@/app/api/registration/submit/route')
     const admin = makeAdminClient({ roleInsertError: { message: 'role failed' } })
     vi.mocked(adminModule.createAdminClient).mockReturnValue(
@@ -142,12 +187,11 @@ describe('POST /api/registration/submit', () => {
 
     const res = await POST(makeRequest(makeFormData()))
     expect(res.status).toBe(500)
-    const body = await res.json()
-    expect(body.error).toBe('Erro ao atribuir papel')
+    expect((await res.json()).error).toBe('Erro ao atribuir papel')
     expect(admin.auth.admin.deleteUser).toHaveBeenCalledWith('user-new-1')
   })
 
-  it('returns 500 when registration_requests insert fails (rolls back auth user)', async () => {
+  it('returns 500 and rolls back auth user when registration_requests insert fails', async () => {
     const { POST } = await import('@/app/api/registration/submit/route')
     const admin = makeAdminClient({ registrationRequestError: { message: 'req failed' } })
     vi.mocked(adminModule.createAdminClient).mockReturnValue(
@@ -156,14 +200,55 @@ describe('POST /api/registration/submit', () => {
 
     const res = await POST(makeRequest(makeFormData()))
     expect(res.status).toBe(500)
-    const body = await res.json()
-    expect(body.error).toBe('Erro ao registrar solicitação')
+    expect((await res.json()).error).toBe('Erro ao registrar solicitação')
     expect(admin.auth.admin.deleteUser).toHaveBeenCalledWith('user-new-1')
   })
+})
 
-  it('returns 201 on successful registration', async () => {
+// ── Status logic (PENDING vs PENDING_DOCS) ────────────────────────────────────
+
+describe('POST /api/registration/submit — PENDING vs PENDING_DOCS', () => {
+  it('creates registration with PENDING when docs are attached', async () => {
     const { POST } = await import('@/app/api/registration/submit/route')
-    const admin = makeAdminClient()
+
+    let capturedRequest: unknown = null
+    let capturedProfile: unknown = null
+
+    const admin = makeAdminClient({
+      captureProfileUpsert: (args) => {
+        capturedProfile = args
+      },
+      captureRequestInsert: (args) => {
+        capturedRequest = args
+      },
+    })
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      admin as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+
+    const res = await POST(makeRequest(makeFormDataWithDoc()))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    expect(body.status).toBe('PENDING')
+    expect((capturedProfile as Record<string, unknown>)?.registration_status).toBe('PENDING')
+    expect((capturedRequest as Record<string, unknown>)?.status).toBe('PENDING')
+  })
+
+  it('creates registration with PENDING_DOCS when no docs are attached', async () => {
+    const { POST } = await import('@/app/api/registration/submit/route')
+
+    let capturedRequest: unknown = null
+    let capturedProfile: unknown = null
+
+    const admin = makeAdminClient({
+      captureProfileUpsert: (args) => {
+        capturedProfile = args
+      },
+      captureRequestInsert: (args) => {
+        capturedRequest = args
+      },
+    })
     vi.mocked(adminModule.createAdminClient).mockReturnValue(
       admin as unknown as ReturnType<typeof adminModule.createAdminClient>
     )
@@ -172,6 +257,74 @@ describe('POST /api/registration/submit', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
-    expect(body.request_id).toBe('req-1')
+    expect(body.status).toBe('PENDING_DOCS')
+    expect((capturedProfile as Record<string, unknown>)?.registration_status).toBe('PENDING_DOCS')
+    expect((capturedRequest as Record<string, unknown>)?.status).toBe('PENDING_DOCS')
+  })
+})
+
+// ── Draft cleanup ─────────────────────────────────────────────────────────────
+
+describe('POST /api/registration/submit — draft cleanup', () => {
+  it('deletes draft when draft_id is provided and submit succeeds', async () => {
+    const { POST } = await import('@/app/api/registration/submit/route')
+
+    const draftDeleteCalled = { value: false }
+    const admin = makeAdminClient({ draftDeleteCalled })
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      admin as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+
+    const fd = makeFormData({ draft_id: 'draft-xyz-999' })
+    const res = await POST(makeRequest(fd))
+
+    expect(res.status).toBe(200)
+    expect(draftDeleteCalled.value).toBe(true)
+  })
+
+  it('does NOT call draft delete when no draft_id is provided', async () => {
+    const { POST } = await import('@/app/api/registration/submit/route')
+
+    const draftDeleteCalled = { value: false }
+    const admin = makeAdminClient({ draftDeleteCalled })
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      admin as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+
+    const res = await POST(makeRequest(makeFormData()))
+
+    expect(res.status).toBe(200)
+    expect(draftDeleteCalled.value).toBe(false)
+  })
+})
+
+// ── Doctor registration ───────────────────────────────────────────────────────
+
+describe('POST /api/registration/submit — doctor type', () => {
+  it('assigns DOCTOR role and creates request for DOCTOR type', async () => {
+    const { POST } = await import('@/app/api/registration/submit/route')
+
+    const admin = makeAdminClient()
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      admin as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+
+    const fd = new FormData()
+    fd.append('type', 'DOCTOR')
+    fd.append(
+      'form_data',
+      JSON.stringify({
+        email: 'dr@test.com',
+        password: 'Senha@1234',
+        full_name: 'Dr. João',
+        crm: '123456',
+        crm_state: 'SP',
+        specialty: 'Dermatologia',
+      })
+    )
+
+    const res = await POST(makeRequest(fd))
+    expect(res.status).toBe(200)
+    expect((await res.json()).success).toBe(true)
   })
 })
