@@ -2,6 +2,21 @@
 
 ---
 
+## [6.0.2] — 2026-04-12 — Plano de auditoria QA + segurança + IA (documentação)
+
+### Documentação
+
+- **`docs/audit-qa-plena-2026-04.md`** — plano de testes exaustivo reconciliado com
+  `known-limitations`, `PENDING`, `go-live-checklist`, `lgpd-registro-atividades` e
+  `roadmap-90pts`: marca **N/A** onde o prompt genérico assume NF-e, split automático,
+  ANVISA API, S3, WhatsApp ativo, etc.; inclui **147 casos** de injeção/fuzzing campo
+  a campo no cadastro (clínica + médico), seções 1–11 condensadas com expansão RBAC,
+  auditoria completa das features de IA (incl. achados estáticos: validação de
+  sentimento, temperatura em contratos, ausência de LLM nas recomendações SQL).
+- **`docs/PENDING.md`** — referência à v6.0.2 e ao novo documento de auditoria.
+
+---
+
 ## [6.0.1] — 2026-04-12 — Cobertura de testes para features de IA + migration 029
 
 ### Testes adicionados

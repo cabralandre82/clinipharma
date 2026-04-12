@@ -73,6 +73,10 @@
 > O token de serviço (Vercel API Token) pode ser criado em vercel.com/account/tokens.
 > PROJECT_ID = `prj_AselTmZTlBpnArr0M7zP6GTmNJ16` | TEAM_ID = `team_fccKc8W6hyQmvCcZAGCqV1UK`
 
+## Auditoria interna de QA / segurança / IA
+
+- [ ] **`docs/audit-qa-plena-2026-04.md`** — executar matriz de testes (v6.0.2); expandir RBAC linha a linha para cada rota em `app/api/**/route.ts` conforme nota no sumário quantitativo do documento.
+
 ## Segurança (Roadmap 90pts — Semana 1–2)
 
 - [x] **Session revocation** — `revoked_tokens` blacklist implementada. `deactivateUser()` e `assignUserRole()` revogam sessões imediatamente via `revokeAllUserTokens()`.
