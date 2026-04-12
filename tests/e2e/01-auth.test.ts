@@ -59,6 +59,14 @@ test.describe('Authentication', () => {
     }
   })
 
+  test('legal pages are accessible without authentication', async ({ page }) => {
+    for (const path of ['/terms', '/privacy']) {
+      await page.goto(path)
+      await expect(page).not.toHaveURL(/login/, { timeout: 10_000 })
+      await expect(page.locator('body')).toBeVisible()
+    }
+  })
+
   test('password reset link is accessible from login page', async ({ page }) => {
     const login = new LoginPage(page)
     await login.goto()

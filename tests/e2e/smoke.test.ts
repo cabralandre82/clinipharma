@@ -9,7 +9,7 @@ import { test, expect } from '@playwright/test'
 
 const AUTHENTICATED_ROUTES = ['/dashboard', '/orders', '/profile']
 
-const PUBLIC_ROUTES = ['/login']
+const PUBLIC_ROUTES = ['/login', '/terms', '/privacy']
 
 test.describe('Smoke: public routes', () => {
   test.use({ storageState: { cookies: [], origins: [] } })
