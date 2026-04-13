@@ -115,6 +115,14 @@ describe('createOrder — validation', () => {
 })
 
 describe('createOrder — products validation', () => {
+  beforeEach(() => {
+    // CLINIC_ADMIN membership check: always return valid membership for CID
+    const membershipQb = makeQueryBuilder({ clinic_id: CID }, null)
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(membershipQb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+  })
+
   it('returns error when products are not found', async () => {
     const supabase = mockSupabaseClient()
     const qb = makeQueryBuilder(null, null)
@@ -375,6 +383,13 @@ describe('updateOrderStatus', () => {
 })
 
 describe('createOrder — compliance check', () => {
+  beforeEach(() => {
+    const membershipQb = makeQueryBuilder({ clinic_id: CID }, null)
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(membershipQb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+  })
+
   it('blocks order when compliance check fails', async () => {
     const { canPlaceOrder } = await import('@/lib/compliance')
     vi.mocked(canPlaceOrder).mockResolvedValueOnce({
@@ -400,8 +415,13 @@ describe('createOrder — compliance check', () => {
       supabase as ReturnType<typeof mockSupabaseClient>
     )
 
+    const admin = mockSupabaseAdmin()
+    const membershipQbC1 = makeQueryBuilder({ clinic_id: CID }, null)
+    const genericQbC1 = makeQueryBuilder(null, null)
+    let c1 = 0
+    admin.from = vi.fn().mockImplementation(() => (++c1 === 1 ? membershipQbC1 : genericQbC1))
     vi.mocked(adminModule.createAdminClient).mockReturnValue(
-      mockSupabaseAdmin() as unknown as ReturnType<typeof adminModule.createAdminClient>
+      admin as unknown as ReturnType<typeof adminModule.createAdminClient>
     )
 
     const result = await createOrder({
@@ -435,8 +455,13 @@ describe('createOrder — compliance check', () => {
       supabase as ReturnType<typeof mockSupabaseClient>
     )
 
+    const admin = mockSupabaseAdmin()
+    const membershipQbC2 = makeQueryBuilder({ clinic_id: CID }, null)
+    const genericQbC2 = makeQueryBuilder(null, null)
+    let c2 = 0
+    admin.from = vi.fn().mockImplementation(() => (++c2 === 1 ? membershipQbC2 : genericQbC2))
     vi.mocked(adminModule.createAdminClient).mockReturnValue(
-      mockSupabaseAdmin() as unknown as ReturnType<typeof adminModule.createAdminClient>
+      admin as unknown as ReturnType<typeof adminModule.createAdminClient>
     )
 
     const result = await createOrder({
@@ -450,6 +475,13 @@ describe('createOrder — compliance check', () => {
 })
 
 describe('createOrder — insertion errors', () => {
+  beforeEach(() => {
+    const membershipQb = makeQueryBuilder({ clinic_id: CID }, null)
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(membershipQb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+  })
+
   const validProducts = [
     {
       id: PID,
@@ -476,9 +508,15 @@ describe('createOrder — insertion errors', () => {
     )
 
     const admin = mockSupabaseAdmin()
+    const membershipQb = makeQueryBuilder({ clinic_id: CID }, null)
     const insertFailQb = makeQueryBuilder()
     insertFailQb.single = vi.fn().mockResolvedValue({ data: null, error: { message: 'DB error' } })
-    admin.from = vi.fn().mockReturnValue(insertFailQb)
+    let adminCallCount = 0
+    admin.from = vi.fn().mockImplementation(() => {
+      adminCallCount++
+      if (adminCallCount === 1) return membershipQb // membership check
+      return insertFailQb
+    })
 
     vi.mocked(adminModule.createAdminClient).mockReturnValue(
       admin as unknown as ReturnType<typeof adminModule.createAdminClient>
@@ -513,11 +551,13 @@ describe('createOrder — insertion errors', () => {
     // call 3+: cleanup delete and further calls
     const cleanupQb = makeQueryBuilder(null, null)
 
+    const membershipQb2 = makeQueryBuilder({ clinic_id: CID }, null)
     let callCount = 0
     admin.from = vi.fn().mockImplementation(() => {
       callCount++
-      if (callCount === 1) return orderInsertQb
-      if (callCount === 2) return itemsFailQb
+      if (callCount === 1) return membershipQb2 // membership check
+      if (callCount === 2) return orderInsertQb
+      if (callCount === 3) return itemsFailQb
       return cleanupQb
     })
 
@@ -536,6 +576,13 @@ describe('createOrder — insertion errors', () => {
 })
 
 describe('createOrder — document upload advances status', () => {
+  beforeEach(() => {
+    const membershipQb = makeQueryBuilder({ clinic_id: CID }, null)
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(membershipQb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+  })
+
   const validProducts = [
     {
       id: PID,
@@ -571,10 +618,12 @@ describe('createOrder — document upload advances status', () => {
       }),
     } as unknown as typeof admin.storage
 
+    const membershipQbDoc = makeQueryBuilder({ clinic_id: CID }, null)
     let callCount = 0
     admin.from = vi.fn().mockImplementation(() => {
       callCount++
-      if (callCount === 1) return orderInsertQb // orders insert
+      if (callCount === 1) return membershipQbDoc // membership check
+      if (callCount === 2) return orderInsertQb // orders insert
       return genericQb // items, history, payment, token, order_documents, status update, history
     })
 
@@ -608,10 +657,12 @@ describe('createOrder — document upload advances status', () => {
     const orderInsertQb = makeQueryBuilder({ id: OID, code: 'ORD-001' }, null)
     const genericQb = makeQueryBuilder(null, null)
 
+    const membershipQbNoDoc = makeQueryBuilder({ clinic_id: CID }, null)
     let callCount = 0
     admin.from = vi.fn().mockImplementation(() => {
       callCount++
-      if (callCount === 1) return orderInsertQb
+      if (callCount === 1) return membershipQbNoDoc // membership check
+      if (callCount === 2) return orderInsertQb
       return genericQb
     })
 

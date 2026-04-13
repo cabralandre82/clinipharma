@@ -72,6 +72,18 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     const supabase = await createClient()
     const adminClient = createAdminClient()
 
+    // CLINIC_ADMIN must belong to the clinic they are ordering for
+    const isAdmin = user.roles.some((r) => ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(r))
+    if (!isAdmin) {
+      const { data: membership } = await adminClient
+        .from('clinic_members')
+        .select('clinic_id')
+        .eq('user_id', user.id)
+        .eq('clinic_id', clinic_id)
+        .maybeSingle()
+      if (!membership) return { error: 'Sem permissão para criar pedido para esta clínica' }
+    }
+
     // Validate all products and get pharmacy (all items must be from same pharmacy)
     const productIds = items.map((i) => i.product_id)
     const { data: products, error: productsError } = await supabase

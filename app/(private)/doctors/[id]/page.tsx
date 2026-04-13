@@ -17,12 +17,33 @@ interface PageProps {
 
 export default async function DoctorDetailPage({ params }: PageProps) {
   const { id } = await params
-  await requireRolePage(['SUPER_ADMIN', 'PLATFORM_ADMIN', 'CLINIC_ADMIN'])
+  const currentUser = await requireRolePage(['SUPER_ADMIN', 'PLATFORM_ADMIN', 'CLINIC_ADMIN'])
 
   const supabase = createAdminClient()
   const { data: doctor } = await supabase.from('doctors').select('*').eq('id', id).single()
 
   if (!doctor) notFound()
+
+  // CLINIC_ADMIN can only view doctors linked to their clinic
+  if (
+    currentUser.roles.includes('CLINIC_ADMIN') &&
+    !currentUser.roles.some((r) => ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(r))
+  ) {
+    const { data: membership } = await supabase
+      .from('clinic_members')
+      .select('clinic_id')
+      .eq('user_id', currentUser.id)
+      .single()
+    if (membership) {
+      const { data: link } = await supabase
+        .from('doctor_clinic_links')
+        .select('doctor_id')
+        .eq('doctor_id', id)
+        .eq('clinic_id', membership.clinic_id)
+        .single()
+      if (!link) notFound()
+    }
+  }
 
   const typedDoctor = doctor as unknown as Doctor
 

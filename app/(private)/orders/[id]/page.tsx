@@ -52,6 +52,27 @@ export default async function OrderPage({ params }: OrderPageProps) {
 
   if (!order) notFound()
 
+  // Scope check: non-admins can only see orders belonging to their clinic/pharmacy
+  const isAdmin = user?.roles.some((r) => ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(r))
+  if (!isAdmin && user) {
+    const isPharmacy = user.roles.includes('PHARMACY_ADMIN')
+    if (isPharmacy) {
+      const { data: membership } = await admin
+        .from('pharmacy_members')
+        .select('pharmacy_id')
+        .eq('user_id', user.id)
+        .single()
+      if (!membership || (order as any).pharmacy_id !== membership.pharmacy_id) notFound()
+    } else {
+      const { data: membership } = await admin
+        .from('clinic_members')
+        .select('clinic_id')
+        .eq('user_id', user.id)
+        .single()
+      if (!membership || (order as any).clinic_id !== membership.clinic_id) notFound()
+    }
+  }
+
   // Get tracking token
   const { data: trackingToken } = await admin
     .from('order_tracking_tokens')
