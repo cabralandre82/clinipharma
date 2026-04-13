@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Metadata } from 'next'
-import { createClient } from '@/lib/db/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { notFound } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/session'
@@ -20,9 +19,9 @@ interface OrderPageProps {
 export default async function OrderPage({ params }: OrderPageProps) {
   const { id } = await params
   const user = await getCurrentUser()
-  const supabase = await createClient()
+  const admin = createAdminClient()
 
-  const { data: order } = await supabase
+  const { data: order } = await admin
     .from('orders')
     .select(
       `
@@ -53,7 +52,6 @@ export default async function OrderPage({ params }: OrderPageProps) {
   if (!order) notFound()
 
   // Get tracking token
-  const admin = createAdminClient()
   const { data: trackingToken } = await admin
     .from('order_tracking_tokens')
     .select('token')
