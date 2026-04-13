@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import { createClient } from '@/lib/db/server'
+import { createAdminClient } from '@/lib/db/admin'
 import { requireRolePage } from '@/lib/rbac'
 import { EntityTable } from '@/components/shared/entity-table'
 import { ButtonLink } from '@/components/ui/button-link'
@@ -18,12 +18,12 @@ interface Props {
 export default async function DoctorsPage({ searchParams }: Props) {
   await requireRolePage(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
   const { page: pageRaw } = await searchParams
-  const supabase = await createClient()
+  const admin = createAdminClient()
 
   const page = parsePage(pageRaw)
   const { from, to } = paginationRange(page, PAGE_SIZE)
 
-  const { data: doctors, count } = await supabase
+  const { data: doctors, count } = await admin
     .from('doctors')
     .select('id, full_name, crm, crm_state, specialty, email, phone, status', { count: 'exact' })
     .order('full_name')

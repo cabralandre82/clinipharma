@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/db/server'
+import { createAdminClient } from '@/lib/db/admin'
 import { requireRolePage } from '@/lib/rbac'
 import { getCurrentUser } from '@/lib/auth/session'
 import { ButtonLink } from '@/components/ui/button-link'
@@ -24,7 +24,7 @@ export default async function ConsultantsPage() {
   const currentUser = await getCurrentUser()
   const isSuperAdmin = currentUser?.roles.includes('SUPER_ADMIN') ?? false
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data: consultants } = await supabase
     .from('sales_consultants')
     .select('id, full_name, email, cnpj, phone, status, created_at')

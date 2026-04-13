@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import { createClient } from '@/lib/db/server'
+import { createAdminClient } from '@/lib/db/admin'
 import { requireRolePage } from '@/lib/rbac'
 import { formatDateTime } from '@/lib/utils'
 import { parseCursorParams, sliceCursorResult } from '@/lib/cursor-pagination'
@@ -46,7 +46,7 @@ type AuditLog = {
 export default async function AuditPage({ searchParams }: Props) {
   await requireRolePage(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
   const { after, before } = await searchParams
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const cursor = parseCursorParams({ after, before, pageSize: PAGE_SIZE })
 

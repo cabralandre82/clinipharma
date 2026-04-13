@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import { createClient } from '@/lib/db/server'
+import { createAdminClient } from '@/lib/db/admin'
 import { requireRolePage } from '@/lib/rbac'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { parseCursorParams, sliceCursorResult } from '@/lib/cursor-pagination'
@@ -42,7 +42,7 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function PaymentsPage({ searchParams }: Props) {
   await requireRolePage(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
   const { after, before } = await searchParams
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const cursor = parseCursorParams({ after, before, pageSize: PAGE_SIZE })
 
