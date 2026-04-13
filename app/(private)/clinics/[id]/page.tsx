@@ -21,17 +21,26 @@ export default async function ClinicDetailPage({ params }: PageProps) {
   const currentUser = await requireRolePage(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
   const isSuperAdmin = currentUser.roles.includes('SUPER_ADMIN')
   const supabase = createAdminClient()
-  const { data: clinic } = await supabase
+
+  const { data: clinic, error: clinicError } = await supabase
     .from('clinics')
-    .select('*, sales_consultants(id, full_name, commission_rate, status)')
+    .select('*')
     .eq('id', id)
     .single()
 
+  if (clinicError) console.error('[clinics/[id]] query error:', clinicError)
   if (!clinic) notFound()
 
-  const typedClinic = clinic as unknown as Clinic & {
-    sales_consultants: Pick<SalesConsultant, 'id' | 'full_name' | 'status'> | null
-  }
+  const typedClinic = clinic as unknown as Clinic
+
+  const linkedConsultant = typedClinic.consultant_id
+    ? await supabase
+        .from('sales_consultants')
+        .select('id, full_name, status')
+        .eq('id', typedClinic.consultant_id)
+        .single()
+        .then((r) => r.data as Pick<SalesConsultant, 'id' | 'full_name' | 'status'> | null)
+    : null
 
   const { data: allConsultants } = await supabase
     .from('sales_consultants')
@@ -165,16 +174,14 @@ export default async function ClinicDetailPage({ params }: PageProps) {
               />
             )}
           </div>
-          {typedClinic.sales_consultants ? (
+          {linkedConsultant ? (
             <div className="flex items-center justify-between rounded-lg bg-blue-50 px-4 py-3">
               <div>
-                <p className="text-sm font-medium text-blue-900">
-                  {typedClinic.sales_consultants.full_name}
-                </p>
+                <p className="text-sm font-medium text-blue-900">{linkedConsultant.full_name}</p>
                 <p className="text-xs text-blue-700">Taxa global configurada em Configurações</p>
               </div>
               <Link
-                href={`/consultants/${typedClinic.sales_consultants.id}`}
+                href={`/consultants/${linkedConsultant.id}`}
                 className="text-xs text-blue-600 hover:underline"
               >
                 Ver perfil
