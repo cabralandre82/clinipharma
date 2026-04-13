@@ -78,9 +78,11 @@ export default async function EditProductPage({ params }: PageProps) {
           <span>Editar</span>
         </div>
         <h1 className="mt-1 text-2xl font-bold text-gray-900">Editar Produto</h1>
-        <p className="mt-1 text-sm text-amber-600">
-          Para alterar o preço, use o botão &quot;Atualizar preço&quot; na página de detalhe.
-        </p>
+        {!isPharmacy && (
+          <p className="mt-1 text-sm text-amber-600">
+            Para alterar o preço, use o botão &quot;Atualizar preço&quot; na página de detalhe.
+          </p>
+        )}
       </div>
       <div className="rounded-lg border bg-white p-6">
         <ProductForm
@@ -88,6 +90,7 @@ export default async function EditProductPage({ params }: PageProps) {
           categories={categories}
           pharmacies={pharmacies}
           consultantRate={consultantRate}
+          isPharmacyAdmin={isPharmacy}
         />
       </div>
     </div>

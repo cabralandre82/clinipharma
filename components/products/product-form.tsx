@@ -31,6 +31,8 @@ interface ProductFormProps {
   consultantRate: number
   /** Pre-select pharmacy and lock the selector (used for PHARMACY_ADMIN creating new products) */
   defaultPharmacyId?: string
+  /** When true, hides price_current and margin analysis — pharmacy only sets their own cost */
+  isPharmacyAdmin?: boolean
 }
 
 export function ProductForm({
@@ -39,6 +41,7 @@ export function ProductForm({
   pharmacies,
   consultantRate,
   defaultPharmacyId,
+  isPharmacyAdmin = false,
 }: ProductFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -78,6 +81,7 @@ export function ProductForm({
           status: 'active' as const,
           featured: false,
           pharmacy_id: defaultPharmacyId,
+          price_current: 0,
           pharmacy_cost: 0,
           characteristics_json: {},
           requires_prescription: false,
@@ -297,13 +301,14 @@ export function ProductForm({
         </div>
       </section>
 
-      {/* Preços e Comissão */}
+      {/* Preços */}
       <section>
         <h3 className="mb-4 text-sm font-semibold tracking-wider text-gray-700 uppercase">
-          Preços e Comissão
+          {isPharmacyAdmin ? 'Seu repasse' : 'Preços e Comissão'}
         </h3>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {!isEditing && (
+          {/* price_current — platform only */}
+          {!isPharmacyAdmin && !isEditing && (
             <div className="space-y-2">
               <Label htmlFor="price_current">Preço ao cliente (R$) *</Label>
               <Input
@@ -319,7 +324,7 @@ export function ProductForm({
               )}
             </div>
           )}
-          {isEditing && (
+          {!isPharmacyAdmin && isEditing && (
             <div className="space-y-2">
               <Label>Preço ao cliente (R$)</Label>
               <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm text-slate-600">
@@ -331,8 +336,13 @@ export function ProductForm({
             </div>
           )}
 
+          {/* pharmacy_cost — editable by everyone */}
           <div className="space-y-2">
-            <Label htmlFor="pharmacy_cost">Repasse à farmácia por unidade (R$) *</Label>
+            <Label htmlFor="pharmacy_cost">
+              {isPharmacyAdmin
+                ? 'Valor do seu repasse por unidade (R$) *'
+                : 'Repasse à farmácia por unidade (R$) *'}
+            </Label>
             <Input
               id="pharmacy_cost"
               type="number"
@@ -344,21 +354,22 @@ export function ProductForm({
             {errors.pharmacy_cost && (
               <p className="text-sm text-red-500">{errors.pharmacy_cost.message}</p>
             )}
-            {pharmacyCostValue === 0 && priceValue > 0 && (
-              <p className="flex items-center gap-1.5 text-sm font-medium text-amber-600">
-                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-                Repasse R$ 0,00 — a farmácia não receberá nada por este produto. Verifique se está
-                correto.
+            {isPharmacyAdmin && (
+              <p className="text-xs text-slate-500">
+                Valor que você receberá da plataforma por unidade vendida deste produto.
               </p>
             )}
-            <p className="text-xs text-slate-500">
-              Valor fixo que a plataforma deve repassar à farmácia por unidade vendida
-            </p>
+            {!isPharmacyAdmin && pharmacyCostValue === 0 && priceValue > 0 && (
+              <p className="flex items-center gap-1.5 text-sm font-medium text-amber-600">
+                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                Repasse R$ 0,00 — a farmácia não receberá nada por este produto.
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Margin preview — shown when both values are filled */}
-        {priceValue > 0 && (
+        {/* Margin preview — platform only */}
+        {!isPharmacyAdmin && priceValue > 0 && (
           <div
             className={`mt-4 rounded-xl border p-4 ${marginInsufficient ? 'border-red-200 bg-red-50' : 'border-blue-100 bg-blue-50'}`}
           >

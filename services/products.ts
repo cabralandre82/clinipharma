@@ -70,6 +70,8 @@ export async function createProduct(
       if (!member || member.pharmacy_id !== parsed.data.pharmacy_id) {
         return { error: 'Sem permissão para criar produto nesta farmácia' }
       }
+      // Platform sets price_current — pharmacy always creates with 0
+      parsed.data.price_current = 0
     }
 
     const slug = parsed.data.slug || slugify(parsed.data.name)
@@ -252,7 +254,7 @@ export async function updatePharmacyCost(
   reason: string
 ): Promise<{ error?: string }> {
   try {
-    const user = await requireRole(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
+    const user = await requireRole(['SUPER_ADMIN', 'PLATFORM_ADMIN', 'PHARMACY_ADMIN'])
     if (!reason?.trim()) return { error: 'Motivo é obrigatório' }
     if (newCost < 0) return { error: 'Custo deve ser maior ou igual a zero' }
 
@@ -260,11 +262,23 @@ export async function updatePharmacyCost(
 
     const { data: product } = await adminClient
       .from('products')
-      .select('pharmacy_cost')
+      .select('pharmacy_cost, pharmacy_id')
       .eq('id', productId)
       .single()
 
     if (!product) return { error: 'Produto não encontrado' }
+
+    // PHARMACY_ADMIN can only update cost of their own pharmacy's products
+    if (user.roles.includes('PHARMACY_ADMIN')) {
+      const { data: member } = await adminClient
+        .from('pharmacy_members')
+        .select('pharmacy_id')
+        .eq('user_id', user.id)
+        .single()
+      if (!member || (product as { pharmacy_id: string }).pharmacy_id !== member.pharmacy_id) {
+        return { error: 'Sem permissão para alterar custo deste produto' }
+      }
+    }
 
     await adminClient.from('product_pharmacy_cost_history').insert({
       product_id: productId,

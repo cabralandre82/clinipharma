@@ -61,6 +61,7 @@ export default async function NewProductPage() {
           pharmacies={pharmacies}
           consultantRate={consultantRate}
           defaultPharmacyId={myPharmacyId}
+          isPharmacyAdmin={isPharmacy}
         />
       </div>
     </div>

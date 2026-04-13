@@ -105,7 +105,7 @@ export const productSchema = z.object({
   short_description: z.string().min(10, 'Descrição curta muito curta'),
   long_description: z.string().optional(),
   characteristics_json: z.record(z.string(), z.unknown()).optional(),
-  price_current: z.number().positive('Preço deve ser positivo'),
+  price_current: z.number().min(0, 'Preço deve ser ≥ 0'),
   pharmacy_cost: z.number().min(0, 'Repasse à farmácia deve ser ≥ 0'),
   estimated_deadline_days: z.number().int().positive('Prazo deve ser positivo'),
   active: z.boolean().optional(),

@@ -224,10 +224,24 @@ export default async function ProductDetailAdminPage({ params }: PageProps) {
 
         <div className="space-y-6">
           <div className="space-y-4 rounded-lg border bg-white p-6">
-            <h2 className="font-semibold text-gray-900">Preço & Status</h2>
-            <div className="text-primary text-3xl font-bold">
-              {formatCurrency(product.price_current)}
-            </div>
+            <h2 className="font-semibold text-gray-900">
+              {isPharmacy ? 'Repasse & Status' : 'Preço & Status'}
+            </h2>
+            {/* Platform sees selling price; pharmacy sees only their repasse */}
+            {!isPharmacy && (
+              <div className="text-primary text-3xl font-bold">
+                {formatCurrency(product.price_current)}
+              </div>
+            )}
+            {isPharmacy && (
+              <div>
+                <p className="mb-1 text-xs tracking-wide text-gray-400 uppercase">Seu repasse</p>
+                <div className="text-3xl font-bold text-gray-900">
+                  {formatCurrency(product.pharmacy_cost ?? 0)}
+                </div>
+                <p className="mt-1 text-xs text-gray-400">por unidade vendida</p>
+              </div>
+            )}
             <div className="flex gap-2">
               <Badge
                 className={
@@ -241,10 +255,10 @@ export default async function ProductDetailAdminPage({ params }: PageProps) {
             <div className="flex flex-wrap gap-2 pt-2">
               <ToggleProductActive productId={id} active={product.active} />
               {isSuperAdmin && (
-                <>
-                  <PriceUpdateForm productId={id} currentPrice={product.price_current} />
-                  <PharmacyCostUpdateForm productId={id} currentCost={product.pharmacy_cost ?? 0} />
-                </>
+                <PriceUpdateForm productId={id} currentPrice={product.price_current} />
+              )}
+              {(isSuperAdmin || isPharmacy) && (
+                <PharmacyCostUpdateForm productId={id} currentCost={product.pharmacy_cost ?? 0} />
               )}
             </div>
           </div>
