@@ -16,7 +16,9 @@ const createTicketSchema = z.object({
 })
 
 const addMessageSchema = z.object({
-  ticket_id: z.string().uuid(),
+  ticket_id: z
+    .string()
+    .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'ID inválido'),
   body: z.string().min(1, 'Mensagem não pode estar vazia'),
   is_internal: z.boolean().optional().default(false),
 })

@@ -64,9 +64,18 @@ const createUserSchema = z.object({
     'PHARMACY_ADMIN',
     'SALES_CONSULTANT',
   ]),
-  clinic_id: z.string().uuid().optional(),
-  pharmacy_id: z.string().uuid().optional(),
-  consultant_id: z.string().uuid().optional(),
+  clinic_id: z
+    .string()
+    .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'ID inválido')
+    .optional(),
+  pharmacy_id: z
+    .string()
+    .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'ID inválido')
+    .optional(),
+  consultant_id: z
+    .string()
+    .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'ID inválido')
+    .optional(),
   membership_role: z.enum(['ADMIN', 'STAFF']).optional(),
 })
 

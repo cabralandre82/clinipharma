@@ -1,5 +1,9 @@
 import { z } from 'zod'
 
+const uuidLoose = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'ID inválido')
+
 const brazilianPhone = z
   .string()
   .min(1, 'Telefone é obrigatório')
@@ -91,8 +95,8 @@ export type PharmacyFormData = z.infer<typeof pharmacySchema>
 // --- Product ---
 
 export const productSchema = z.object({
-  category_id: z.string().uuid('Categoria inválida'),
-  pharmacy_id: z.string().uuid('Farmácia inválida'),
+  category_id: uuidLoose,
+  pharmacy_id: uuidLoose,
   sku: z.string().min(2).optional(), // gerado automaticamente no backend se omitido
   name: z.string().min(2, 'Nome é obrigatório'),
   slug: z.string().min(2, 'Slug é obrigatório'),
@@ -116,7 +120,7 @@ export const productSchema = z.object({
 export type ProductFormData = z.infer<typeof productSchema>
 
 export const productInterestSchema = z.object({
-  product_id: z.string().uuid(),
+  product_id: uuidLoose,
   name: z.string().min(2, 'Nome é obrigatório'),
   whatsapp: z.string().min(8, 'WhatsApp inválido'),
 })
@@ -131,13 +135,13 @@ export type PriceUpdateFormData = z.infer<typeof priceUpdateSchema>
 // --- Order ---
 
 export const orderItemSchema = z.object({
-  product_id: z.string().uuid('Produto inválido'),
+  product_id: uuidLoose,
   quantity: z.number().int().positive('Quantidade deve ser positiva'),
 })
 
 export const orderSchema = z.object({
-  clinic_id: z.string().uuid('Clínica inválida'),
-  doctor_id: z.string().uuid('Médico inválido'),
+  clinic_id: uuidLoose,
+  doctor_id: uuidLoose,
   notes: z.string().optional(),
   items: z.array(orderItemSchema).min(1, 'Adicione ao menos um produto'),
 })
