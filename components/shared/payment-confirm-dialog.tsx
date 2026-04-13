@@ -33,6 +33,7 @@ export function PaymentConfirmDialog({ paymentId, amount, orderCode }: PaymentCo
   const [notes, setNotes] = useState('')
 
   async function handleConfirm() {
+    if (loading) return
     setLoading(true)
     try {
       const result = await confirmPayment({

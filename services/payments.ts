@@ -31,17 +31,6 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ erro
     if (fetchError || !payment) return { error: 'Pagamento não encontrado' }
     if (payment.status !== 'PENDING') return { error: 'Pagamento já processado' }
 
-    // Atomic guard: try to claim the payment by updating only if still PENDING.
-    // This prevents race conditions where two concurrent requests both pass the check above.
-    const { data: claimed } = await adminClient
-      .from('payments')
-      .update({ status: 'PROCESSING' })
-      .eq('id', input.paymentId)
-      .eq('status', 'PENDING')
-      .select('id')
-
-    if (!claimed || claimed.length === 0) return { error: 'Pagamento já está sendo processado' }
-
     // Fetch order with items (frozen cost fields) + clinic consultant + current status
     const { data: orderData } = await adminClient
       .from('orders')

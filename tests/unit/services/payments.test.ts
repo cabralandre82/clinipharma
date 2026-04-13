@@ -183,27 +183,20 @@ describe('completeTransfer', () => {
   })
 })
 
-describe('confirmPayment — claim racing', () => {
-  it('returns error when payment claim returns empty (race condition)', async () => {
+describe('confirmPayment — already processed guard', () => {
+  it('returns error when payment status is not PENDING', async () => {
     const { mockSupabaseAdmin } = await import('../../setup')
     const admin = mockSupabaseAdmin()
+    // Payment with status CONFIRMED (already processed)
     const paymentQb = makeQueryBuilder(
-      { id: 'pay-1', order_id: 'ord-1', gross_amount: 500, status: 'PENDING' },
+      { id: 'pay-1', order_id: 'ord-1', gross_amount: 500, status: 'CONFIRMED' },
       null
     )
-    const claimQb = makeQueryBuilder()
-    claimQb.then = (resolve: (v: unknown) => void) => resolve({ data: [], error: null })
-
-    let callCount = 0
-    admin.from = vi.fn().mockImplementation(() => {
-      callCount++
-      if (callCount === 1) return paymentQb
-      return claimQb
-    })
+    admin.from = vi.fn().mockReturnValue(paymentQb)
     vi.mocked(adminModule.createAdminClient).mockReturnValue(
       admin as unknown as ReturnType<typeof adminModule.createAdminClient>
     )
     const result = await confirmPayment({ paymentId: 'pay-1', paymentMethod: 'PIX' })
-    expect(result.error).toBe('Pagamento já está sendo processado')
+    expect(result.error).toBe('Pagamento já processado')
   })
 })
