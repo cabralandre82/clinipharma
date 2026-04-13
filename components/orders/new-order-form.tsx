@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createOrder } from '@/services/orders'
+import { resolveDoctorFieldState } from '@/lib/orders/doctor-field-rules'
 import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -93,13 +94,10 @@ export function NewOrderForm({
   const maxDeadline = Math.max(0, ...cart.map((c) => c.product.estimated_deadline_days))
   const pharmacyName = cart[0]?.product.pharmacies?.trade_name ?? '—'
 
-  // Doctor field visibility rules:
-  // - cartRequiresPrescription: at least one product needs a prescription → doctor is mandatory
-  // - hasDoctors: the clinic has linked doctors → show the field (optional or required)
-  const cartRequiresPrescription = cart.some((c) => c.product.requires_prescription)
-  const hasDoctors = doctors.length > 0
-  const showDoctorField = hasDoctors
-  const doctorRequired = cartRequiresPrescription && hasDoctors
+  const { show: showDoctorField, required: doctorRequired } = resolveDoctorFieldState(
+    cart.map((c) => ({ requires_prescription: c.product.requires_prescription })),
+    doctors
+  )
 
   const handleFileAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
