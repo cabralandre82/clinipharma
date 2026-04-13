@@ -20,6 +20,7 @@ export interface NewOrderFormProduct {
   presentation: string
   price_current: number
   estimated_deadline_days: number
+  requires_prescription: boolean
   pharmacy_id: string
   pharmacies: { id: string; trade_name: string } | null
   product_images: { id: string; public_url: string | null; sort_order: number }[]
@@ -33,25 +34,24 @@ interface CartItem {
 interface NewOrderFormProps {
   initialProduct?: NewOrderFormProduct
   availableProducts: NewOrderFormProduct[]
-  clinics: { id: string; trade_name: string }[]
+  /** Clinic already resolved from the logged-in user's membership — no dropdown shown. */
+  resolvedClinic: { id: string; trade_name: string } | null
+  /** When the user is admin or a doctor linked to multiple clinics, show a selector. */
+  adminClinics: { id: string; trade_name: string }[] | null
   doctors: { id: string; full_name: string; crm: string; crm_state: string }[]
-  doctorClinics?: { id: string; trade_name: string }[] | null
 }
 
 export function NewOrderForm({
   initialProduct,
   availableProducts,
-  clinics,
+  resolvedClinic,
+  adminClinics,
   doctors,
-  doctorClinics,
 }: NewOrderFormProps) {
-  // If doctor has exactly one clinic, auto-select it
-  const autoClinicId = doctorClinics?.length === 1 ? doctorClinics[0].id : ''
-  const clinicOptions = doctorClinics ?? clinics
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [documents, setDocuments] = useState<File[]>([])
-  const [clinicId, setClinicId] = useState(autoClinicId)
+  const [clinicId, setClinicId] = useState(resolvedClinic?.id ?? '')
   const [doctorId, setDoctorId] = useState('')
   const [notes, setNotes] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -93,6 +93,14 @@ export function NewOrderForm({
   const maxDeadline = Math.max(0, ...cart.map((c) => c.product.estimated_deadline_days))
   const pharmacyName = cart[0]?.product.pharmacies?.trade_name ?? '—'
 
+  // Doctor field visibility rules:
+  // - cartRequiresPrescription: at least one product needs a prescription → doctor is mandatory
+  // - hasDoctors: the clinic has linked doctors → show the field (optional or required)
+  const cartRequiresPrescription = cart.some((c) => c.product.requires_prescription)
+  const hasDoctors = doctors.length > 0
+  const showDoctorField = hasDoctors
+  const doctorRequired = cartRequiresPrescription && hasDoctors
+
   const handleFileAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
     setDocuments((prev) => [...prev, ...files])
@@ -103,7 +111,7 @@ export function NewOrderForm({
     e.preventDefault()
     const newErrors: Record<string, string> = {}
     if (!clinicId) newErrors.clinic_id = 'Selecione a clínica'
-    if (!doctorId) newErrors.doctor_id = 'Selecione o médico'
+    if (doctorRequired && !doctorId) newErrors.doctor_id = 'Selecione o médico solicitante'
     if (cart.length === 0) newErrors.items = 'Adicione ao menos um produto'
     if (Object.keys(newErrors).length) {
       setErrors(newErrors)
@@ -238,41 +246,61 @@ export function NewOrderForm({
           <CardTitle className="text-base">Dados do pedido</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="clinic_id">Clínica *</Label>
-            <select
-              id="clinic_id"
-              value={clinicId}
-              onChange={(e) => setClinicId(e.target.value)}
-              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
-            >
-              <option value="">Selecione a clínica...</option>
-              {clinicOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.trade_name}
-                </option>
-              ))}
-            </select>
-            {errors.clinic_id && <p className="text-xs text-red-500">{errors.clinic_id}</p>}
-          </div>
+          {/* Clinic — shown as read-only badge when resolved, or as selector for admins */}
+          {resolvedClinic ? (
+            <div className="space-y-1.5">
+              <Label>Clínica</Label>
+              <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                {resolvedClinic.trade_name}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label htmlFor="clinic_id">Clínica *</Label>
+              <select
+                id="clinic_id"
+                value={clinicId}
+                onChange={(e) => setClinicId(e.target.value)}
+                className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              >
+                <option value="">Selecione a clínica...</option>
+                {(adminClinics ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.trade_name}
+                  </option>
+                ))}
+              </select>
+              {errors.clinic_id && <p className="text-xs text-red-500">{errors.clinic_id}</p>}
+            </div>
+          )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="doctor_id">Médico solicitante *</Label>
-            <select
-              id="doctor_id"
-              value={doctorId}
-              onChange={(e) => setDoctorId(e.target.value)}
-              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
-            >
-              <option value="">Selecione o médico...</option>
-              {doctors.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.full_name} — CRM {d.crm}/{d.crm_state}
-                </option>
-              ))}
-            </select>
-            {errors.doctor_id && <p className="text-xs text-red-500">{errors.doctor_id}</p>}
-          </div>
+          {/* Doctor — only shown when the clinic has linked doctors */}
+          {showDoctorField && (
+            <div className="space-y-1.5">
+              <Label htmlFor="doctor_id">
+                Médico solicitante{' '}
+                {doctorRequired ? (
+                  '*'
+                ) : (
+                  <span className="font-normal text-gray-400">(opcional)</span>
+                )}
+              </Label>
+              <select
+                id="doctor_id"
+                value={doctorId}
+                onChange={(e) => setDoctorId(e.target.value)}
+                className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              >
+                <option value="">Selecione o médico...</option>
+                {doctors.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.full_name} — CRM {d.crm}/{d.crm_state}
+                  </option>
+                ))}
+              </select>
+              {errors.doctor_id && <p className="text-xs text-red-500">{errors.doctor_id}</p>}
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="notes">Observações</Label>

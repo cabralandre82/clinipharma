@@ -84,6 +84,34 @@ describe('createOrder — validation', () => {
     })
     expect(result.error).toContain('Sessão expirada')
   })
+
+  it('accepts omitted doctor_id (non-prescription order)', async () => {
+    // doctor_id is now optional — omitting it must not produce a validation error
+    const result = await createOrder({
+      clinic_id: CID,
+      items: [{ product_id: PID, quantity: 1 }],
+    })
+    // Validation passes; downstream DB error expected in unit context (no mock here)
+    expect(result.error).not.toContain('Dados inválidos')
+  })
+
+  it('accepts explicit null doctor_id', async () => {
+    const result = await createOrder({
+      clinic_id: CID,
+      doctor_id: null,
+      items: [{ product_id: PID, quantity: 1 }],
+    })
+    expect(result.error).not.toContain('Dados inválidos')
+  })
+
+  it('returns error for invalid UUID in doctor_id when provided', async () => {
+    const result = await createOrder({
+      clinic_id: CID,
+      doctor_id: 'not-a-uuid',
+      items: [{ product_id: PID, quantity: 1 }],
+    })
+    expect(result.error).toBeTruthy()
+  })
 })
 
 describe('createOrder — products validation', () => {

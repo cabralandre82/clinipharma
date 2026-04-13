@@ -24,7 +24,7 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
   const { data: productsRaw } = await supabase
     .from('products')
     .select(
-      'id, name, slug, concentration, presentation, price_current, pharmacy_cost, estimated_deadline_days, pharmacy_id, pharmacies(id, trade_name), product_images(id, public_url, alt_text, sort_order)'
+      'id, name, slug, concentration, presentation, price_current, estimated_deadline_days, requires_prescription, pharmacy_id, pharmacies(id, trade_name), product_images(id, public_url, alt_text, sort_order)'
     )
     .eq('active', true)
     .order('name')
@@ -32,18 +32,23 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
   const products = (productsRaw ?? []) as unknown as NewOrderFormProduct[]
   const initialProduct = params.product ? products.find((p) => p.id === params.product) : undefined
 
-  const [{ data: clinics }, { data: doctors }] = await Promise.all([
-    supabase.from('clinics').select('id, trade_name').eq('status', 'ACTIVE').order('trade_name'),
-    supabase
-      .from('doctors')
-      .select('id, full_name, crm, crm_state')
-      .eq('status', 'ACTIVE')
-      .order('full_name'),
-  ])
+  // Resolve the clinic the current user belongs to.
+  // CLINIC_ADMIN / STAFF → exactly one clinic via clinic_members.
+  // DOCTOR → one or more clinics via doctor_clinic_links.
+  // SUPER_ADMIN / PLATFORM_ADMIN → all active clinics (admin placing order on behalf).
+  let resolvedClinic: { id: string; trade_name: string } | null = null
+  let adminClinics: { id: string; trade_name: string }[] | null = null
 
-  // For doctors: fetch their linked clinics to pre-select / force selection
-  let doctorClinics: Array<{ id: string; trade_name: string }> | null = null
-  if (user.roles.includes('DOCTOR')) {
+  if (user.roles.includes('CLINIC_ADMIN')) {
+    const { data: membership } = await supabase
+      .from('clinic_members')
+      .select('clinics(id, trade_name)')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    resolvedClinic =
+      (membership?.clinics as unknown as { id: string; trade_name: string } | null) ?? null
+  } else if (user.roles.includes('DOCTOR')) {
     const { data: doctorRecord } = await supabase
       .from('doctors')
       .select('id')
@@ -56,10 +61,48 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
         .select('clinics(id, trade_name)')
         .eq('doctor_id', doctorRecord.id)
 
-      doctorClinics = (linked ?? [])
+      const doctorClinics = (linked ?? [])
         .map((l) => l.clinics as unknown as { id: string; trade_name: string })
         .filter(Boolean)
+
+      if (doctorClinics.length === 1) {
+        resolvedClinic = doctorClinics[0]
+      } else {
+        adminClinics = doctorClinics
+      }
     }
+  } else {
+    // SUPER_ADMIN / PLATFORM_ADMIN see all clinics
+    const { data } = await supabase
+      .from('clinics')
+      .select('id, trade_name')
+      .eq('status', 'ACTIVE')
+      .order('trade_name')
+    adminClinics = data ?? []
+  }
+
+  // Fetch doctors linked to the resolved clinic (if known), or all active doctors for admins.
+  let linkedDoctors: { id: string; full_name: string; crm: string; crm_state: string }[] = []
+
+  if (resolvedClinic) {
+    const { data } = await supabase
+      .from('doctor_clinic_links')
+      .select('doctors(id, full_name, crm, crm_state)')
+      .eq('clinic_id', resolvedClinic.id)
+
+    linkedDoctors = (data ?? [])
+      .map(
+        (l) =>
+          l.doctors as unknown as { id: string; full_name: string; crm: string; crm_state: string }
+      )
+      .filter(Boolean)
+  } else {
+    const { data } = await supabase
+      .from('doctors')
+      .select('id, full_name, crm, crm_state')
+      .eq('status', 'ACTIVE')
+      .order('full_name')
+    linkedDoctors = data ?? []
   }
 
   return (
@@ -73,9 +116,9 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
       <NewOrderForm
         initialProduct={initialProduct}
         availableProducts={products}
-        clinics={clinics ?? []}
-        doctors={doctors ?? []}
-        doctorClinics={doctorClinics}
+        resolvedClinic={resolvedClinic}
+        adminClinics={adminClinics}
+        doctors={linkedDoctors}
       />
     </div>
   )

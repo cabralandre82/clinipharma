@@ -55,6 +55,26 @@ Inseridos via `supabase/seed.sql` (executado com `supabase db push --include-see
 
 ---
 
+## Fluxo de criação de pedidos
+
+Ao acessar `/orders/new`:
+
+- **`CLINIC_ADMIN` / `STAFF`** — a clínica é detectada automaticamente via `clinic_members`; nenhum dropdown é exibido.
+- **`DOCTOR`** — se vinculado a uma clínica, auto-selecionada; se a múltiplas, exibe dropdown apenas das suas clínicas.
+- **`SUPER_ADMIN` / `PLATFORM_ADMIN`** — dropdown com todas as clínicas ativas.
+
+**Campo "Médico solicitante":**
+
+| Clínica tem médicos vinculados? | Carrinho tem produto com `requires_prescription`? | Comportamento |
+| ------------------------------- | ------------------------------------------------- | ------------- |
+| Não                             | Qualquer                                          | Campo oculto  |
+| Sim                             | Não                                               | Opcional      |
+| Sim                             | Sim                                               | Obrigatório   |
+
+A coluna `orders.doctor_id` é nullable desde a migration 032.
+
+---
+
 ## Para criar novos usuários
 
 Use a página de gestão de usuários em `/users/new` (requer `SUPER_ADMIN` ou `PLATFORM_ADMIN`).

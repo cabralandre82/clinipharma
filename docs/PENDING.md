@@ -1,6 +1,8 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-13 | Versão da plataforma: **6.3.0** | **846 testes** | cobertura atualizada
+> Gerado em: 2026-04-13 | Versão da plataforma: **6.4.0** | **846 testes** | cobertura atualizada
+>
+> **v6.4.0:** Fluxo de criação de pedidos corrigido — clínica auto-detectada pelo papel do usuário (sem dropdown para `CLINIC_ADMIN`), médico solicitante condicional: obrigatório apenas quando o carrinho contém produto com `requires_prescription = true`, opcional quando a clínica tem médicos vinculados, oculto quando não tem. Migration 032 torna `orders.doctor_id` nullable. Médicos exibidos são apenas os vinculados à clínica do pedido.
 >
 > **v6.3.0:** Push FCM frontend completo — `PushInitializer` component montado no layout privado (solicita permissão, registra token, exibe toasts em foreground). Ícones PWA criados (`public/icons/`). Guia de produção Evolution API/WhatsApp em `docs/infra/evolution-api-setup.md`. 13 novos testes.
 >
@@ -178,6 +180,7 @@ Itens do roadmap que dependem de CNPJ ativo para implementar:
 | 6.0.3  | Fix auditoria IA: `analyzeSentiment` validação enum/bool, `temperature 0` contratos, circuit breakers      | ✅     |
 | 6.1.0  | Enforcement receitas médicas: migration 030, gate `/advance`, upload por item, UI PrescriptionManager      | ✅     |
 | 6.1.1  | Formulário de produto: seção "Receita Médica" com toggle, tipo e unidades por receita                      | ✅     |
+| 6.4.0  | Fluxo de pedidos: clínica auto-detectada, médico condicional por `requires_prescription`, migration 032    | ✅     |
 
 **O que está 100% pronto:** plataforma técnica, autenticação, pedidos, pagamentos sandbox, notificações (push/email/SMS/push), LGPD portal, auditoria, compliance CNPJ, suporte por tickets com IA, cupons de desconto, gerenciamento de categorias, SKU automático, Política de Privacidade, Termos de Uso, E2E tests, CI/CD, documentação, **8 features de IA em produção**, **enforcement completo de receitas médicas com controle por produto e por unidade**.
 

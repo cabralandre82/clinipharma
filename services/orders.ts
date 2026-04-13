@@ -19,7 +19,7 @@ import { sendWhatsApp, WA } from '@/lib/whatsapp'
 
 const createOrderSchema = z.object({
   clinic_id: z.string().uuid(),
-  doctor_id: z.string().uuid(),
+  doctor_id: z.string().uuid().optional().nullable(),
   notes: z.string().optional(),
   items: z
     .array(
@@ -47,7 +47,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     const parsed = createOrderSchema.safeParse(input)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }
 
-    const { clinic_id, doctor_id, notes, items } = parsed.data
+    const { clinic_id, doctor_id = null, notes, items } = parsed.data
     const supabase = await createClient()
     const adminClient = createAdminClient()
 
