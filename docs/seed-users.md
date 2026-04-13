@@ -83,9 +83,11 @@ Ao clicar em "Cadastrar novo médico" dentro do formulário de pedido, os itens 
 - Ao salvar, o médico é automaticamente vinculado à clínica do usuário (`doctor_clinic_links`) com status `ACTIVE`.
 - O redirect pós-criação vai para `/orders/new` (preservando o carrinho via URL).
 
-**Página de detalhe do pedido (`/orders/[id]`):**
+**Padrão de acesso a dados (RLS bootstrap):**
 
-Usa `adminClient` (service role) para buscar o pedido e suas relações, evitando bloqueios de RLS para `CLINIC_ADMIN` após a criação do pedido.
+Todas as pages da área privada que servem `CLINIC_ADMIN`, `PHARMACY_ADMIN` ou `DOCTOR` usam `createAdminClient()` (service role) com filtro de escopo explícito (`clinic_id` ou `pharmacy_id`), em vez do client de usuário com RLS. Isso evita o problema de bootstrap onde o RLS falha silenciosamente e retorna listas vazias para usuários recém-adicionados.
+
+Pages corrigidas: `/orders`, `/orders/[id]`, `/orders/new`, `/catalog`, `/catalog/[slug]`, `/transfers`.
 
 **Documentos no pedido:**
 
