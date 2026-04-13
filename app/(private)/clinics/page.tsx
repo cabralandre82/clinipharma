@@ -24,13 +24,24 @@ export default async function ClinicsPage({ searchParams }: Props) {
   const page = parsePage(pageRaw)
   const { from, to } = paginationRange(page, PAGE_SIZE)
 
-  const { data: clinics, count } = await supabase
+  const {
+    data: clinics,
+    count,
+    error: clinicsError,
+  } = await supabase
     .from('clinics')
     .select('id, trade_name, corporate_name, cnpj, city, state, status, email, phone', {
       count: 'exact',
     })
     .order('trade_name')
     .range(from, to)
+
+  console.error(
+    '[clinics/page] count=%s error=%s rows=%s',
+    count,
+    JSON.stringify(clinicsError),
+    clinics?.length
+  )
 
   const columns = [
     { key: 'trade_name', label: 'Nome' },
