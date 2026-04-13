@@ -219,8 +219,8 @@ describe('productSchema', () => {
     expect(productSchema.safeParse({ ...valid, status: 'deleted' }).success).toBe(false)
   })
 
-  it('rejects non-positive price', () => {
-    expect(productSchema.safeParse({ ...valid, price_current: 0 }).success).toBe(false)
+  it('accepts price_current of 0 (pharmacy creates product awaiting platform pricing)', () => {
+    expect(productSchema.safeParse({ ...valid, price_current: 0 }).success).toBe(true)
   })
 
   it('rejects negative pharmacy_cost', () => {

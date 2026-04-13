@@ -1,6 +1,8 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-13 | Versão da plataforma: **6.5.20** | **876 testes** | cobertura atualizada
+> Gerado em: 2026-04-13 | Versão da plataforma: **6.5.21** | **881 testes** | cobertura atualizada
+>
+> **v6.5.21:** Integridade de preços — resposta em 3 camadas quando farmácia atualiza `pharmacy_cost`. (1) 🟡 Margem > 15%: notificação informativa "repasse atualizado, margem parece OK — revise o preço ao cliente" (não silenciável). (2) 🟠 Margem ≤ 15%: alerta "margem crítica — revise o preço com urgência". (3) 🔴 `pharmacy_cost ≥ price_current`: produto **desativado automaticamente** + alerta urgente "produto desativado — repasse excede preço ao cliente". Nenhuma ação quando `price_current=0` (produto já estava inativo aguardando precificação). Novo tipo de notificação `PRODUCT_COST_UPDATED` (não silenciável). 5 novos testes unitários (881 total).
 >
 > **v6.5.20:** Workflow de precificação de produtos — farmácia cria produto → plataforma precifica e publica. `createProduct` por `PHARMACY_ADMIN` força `price_current=0` + `status=inactive` (produto nunca vai ao catálogo sem preço). Notificação automática `PRODUCT_AWAITING_PRICE` disparada para todos `SUPER_ADMIN`/`PLATFORM_ADMIN` com push. Dashboard: novo card "Aguardando preço" (âmbar com alerta quando > 0). Lista de produtos: badge `⏳ Aguardando preço` substitui Ativo/Inativo; produtos sem preço sobem ao topo. Detalhe do produto: banner âmbar com botão "Definir preço" em destaque quando `price_current=0`. `PriceUpdateForm`: novas props `label` e `highlight`. 4 novos testes unitários (876 total).
 >

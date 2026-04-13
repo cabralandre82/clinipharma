@@ -11,6 +11,7 @@ describe('SILENCEABLE_TYPES', () => {
       'PRODUCT_INTEREST',
       'REGISTRATION_REQUEST',
       'STALE_ORDER',
+      'PRODUCT_AWAITING_PRICE',
     ]
     expect(SILENCEABLE_TYPES).toEqual(expect.arrayContaining(expected))
     expect(SILENCEABLE_TYPES.length).toBe(expected.length)

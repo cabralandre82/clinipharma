@@ -267,13 +267,90 @@ describe('updatePharmacyCost', () => {
   })
 
   it('succeeds with valid cost', async () => {
-    const qb = makeQueryBuilder({ pharmacy_cost: 60 }, null)
-    qb.single = vi.fn().mockResolvedValue({ data: { pharmacy_cost: 60 }, error: null })
+    const qb = makeQueryBuilder(
+      { pharmacy_cost: 60, price_current: 100, name: 'Prod', sku: 'SKU' },
+      null
+    )
+    qb.single = vi.fn().mockResolvedValue({
+      data: { pharmacy_cost: 60, price_current: 100, name: 'Prod', sku: 'SKU' },
+      error: null,
+    })
     vi.mocked(adminModule.createAdminClient).mockReturnValue({
       from: vi.fn().mockReturnValue(qb),
     } as unknown as ReturnType<typeof adminModule.createAdminClient>)
 
     const result = await updatePharmacyCost('prod-1', 70, 'ajuste custo')
+    expect(result.error).toBeUndefined()
+  })
+
+  it('succeeds and does not deactivate when price_current is 0 (awaiting pricing)', async () => {
+    const qb = makeQueryBuilder(
+      { pharmacy_cost: 50, price_current: 0, name: 'Prod', sku: 'SKU' },
+      null
+    )
+    qb.single = vi.fn().mockResolvedValue({
+      data: { pharmacy_cost: 50, price_current: 0, name: 'Prod', sku: 'SKU' },
+      error: null,
+    })
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(qb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await updatePharmacyCost('prod-1', 60, 'ajuste')
+    expect(result.error).toBeUndefined()
+  })
+
+  it('tier 1 — healthy margin (> 15%): succeeds without deactivation', async () => {
+    // price_current=100, new cost=70 → margin 30% > 15%
+    const qb = makeQueryBuilder(
+      { pharmacy_cost: 60, price_current: 100, name: 'Prod', sku: 'SKU' },
+      null
+    )
+    qb.single = vi.fn().mockResolvedValue({
+      data: { pharmacy_cost: 60, price_current: 100, name: 'Prod', sku: 'SKU' },
+      error: null,
+    })
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(qb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await updatePharmacyCost('prod-1', 70, 'ajuste margem ok')
+    expect(result.error).toBeUndefined()
+  })
+
+  it('tier 2 — critical margin (≤ 15%): succeeds without deactivation', async () => {
+    // price_current=100, new cost=90 → margin 10% ≤ 15%
+    const qb = makeQueryBuilder(
+      { pharmacy_cost: 60, price_current: 100, name: 'Prod', sku: 'SKU' },
+      null
+    )
+    qb.single = vi.fn().mockResolvedValue({
+      data: { pharmacy_cost: 60, price_current: 100, name: 'Prod', sku: 'SKU' },
+      error: null,
+    })
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(qb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await updatePharmacyCost('prod-1', 90, 'ajuste margem critica')
+    expect(result.error).toBeUndefined()
+  })
+
+  it('tier 3 — cost ≥ price_current: succeeds and auto-deactivates product', async () => {
+    // price_current=100, new cost=105 → loss → deactivate
+    const qb = makeQueryBuilder(
+      { pharmacy_cost: 60, price_current: 100, name: 'Prod', sku: 'SKU' },
+      null
+    )
+    qb.single = vi.fn().mockResolvedValue({
+      data: { pharmacy_cost: 60, price_current: 100, name: 'Prod', sku: 'SKU' },
+      error: null,
+    })
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(qb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await updatePharmacyCost('prod-1', 105, 'aumento repasse')
     expect(result.error).toBeUndefined()
   })
 })
@@ -519,9 +596,24 @@ describe('updatePharmacyCost — PHARMACY_ADMIN role', () => {
           }
         }
         // products table
-        const qb = makeQueryBuilder({ pharmacy_cost: 60, pharmacy_id: 'pharm-1' }, null)
+        const qb = makeQueryBuilder(
+          {
+            pharmacy_cost: 60,
+            pharmacy_id: 'pharm-1',
+            price_current: 100,
+            name: 'Prod',
+            sku: 'SKU',
+          },
+          null
+        )
         qb.single = vi.fn().mockResolvedValue({
-          data: { pharmacy_cost: 60, pharmacy_id: 'pharm-1' },
+          data: {
+            pharmacy_cost: 60,
+            pharmacy_id: 'pharm-1',
+            price_current: 100,
+            name: 'Prod',
+            sku: 'SKU',
+          },
           error: null,
         })
         return qb
@@ -549,9 +641,24 @@ describe('updatePharmacyCost — PHARMACY_ADMIN role', () => {
               .mockResolvedValue({ data: { pharmacy_id: 'pharm-OTHER' }, error: null }),
           }
         }
-        const qb = makeQueryBuilder({ pharmacy_cost: 60, pharmacy_id: 'pharm-1' }, null)
+        const qb = makeQueryBuilder(
+          {
+            pharmacy_cost: 60,
+            pharmacy_id: 'pharm-1',
+            price_current: 100,
+            name: 'Prod',
+            sku: 'SKU',
+          },
+          null
+        )
         qb.single = vi.fn().mockResolvedValue({
-          data: { pharmacy_cost: 60, pharmacy_id: 'pharm-1' },
+          data: {
+            pharmacy_cost: 60,
+            pharmacy_id: 'pharm-1',
+            price_current: 100,
+            name: 'Prod',
+            sku: 'SKU',
+          },
           error: null,
         })
         return qb

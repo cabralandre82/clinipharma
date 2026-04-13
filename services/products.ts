@@ -273,7 +273,7 @@ export async function updatePharmacyCost(
 
     const { data: product } = await adminClient
       .from('products')
-      .select('pharmacy_cost, pharmacy_id')
+      .select('pharmacy_cost, pharmacy_id, price_current, name, sku')
       .eq('id', productId)
       .single()
 
@@ -299,10 +299,20 @@ export async function updatePharmacyCost(
       reason,
     })
 
-    const { error } = await adminClient
-      .from('products')
-      .update({ pharmacy_cost: newCost, updated_at: new Date().toISOString() })
-      .eq('id', productId)
+    const priceCurrentNum = Number(product.price_current ?? 0)
+
+    // Determine if the product needs to be auto-deactivated (selling at a loss)
+    const shouldDeactivate = priceCurrentNum > 0 && newCost >= priceCurrentNum
+
+    const updatePayload: Record<string, unknown> = {
+      pharmacy_cost: newCost,
+      updated_at: new Date().toISOString(),
+    }
+    if (shouldDeactivate) {
+      updatePayload.active = false
+    }
+
+    const { error } = await adminClient.from('products').update(updatePayload).eq('id', productId)
 
     if (error) return { error: 'Erro ao atualizar custo de farmácia' }
 
@@ -313,11 +323,24 @@ export async function updatePharmacyCost(
       entityId: productId,
       action: AuditAction.UPDATE,
       oldValues: { pharmacy_cost: product.pharmacy_cost },
-      newValues: { pharmacy_cost: newCost, reason },
+      newValues: { pharmacy_cost: newCost, reason, ...(shouldDeactivate ? { active: false } : {}) },
     })
+
+    // Notify admins about the cost change (always, when product has a price set)
+    if (priceCurrentNum > 0) {
+      await notifyAdminsCostUpdated(
+        productId,
+        product.name,
+        product.sku,
+        newCost,
+        priceCurrentNum,
+        shouldDeactivate
+      )
+    }
 
     revalidatePath(`/products/${productId}`)
     revalidatePath('/products')
+    revalidateTag('dashboard')
     return {}
   } catch {
     return { error: 'Erro interno' }
@@ -360,6 +383,55 @@ export async function toggleProductActive(
  * Sends an in-app notification to all SUPER_ADMIN and PLATFORM_ADMIN users
  * when a pharmacy creates a product that needs pricing before going live.
  */
+async function notifyAdminsCostUpdated(
+  productId: string,
+  productName: string,
+  sku: string,
+  newCost: number,
+  priceCurrentNum: number,
+  autoDeactivated: boolean
+): Promise<void> {
+  const label = `${productName} (${sku})`
+  const link = `/products/${productId}`
+
+  let title: string
+  let body: string
+
+  if (autoDeactivated) {
+    // Tier 3 — critical: product deactivated to prevent loss
+    title = '🔴 Produto desativado — repasse excede preço ao cliente'
+    body = `${label}: repasse atualizado para R$ ${newCost.toFixed(2)}, que é ≥ ao preço praticado (R$ ${priceCurrentNum.toFixed(2)}). Produto desativado automaticamente. Atualize o preço ao cliente para reativar.`
+  } else {
+    const marginPct = ((priceCurrentNum - newCost) / priceCurrentNum) * 100
+
+    if (marginPct <= 15) {
+      // Tier 2 — warning: margin critically low
+      title = '🟠 Margem crítica após ajuste de repasse'
+      body = `${label}: repasse agora R$ ${newCost.toFixed(2)} (margem ${marginPct.toFixed(1)}%). Revise o preço ao cliente com urgência para manter a margem saudável.`
+    } else {
+      // Tier 1 — info: healthy margin, but admin should still review
+      title = '🟡 Repasse atualizado — revise o preço ao cliente'
+      body = `${label}: repasse atualizado para R$ ${newCost.toFixed(2)} (margem atual ${marginPct.toFixed(1)}%). Margem parece OK, mas revise o preço ao cliente para confirmar.`
+    }
+  }
+
+  const payload = {
+    type: 'PRODUCT_COST_UPDATED' as const,
+    title,
+    body,
+    link,
+    push: true,
+  }
+  try {
+    await Promise.all([
+      createNotificationForRole('SUPER_ADMIN', payload),
+      createNotificationForRole('PLATFORM_ADMIN', payload),
+    ])
+  } catch {
+    // Notification failure must never block cost update
+  }
+}
+
 async function notifyAdminsNewProduct(
   productId: string,
   productName: string,

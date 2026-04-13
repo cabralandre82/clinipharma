@@ -20,6 +20,7 @@ export type NotificationType =
   | 'REORDER_ALERT'
   | 'CHURN_RISK'
   | 'PRODUCT_AWAITING_PRICE'
+  | 'PRODUCT_COST_UPDATED'
   | 'GENERIC'
 
 /** Types the user can silence. Critical types are always delivered. */
