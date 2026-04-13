@@ -7,13 +7,60 @@
 
 ## Status atual (produção)
 
-| Etapa                       | Status       |
-| --------------------------- | ------------ |
-| Migrations aplicadas        | ✅ Concluído |
-| Buckets de storage criados  | ✅ Concluído |
-| Seed de categorias/produtos | ✅ Concluído |
-| Usuários iniciais criados   | ✅ Concluído |
-| Auth URLs configuradas      | ✅ Concluído |
+| Etapa                                  | Status                               |
+| -------------------------------------- | ------------------------------------ |
+| Migrations 001–033 aplicadas           | ✅ Concluído                         |
+| Migration 034 — Realtime orders        | ✅ Concluído (manual via SQL Editor) |
+| Migration 035 — Realtime notifications | ✅ Concluído (manual via SQL Editor) |
+| Migration 036 — needs_price_review     | ✅ Concluído (manual via SQL Editor) |
+| Buckets de storage criados             | ✅ Concluído                         |
+| Seed de categorias/produtos            | ✅ Concluído                         |
+| Usuários iniciais criados              | ✅ Concluído                         |
+| Auth URLs configuradas                 | ✅ Concluído                         |
+
+### Migrations que exigem execução manual via SQL Editor
+
+As migrations abaixo envolvem `ALTER PUBLICATION supabase_realtime` e alterações de schema que devem ser rodadas diretamente no [SQL Editor](https://app.supabase.com/project/jomdntqlgrupvhrqoyai/sql) do painel Supabase (o Supabase CLI não consegue aplicar publicações Realtime remotamente sem acesso direto ao banco):
+
+**034 — Realtime para pedidos** (`supabase/migrations/034_realtime_orders.sql`)
+
+```sql
+ALTER TABLE public.orders REPLICA IDENTITY FULL;
+ALTER TABLE public.order_status_history REPLICA IDENTITY FULL;
+ALTER TABLE public.order_operational_updates REPLICA IDENTITY FULL;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'orders') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'order_status_history') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.order_status_history;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'order_operational_updates') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.order_operational_updates;
+  END IF;
+END $$;
+```
+
+**035 — Realtime para notificações** (`supabase/migrations/035_realtime_notifications.sql`)
+
+```sql
+ALTER TABLE public.notifications REPLICA IDENTITY FULL;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'notifications') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+  END IF;
+END $$;
+```
+
+**036 — Flag de revisão de preço** (`supabase/migrations/036_product_needs_price_review.sql`)
+
+```sql
+ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS needs_price_review boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_products_needs_price_review
+  ON public.products (needs_price_review)
+  WHERE needs_price_review = true;
+```
 
 ---
 
