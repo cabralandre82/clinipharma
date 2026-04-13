@@ -85,11 +85,14 @@ Ao clicar em "Cadastrar novo médico" dentro do formulário de pedido, os itens 
 
 **Padrão de acesso a dados (RLS bootstrap):**
 
-Todas as pages da área privada que servem `CLINIC_ADMIN`, `PHARMACY_ADMIN` ou `DOCTOR` usam `createAdminClient()` (service role) com filtro de escopo explícito (`clinic_id` ou `pharmacy_id`), em vez do client de usuário com RLS. Isso evita o problema de bootstrap onde o RLS falha silenciosamente e retorna listas vazias para usuários recém-adicionados.
+Todas as pages da área privada usam `createAdminClient()` (service role) com filtro de escopo explícito (`clinic_id` ou `pharmacy_id`), em vez do client de usuário com RLS. Isso evita dois problemas:
 
-Pages corrigidas: `/orders`, `/orders/[id]`, `/orders/new`, `/catalog`, `/catalog/[slug]`, `/transfers`, `/doctors`, `/clinics`, `/pharmacies`, `/products`, `/payments`, `/consultants`, `/audit`.
+1. **RLS bootstrap** — o RLS falha silenciosamente e retorna listas vazias para usuários recém-adicionados.
+2. **SSG cache** — sem `export const dynamic = 'force-dynamic'`, o Next.js gera HTML estático no build (quando o banco está vazio) e serve esse cache indefinidamente em produção.
 
-Regra geral: **nenhuma page da área privada deve usar `createClient()` para queries em tabelas com RLS baseada em membership**. Sempre usar `createAdminClient()` com filtro explícito de escopo.
+Todas as 20 pages da área privada têm `export const dynamic = 'force-dynamic'` e usam `createAdminClient()`.
+
+Regra geral: **nenhuma page da área privada deve usar `createClient()` para queries em tabelas com RLS baseada em membership, e todas devem ter `force-dynamic`**.
 
 **Documentos no pedido:**
 

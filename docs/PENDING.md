@@ -1,6 +1,8 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-13 | Versão da plataforma: **6.5.1** | **872 testes** | cobertura atualizada
+> Gerado em: 2026-04-13 | Versão da plataforma: **6.5.3** | **872 testes** | cobertura atualizada
+>
+> **v6.5.3:** Fix SSG cache em páginas privadas — todas as 20 páginas de listagem da área privada receberam `export const dynamic = 'force-dynamic'`. Sem essa diretiva o Next.js gerava HTML estático no build (quando o banco está vazio) e servia esse cache em produção indefinidamente. Causa raiz do problema de listas vazias em `/clinics` e `/doctors` após deploy. `createAdminClient` agora lança erro explícito se `SUPABASE_SERVICE_ROLE_KEY` estiver ausente.
 >
 > **v6.5.2:** Varredura completa de RLS bootstrap — corrigidas 11 pages da área privada que usavam `createClient()` (RLS) e retornavam listas vazias: `/doctors`, `/clinics`, `/pharmacies`, `/products`, `/payments`, `/consultants`, `/audit` (afetavam `SUPER_ADMIN`/`PLATFORM_ADMIN`). Todas as pages da área privada agora usam `adminClient` com filtro de escopo explícito.
 >
