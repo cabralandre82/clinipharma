@@ -87,6 +87,30 @@ Ao clicar em "Cadastrar novo médico" dentro do formulário de pedido, os itens 
 
 Usa `adminClient` (service role) para buscar o pedido e suas relações, evitando bloqueios de RLS para `CLINIC_ADMIN` após a criação do pedido.
 
+**Documentos no pedido:**
+
+No formulário de criação, cada arquivo anexado recebe um tipo escolhido pela clínica via seletor inline. Os tipos disponíveis (definidos em `components/orders/document-manager.tsx`) são:
+
+| Tipo             | Label                   | Obrigatório                              |
+| ---------------- | ----------------------- | ---------------------------------------- |
+| `PRESCRIPTION`   | Receita médica          | Sim (exibido como pendente no checklist) |
+| `IDENTITY`       | Documento de identidade | Não                                      |
+| `MEDICAL_REPORT` | Relatório médico        | Não                                      |
+| `AUTHORIZATION`  | Autorização especial    | Não                                      |
+| `OTHER`          | Outro                   | Não                                      |
+
+O tipo padrão ao anexar um arquivo é:
+
+- `PRESCRIPTION` — se o carrinho contém algum produto com `requires_prescription = true`
+- `OTHER` — caso contrário
+
+Após a criação do pedido:
+
+- **Sem documentos** → status inicial `AWAITING_DOCUMENTS`
+- **Com pelo menos um documento** → status avança automaticamente para `READY_FOR_REVIEW` com entrada no histórico
+
+Uploads adicionais após a criação são feitos via `DocumentManager` na página de detalhe (`/orders/[id]`), com seletor de tipo e checklist visual dos tipos obrigatórios.
+
 **Compliance:**
 
 O `canPlaceOrder` valida CNPJ da farmácia via API externa. CNPJs fictícios (dados seed) serão bloqueados. Para testes, execute no Supabase SQL Editor:
