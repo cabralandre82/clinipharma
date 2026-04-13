@@ -15,9 +15,13 @@ import type { Pharmacy } from '@/types'
 
 interface PharmacyFormProps {
   pharmacy?: Pharmacy
+  /** Lock CNPJ field (pharmacy admin cannot change legal identifier) */
+  disableCnpj?: boolean
+  /** Where to navigate after a successful save (default: /pharmacies/:id) */
+  redirectAfterSave?: string
 }
 
-export function PharmacyForm({ pharmacy }: PharmacyFormProps) {
+export function PharmacyForm({ pharmacy, disableCnpj, redirectAfterSave }: PharmacyFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const isEditing = !!pharmacy
@@ -60,7 +64,7 @@ export function PharmacyForm({ pharmacy }: PharmacyFormProps) {
           return
         }
         toast.success('Farmácia atualizada com sucesso!')
-        router.push(`/pharmacies/${pharmacy.id}`)
+        router.push(redirectAfterSave ?? `/pharmacies/${pharmacy.id}`)
       } else {
         const result = await createPharmacy(data)
         if (result.error) {
@@ -99,7 +103,14 @@ export function PharmacyForm({ pharmacy }: PharmacyFormProps) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="cnpj">CNPJ *</Label>
-            <Input id="cnpj" placeholder="00.000.000/0000-00" {...register('cnpj')} />
+            <Input
+              id="cnpj"
+              placeholder="00.000.000/0000-00"
+              disabled={disableCnpj}
+              className={disableCnpj ? 'bg-gray-50 text-gray-500' : undefined}
+              {...register('cnpj')}
+            />
+            {disableCnpj && <p className="text-xs text-gray-400">O CNPJ não pode ser alterado.</p>}
             {errors.cnpj && <p className="text-sm text-red-500">{errors.cnpj.message}</p>}
           </div>
           <div className="space-y-2">

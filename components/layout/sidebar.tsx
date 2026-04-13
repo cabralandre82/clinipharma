@@ -25,6 +25,7 @@ import {
   LifeBuoy,
   Ticket,
   TrendingDown,
+  Store,
 } from 'lucide-react'
 
 interface NavItem {
@@ -83,6 +84,12 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Farmácias',
     icon: Pill,
     roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN'],
+  },
+  {
+    href: '/my-pharmacy',
+    label: 'Minha Farmácia',
+    icon: Store,
+    roles: ['PHARMACY_ADMIN'],
   },
   {
     href: '/products',

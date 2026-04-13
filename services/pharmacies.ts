@@ -67,8 +67,23 @@ export async function updatePharmacy(
   data: Partial<PharmacyFormData>
 ): Promise<{ error?: string }> {
   try {
-    const user = await requireRole(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
+    const user = await requireRole(['SUPER_ADMIN', 'PLATFORM_ADMIN', 'PHARMACY_ADMIN'])
     const adminClient = createAdminClient()
+
+    // PHARMACY_ADMIN can only update their own pharmacy and cannot change CNPJ or status
+    if (user.roles.includes('PHARMACY_ADMIN')) {
+      const { data: member } = await adminClient
+        .from('pharmacy_members')
+        .select('pharmacy_id')
+        .eq('user_id', user.id)
+        .single()
+      if (!member || member.pharmacy_id !== id) {
+        return { error: 'Sem permissão para editar esta farmácia' }
+      }
+      // Strip fields that pharmacy admin cannot change
+      delete (data as Record<string, unknown>).cnpj
+      delete (data as Record<string, unknown>).status
+    }
 
     const { data: existing } = await adminClient
       .from('pharmacies')

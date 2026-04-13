@@ -1,6 +1,8 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-13 | Versão da plataforma: **6.5.10** | **872 testes** | cobertura atualizada
+> Gerado em: 2026-04-13 | Versão da plataforma: **6.5.11** | **872 testes** | cobertura atualizada
+>
+> **v6.5.11:** "Minha Farmácia" para PHARMACY_ADMIN — nova rota `/my-pharmacy` com perfil completo da farmácia (CNPJ, responsável, email, telefone, endereço, dados bancários, produtos, repasses recentes, pedidos ativos). Rota `/my-pharmacy/edit` com `PharmacyForm` — CNPJ bloqueado para edição, campos de contato/endereço/banco editáveis; `services/pharmacies.updatePharmacy` aberto para `PHARMACY_ADMIN` com ownership check + strip de `cnpj`/`status` para impedir alterações não autorizadas. `PharmacyForm` recebe `disableCnpj` e `redirectAfterSave` props. Sidebar: "Minha Farmácia" (ícone Store) adicionado como primeiro item específico de PHARMACY_ADMIN.
 >
 > **v6.5.10:** Auditoria completa do fluxo da farmácia — 6 problemas corrigidos: (1) Dashboard `pharmacy-dashboard.tsx` consultava orders/transfers sem filtrar por `pharmacy_id`, expondo dados de outras farmácias; migrado para `adminClient` com filtro explícito. (2) Dashboard não mostrava `READY_FOR_REVIEW` (revisão de documentos), a principal ação da farmácia; adicionado card "Revisar documentos" com alerta visual quando há pedidos aguardando. (3) `services/products.ts` bloqueava `PHARMACY_ADMIN` via `requireRole`; agora permite com validação de ownership (só cria/edita produtos da própria farmácia). (4) ProductForm recebe `defaultPharmacyId` para pré-selecionar e bloquear a farmácia em novos produtos. (5) Páginas `/products`, `/products/new` e `/products/[id]/edit` abertas para `PHARMACY_ADMIN` com escopo por membership. (6) Sidebar: `PHARMACY_ADMIN` removido de "Catálogo" (que é para compradores) e adicionado a "Produtos" (gerenciamento). Status labels do dashboard traduzidos para português via `STATUS_LABELS`.
 >
