@@ -1,6 +1,8 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-13 | Versão da plataforma: **6.5.16** | **872 testes** | cobertura atualizada
+> Gerado em: 2026-04-13 | Versão da plataforma: **6.5.17** | **872 testes** | cobertura atualizada
+>
+> **v6.5.17:** Fix acesso negado em `/products/[id]` para `PHARMACY_ADMIN` — página de detalhe só aceitava `SUPER_ADMIN`/`PLATFORM_ADMIN` enquanto a lista `/products` já permitia `PHARMACY_ADMIN` (inconsistência da v6.5.10). Adicionado `PHARMACY_ADMIN` ao `requireRolePage` + ownership check (`notFound` se produto não pertencer à farmácia do usuário).
 >
 > **v6.5.16:** Fix `OrderRealtimeUpdater` — `createClient()` chamado antes da hidratação da sessão fazia o WebSocket conectar como `anon`, falhando silenciosamente no RLS check do `postgres_changes` (eventos chegavam ao Supabase mas nunca eram entregues). Correção: `supabase.auth.getSession()` chamado antes de subscrever para garantir JWT carregado; bail-out se sem sessão. Adicionado polling fallback de 20 s (`router.refresh()` silencioso) que roda independente do Realtime — safety-net para proxies corporativos e Realtime misconfigured. Cleanup correto com `clientRef` + `channelRef` evitando race condition no strict-mode (double-mount). Tratamento explícito de `CHANNEL_ERROR`, `TIMED_OUT`, `CLOSED`.
 >
@@ -242,6 +244,7 @@ Itens do roadmap que dependem de CNPJ ativo para implementar:
 | 6.5.14  | Stepper visual 6 etapas em `PharmacyOrderActions` + aviso âmbar `pharmacy_cost = 0` no form de produto      | ✅     |
 | 6.5.15  | Realtime de pedidos: `OrderRealtimeUpdater`, `LiveBadge`, toast de status, migration 034                    | ✅     |
 | 6.5.16  | Fix Realtime: auth race + polling fallback 20 s + cleanup com refs + tratamento `CHANNEL_ERROR`/`TIMED_OUT` | ✅     |
+| 6.5.17  | Fix acesso negado em `/products/[id]` para `PHARMACY_ADMIN` — `requireRolePage` + ownership check           | ✅     |
 
 **O que está 100% pronto:** plataforma técnica, autenticação, pedidos, pagamentos sandbox, notificações (push/email/SMS/push), LGPD portal, auditoria, compliance CNPJ, suporte por tickets com IA, cupons de desconto, gerenciamento de categorias, SKU automático, Política de Privacidade, Termos de Uso, E2E tests, CI/CD, documentação, **8 features de IA em produção**, **enforcement completo de receitas médicas com controle por produto e por unidade**, **atualizações em tempo real via Supabase Realtime** (status do pedido sincronizado automaticamente entre clínica, farmácia e admin).
 
