@@ -156,7 +156,7 @@
 - ~~Migration 028~~ ✅ Aplicada em produção (`used_count` em coupons, trigger atômico)
 - ~~Migration 029~~ ✅ Aplicada em produção (`ai_classified` em support_tickets, `sentiment` em support_messages, `product_associations`)
 - ~~`OPENAI_API_KEY`~~ ✅ Configurada no Vercel (Production + Preview) — 2026-04-12
-- **Migration 032 pendente em produção**: `orders.doctor_id DROP NOT NULL` — aplicar via `supabase db push --linked` ou SQL direto antes de usar o novo fluxo de pedidos em produção.
+- ~~Migration 032~~ ✅ Aplicada em produção (`orders.doctor_id` nullable — médico solicitante opcional em pedidos sem receita)
 - **Staging não provisionado**: `clinipharma-staging` no Supabase ainda não criado. Ver `docs/staging-environment.md`.
 - **Cloudflare WAF não ativo**: OWASP Core Ruleset + rate limit 100 req/min em `/api/` — configuração manual no painel Cloudflare.
 
