@@ -3274,21 +3274,24 @@ Steps:
 
 ## MASTER BUG LIST (pré-preenchido com achados de revisão estática de código / doc)
 
-| TC                  | Descrição                                                          | Severity | Fix recomendado                                                                               |
-| ------------------- | ------------------------------------------------------------------ | -------- | --------------------------------------------------------------------------------------------- |
-| **AI-0-007**        | `analyzeSentiment` não valida `sentiment` contra enum após parse   | HIGH     | Espelhar validação de `classifyTicket`: whitelist + `return null` + não persistir inválido    |
-| **AI-0-010**        | `generateContractText` usa `temperature: 0.3` — variância jurídica | HIGH     | Reduzir para `0` ou separar "texto livre marketing" de "cláusulas obrigatórias template-only" |
-| **Prompt genérico** | Seção 8.3 assume "AI explanation" nas recomendações                | LOW      | Atualizar especificações externas; código é SQL-only                                          |
+> **Status v6.0.3 (2026-04-12):** todos os gaps HIGH e MEDIUM foram corrigidos e cobertos por testes.
+
+| TC                  | Descrição                                                          | Severity | Status        | Fix aplicado                                                                                     |
+| ------------------- | ------------------------------------------------------------------ | -------- | ------------- | ------------------------------------------------------------------------------------------------ |
+| **AI-0-007**        | `analyzeSentiment` não valida `sentiment` contra enum após parse   | HIGH     | ✅ CORRIGIDO  | Whitelist `VALID_SENTIMENTS` + guarda `typeof boolean`; retorna null se inválido                 |
+| **AI-0-010**        | `generateContractText` usa `temperature: 0.3` — variância jurídica | HIGH     | ✅ CORRIGIDO  | `temperature: 0` — contrato determinístico para mesmos dados de entrada                          |
+| **AI-0-NEW**        | Circuit breaker `'openai'` único — OCR derruba triagem de tickets  | MEDIUM   | ✅ CORRIGIDO  | 4 breakers independentes: `openai-classify`, `openai-sentiment`, `openai-ocr`, `openai-contract` |
+| **Prompt genérico** | Seção 8.3 assume "AI explanation" nas recomendações                | LOW      | ✅ CONFIRMADO | Sem bug — código é SQL/Apriori; gap era documental externo                                       |
 
 ## HALLUCINATION RISK REGISTER
 
-| Feature           | Pior caso                    | Consequência     | Mitigação atual                      | Suficiente?                           |
-| ----------------- | ---------------------------- | ---------------- | ------------------------------------ | ------------------------------------- |
-| Ticket triage     | Categoria/prioridade erradas | SLA ruim         | Enum validation + null               | PARTIAL                               |
-| Sentimento        | Falso negativo em crise      | Churn não visto  | Palavras-chave no prompt + escalação | PARTIAL                               |
-| Contrato LLM      | Cláusula inexistente         | Litígio          | PDF via Clicksign + corpo IA         | **NO** — requer fluxo jurídico humano |
-| OCR               | Dígito CNPJ errado           | Aprovação errada | Comparativo UI + humano              | PARTIAL                               |
-| Recomendações SQL | N/A LLM                      | N/A              | Apriori determinístico               | YES                                   |
+| Feature           | Pior caso                    | Consequência                      | Mitigação atual (v6.0.3)                                        | Suficiente?                     |
+| ----------------- | ---------------------------- | --------------------------------- | --------------------------------------------------------------- | ------------------------------- |
+| Ticket triage     | Categoria/prioridade erradas | SLA ruim                          | Enum validation + null (desde v6.0.0)                           | PARTIAL                         |
+| Sentimento        | Enum ou boolean inválido     | Violação CHECK + escalação errada | ✅ Whitelist + typeof boolean (v6.0.3) + null fallback          | YES                             |
+| Contrato LLM      | Cláusula inexistente         | Litígio                           | ✅ temperature=0 (v6.0.3); ainda requer revisão humana jurídica | PARTIAL — pendência de processo |
+| OCR               | Dígito CNPJ errado           | Aprovação errada                  | Comparativo UI + humano                                         | PARTIAL                         |
+| Recomendações SQL | N/A LLM                      | N/A                               | Apriori determinístico                                          | YES                             |
 
 ## REGULATORY RISK SUMMARY (IA)
 

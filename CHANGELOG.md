@@ -2,6 +2,42 @@
 
 ---
 
+## [6.0.3] — 2026-04-12 — Correções de gaps identificados na auditoria interna de IA
+
+### Fixes em `lib/ai.ts`
+
+- **`analyzeSentiment` — validação de enum e boolean** (TC-AI-0-007)  
+  Adicionada whitelist `VALID_SENTIMENTS` e guarda `typeof boolean` para `churnRisk` e `shouldEscalate`.
+  Antes: `JSON.parse()` retornava diretamente sem validação — string inválida (ex: `"happy"`) chegava ao
+  `UPDATE support_messages SET sentiment = …` e violava o `CHECK` Postgres da migration 029.
+  Agora: retorna `null` em caso de valor inválido, exatamente como `classifyTicket` já fazia.
+
+- **`generateContractText` — temperature `0.3 → 0`** (TC-AI-0-010)  
+  Texto jurídico deve ser determinístico. Com `temperature: 0`, o mesmo conjunto de dados de entrada
+  produz sempre o mesmo corpo de contrato. Personalização continua via interpolação de `context`
+  no `user` message; apenas a aleatoriedade do modelo foi removida.
+
+- **Circuit breakers separados por feature** (TC-AI-0-NEW)  
+  Breaker único `'openai'` substituído por quatro independentes: `'openai-classify'`,
+  `'openai-sentiment'`, `'openai-ocr'`, `'openai-contract'`. Falhas consecutivas em OCR
+  (Vision, ~R$0,05/chamada) não abrem mais o circuito de classificação de tickets. O endpoint
+  `/api/health` passa a listar os quatro estados individualmente.
+
+### Testes adicionados em `tests/unit/lib/ai.test.ts`
+
+- **TC-AI-08b** — `analyzeSentiment` retorna null se `sentiment` for string fora do enum
+- **TC-AI-08c** — `analyzeSentiment` retorna null se `churnRisk`/`shouldEscalate` não forem boolean
+- **TC-AI-08d** — escalação não dispara se `shouldEscalate` chegar como string `"true"`
+
+### Confirmações sem alteração de código
+
+- **Feature 7 (recomendações)** — 100% SQL/Apriori; nenhuma camada LLM existe ou foi removida.
+  O gap era documental (prompt externo assumia ranking por IA).
+
+**Total de testes: 770 passando.**
+
+---
+
 ## [6.0.2] — 2026-04-12 — Plano de auditoria QA + segurança + IA (documentação)
 
 ### Documentação

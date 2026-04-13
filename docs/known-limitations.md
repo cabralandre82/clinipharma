@@ -94,6 +94,9 @@
 - **OCR limitado a 5 documentos por análise**: por custo e latência, o endpoint OCR processa no máximo 5 arquivos por chamada (GPT-4o Vision).
 - **Churn e reorder internos**: detecção de churn e alertas de recompra são visíveis apenas para consultores e super admin — não expostos às clínicas.
 - **Classificação de tickets assíncrona**: o GPT classifica o ticket em background após criação. Há um breve intervalo em que `category = GENERAL` e `priority = NORMAL` enquanto a IA processa.
+- ~~**Circuit breaker único `'openai'`**~~ ✅ **v6.0.3**: cada função de IA tem breaker independente (`openai-classify`, `openai-sentiment`, `openai-ocr`, `openai-contract`); falha em OCR não afeta triagem de tickets.
+- ~~**`analyzeSentiment` sem validação de enum**~~ ✅ **v6.0.3**: whitelist de sentimentos e guarda de boolean adicionados; valor inválido retorna `null` sem risco de violação do CHECK Postgres.
+- ~~**`generateContractText` com temperature `0.3`**~~ ✅ **v6.0.3**: reduzido para `0` — corpo do contrato é agora determinístico para os mesmos dados de entrada.
 - **`pgvector` não ativado**: busca semântica (H2 do roadmap de IA) requer `CREATE EXTENSION vector` no Supabase e embedding por produto — não implementado no MVP.
 
 ## Testes

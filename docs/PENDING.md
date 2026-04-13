@@ -2,6 +2,7 @@
 
 > Gerado em: 2026-04-12 | Versão da plataforma: **6.0.1** | **767 testes** | cobertura atualizada
 >
+> **v6.0.3:** 4 gaps da auditoria interna corrigidos em `lib/ai.ts`: validação de enum/boolean em `analyzeSentiment`, `temperature 0` em contratos, circuit breakers separados por feature. 3 novos TCs. 770 testes passando.
 > **v6.0.2:** Plano de auditoria de QA e segurança (incl. IA) — `docs/audit-qa-plena-2026-04.md` (~242 casos explícitos + matriz de expansão RBAC para 40 rotas API). Alinhado a `known-limitations`, LGPD e roadmap.
 > **v6.0.1:** Cobertura completa para features de IA — 44 novos testes (lead-score, lib/ai, 4 jobs Inngest, OCR route, recommendations route, 3 crons). Migration 029 aplicada em produção. `OPENAI_API_KEY` configurada no Vercel (Production + Preview). 767 testes passando.
 > **v6.0.0:** Integração de IA com 8 features em produção: score de leads, detecção de churn, alerta preditivo de recompra, triagem automática de tickets (GPT-4o-mini), análise de sentimento em suporte, geração automática de contratos, OCR de documentos (GPT-4o Vision), recomendações de produtos (Apriori SQL). Migration 029 criada. 3 novos crons.
