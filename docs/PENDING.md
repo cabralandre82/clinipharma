@@ -1,6 +1,8 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-13 | Versão da plataforma: **6.4.1** | **851 testes** | cobertura atualizada
+> Gerado em: 2026-04-13 | Versão da plataforma: **6.4.2** | **851 testes** | cobertura atualizada
+>
+> **v6.4.2:** Fix crítico no fluxo de pedidos — `adminClient` usado nas queries de `clinic_members` e `doctor_clinic_links` para contornar bootstrap de RLS (usuário não conseguia ler sua própria clínica com o client de usuário). `CLINIC_ADMIN` pode agora cadastrar médicos em `/doctors/new` com auto-vínculo à sua clínica. Atalhos no form de pedido: link "Cadastrar novo médico" ao lado do campo, e callout âmbar quando a clínica não tem médicos vinculados. 2 novos testes unitários.
 >
 > **v6.4.1:** Refactor — lógica de visibilidade/obrigatoriedade do campo médico extraída para `lib/orders/doctor-field-rules.ts` (função pura `resolveDoctorFieldState`). 5 novos testes unitários cobrem todas as combinações de médicos vinculados × produtos com receita.
 >
@@ -161,29 +163,30 @@ Itens do roadmap que dependem de CNPJ ativo para implementar:
 
 ### Funcionalidades entregues (v4.7.0 → v6.1.1)
 
-| Versão | Feature                                                                                                    | Testes |
-| ------ | ---------------------------------------------------------------------------------------------------------- | ------ |
-| 4.7.0  | Explicações contextuais de SKU, Slug e Variantes no form                                                   | ✅     |
-| 4.8.0  | SKU gerado automaticamente no formato `[CAT]-[FAR]-[NNNN]`                                                 | ✅     |
-| 4.9.0  | Página de gerenciamento de categorias de produtos                                                          | ✅     |
-| 5.0.0  | Sistema de suporte por tickets conversacional                                                              | ✅     |
-| 5.0.1  | Revisão completa do suporte: polling, UI otimista, busca                                                   | ✅     |
-| 5.1.0  | Política de Privacidade e Termos de Uso (LGPD + ANVISA)                                                    | —      |
-| 5.1.1  | Página `/profile` — corrige erro ao clicar no nome no header                                               | ✅     |
-| 5.1.4  | Fix middleware: `/terms` público + cobertura E2E (TC-11, TC-12)                                            | ✅     |
-| 5.2.0  | Captura de leads: drafts anônimos + PENDING_DOCS + painel admin                                            | ✅     |
-| 5.2.1  | Migration 026 + 21 unit tests + 2 E2E + fix Vitest Node 18 (701 testes)                                    | ✅     |
-| 5.3.0  | Cupons de desconto por produto/clínica — auto-aplica por unidade                                           | ✅     |
-| 5.3.1  | Melhorias cupons: SearchableSelect, used_count, resumo financeiro, alertas                                 | ✅     |
-| 5.3.2  | Fix `'use server'` coupons + sidebar Cupons reposicionado (posição 4)                                      | ✅     |
-| 6.0.0  | IA integrada: 8 features (churn, recompra, triagem, sentimento, OCR, contratos, recomendações, lead score) | ✅     |
-| 6.0.1  | Cobertura IA: 44 novos testes + migration 029 aplicada + OPENAI_API_KEY Vercel                             | ✅     |
-| 6.0.2  | Auditoria QA plena — `docs/audit-qa-plena-2026-04.md` (~242 casos + matriz RBAC)                           | —      |
-| 6.0.3  | Fix auditoria IA: `analyzeSentiment` validação enum/bool, `temperature 0` contratos, circuit breakers      | ✅     |
-| 6.1.0  | Enforcement receitas médicas: migration 030, gate `/advance`, upload por item, UI PrescriptionManager      | ✅     |
-| 6.1.1  | Formulário de produto: seção "Receita Médica" com toggle, tipo e unidades por receita                      | ✅     |
-| 6.4.0  | Fluxo de pedidos: clínica auto-detectada, médico condicional por `requires_prescription`, migration 032    | ✅     |
-| 6.4.1  | Refactor: `lib/orders/doctor-field-rules.ts` — lógica extraída do componente, 5 testes unitários           | ✅     |
+| Versão | Feature                                                                                                     | Testes |
+| ------ | ----------------------------------------------------------------------------------------------------------- | ------ |
+| 4.7.0  | Explicações contextuais de SKU, Slug e Variantes no form                                                    | ✅     |
+| 4.8.0  | SKU gerado automaticamente no formato `[CAT]-[FAR]-[NNNN]`                                                  | ✅     |
+| 4.9.0  | Página de gerenciamento de categorias de produtos                                                           | ✅     |
+| 5.0.0  | Sistema de suporte por tickets conversacional                                                               | ✅     |
+| 5.0.1  | Revisão completa do suporte: polling, UI otimista, busca                                                    | ✅     |
+| 5.1.0  | Política de Privacidade e Termos de Uso (LGPD + ANVISA)                                                     | —      |
+| 5.1.1  | Página `/profile` — corrige erro ao clicar no nome no header                                                | ✅     |
+| 5.1.4  | Fix middleware: `/terms` público + cobertura E2E (TC-11, TC-12)                                             | ✅     |
+| 5.2.0  | Captura de leads: drafts anônimos + PENDING_DOCS + painel admin                                             | ✅     |
+| 5.2.1  | Migration 026 + 21 unit tests + 2 E2E + fix Vitest Node 18 (701 testes)                                     | ✅     |
+| 5.3.0  | Cupons de desconto por produto/clínica — auto-aplica por unidade                                            | ✅     |
+| 5.3.1  | Melhorias cupons: SearchableSelect, used_count, resumo financeiro, alertas                                  | ✅     |
+| 5.3.2  | Fix `'use server'` coupons + sidebar Cupons reposicionado (posição 4)                                       | ✅     |
+| 6.0.0  | IA integrada: 8 features (churn, recompra, triagem, sentimento, OCR, contratos, recomendações, lead score)  | ✅     |
+| 6.0.1  | Cobertura IA: 44 novos testes + migration 029 aplicada + OPENAI_API_KEY Vercel                              | ✅     |
+| 6.0.2  | Auditoria QA plena — `docs/audit-qa-plena-2026-04.md` (~242 casos + matriz RBAC)                            | —      |
+| 6.0.3  | Fix auditoria IA: `analyzeSentiment` validação enum/bool, `temperature 0` contratos, circuit breakers       | ✅     |
+| 6.1.0  | Enforcement receitas médicas: migration 030, gate `/advance`, upload por item, UI PrescriptionManager       | ✅     |
+| 6.1.1  | Formulário de produto: seção "Receita Médica" com toggle, tipo e unidades por receita                       | ✅     |
+| 6.4.0  | Fluxo de pedidos: clínica auto-detectada, médico condicional por `requires_prescription`, migration 032     | ✅     |
+| 6.4.1  | Refactor: `lib/orders/doctor-field-rules.ts` — lógica extraída do componente, 5 testes unitários            | ✅     |
+| 6.4.2  | Fix RLS bootstrap, CLINIC_ADMIN cadastra médico com auto-vínculo, atalhos no form de pedido, 2 novos testes | ✅     |
 
 **O que está 100% pronto:** plataforma técnica, autenticação, pedidos, pagamentos sandbox, notificações (push/email/SMS/push), LGPD portal, auditoria, compliance CNPJ, suporte por tickets com IA, cupons de desconto, gerenciamento de categorias, SKU automático, Política de Privacidade, Termos de Uso, E2E tests, CI/CD, documentação, **8 features de IA em produção**, **enforcement completo de receitas médicas com controle por produto e por unidade**.
 

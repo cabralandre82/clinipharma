@@ -38,6 +38,18 @@ const actorMock = {
   updated_at: '2026-01-01',
 }
 
+const clinicAdminMock = {
+  id: 'clinic-user-1',
+  roles: ['CLINIC_ADMIN'] as ['CLINIC_ADMIN'],
+  full_name: 'Admin Clínica',
+  email: 'admin@clinica.com',
+  is_active: true,
+  registration_status: 'APPROVED' as const,
+  notification_preferences: {},
+  created_at: '2026-01-01',
+  updated_at: '2026-01-01',
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(rbacModule.requireRole).mockResolvedValue(actorMock)
@@ -103,6 +115,66 @@ describe('createDoctor', () => {
       crm_uf: 'SP',
     } as Parameters<typeof createDoctor>[0])
     expect(result.error).toBe('Sem permissão')
+  })
+
+  it('CLINIC_ADMIN creates doctor and auto-links to their clinic', async () => {
+    vi.mocked(rbacModule.requireRole).mockResolvedValue(clinicAdminMock)
+
+    const doctorQb = makeQueryBuilder({ id: 'doc-2' }, null)
+    doctorQb.single = vi.fn().mockResolvedValue({ data: { id: 'doc-2' }, error: null })
+
+    const membershipQb = makeQueryBuilder(null, null)
+    membershipQb.maybeSingle = vi
+      .fn()
+      .mockResolvedValue({ data: { clinic_id: 'clinic-1' }, error: null })
+
+    const upsertQb = makeQueryBuilder(null, null)
+
+    let callCount = 0
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockImplementation(() => {
+        callCount++
+        if (callCount === 1) return doctorQb // insert doctor
+        if (callCount === 2) return membershipQb // fetch clinic_id from clinic_members
+        return upsertQb // upsert doctor_clinic_links
+      }),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await createDoctor({
+      full_name: 'Dr. Novo',
+      crm: '99999',
+      crm_uf: 'SP',
+    } as Parameters<typeof createDoctor>[0])
+    expect(result.id).toBe('doc-2')
+    expect(result.error).toBeUndefined()
+    expect(callCount).toBe(3) // insert + fetch membership + upsert link
+  })
+
+  it('CLINIC_ADMIN with no clinic membership still creates doctor (no link)', async () => {
+    vi.mocked(rbacModule.requireRole).mockResolvedValue(clinicAdminMock)
+
+    const doctorQb = makeQueryBuilder({ id: 'doc-3' }, null)
+    doctorQb.single = vi.fn().mockResolvedValue({ data: { id: 'doc-3' }, error: null })
+
+    const membershipQb = makeQueryBuilder(null, null)
+    membershipQb.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
+
+    let callCount = 0
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockImplementation(() => {
+        callCount++
+        if (callCount === 1) return doctorQb
+        return membershipQb
+      }),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await createDoctor({
+      full_name: 'Dr. Sem Clinica',
+      crm: '77777',
+      crm_uf: 'RJ',
+    } as Parameters<typeof createDoctor>[0])
+    expect(result.id).toBe('doc-3')
+    expect(result.error).toBeUndefined()
   })
 
   it('returns validation error when schema fails', async () => {
