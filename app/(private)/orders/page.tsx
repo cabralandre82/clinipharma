@@ -1,5 +1,4 @@
 import { Metadata } from 'next'
-import { createClient } from '@/lib/db/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { getCurrentUser } from '@/lib/auth/session'
 import { OrdersTable, type OrderRow } from '@/components/orders/orders-table'
@@ -20,34 +19,46 @@ interface Props {
 export default async function OrdersPage({ searchParams }: Props) {
   const { after, before } = await searchParams
   const user = await getCurrentUser()
-  const supabase = await createClient()
+  const admin = createAdminClient()
   const isAdmin = user?.roles.some((r) => ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(r))
+  const isPharmacy = user?.roles.includes('PHARMACY_ADMIN')
 
+  // Resolve scope filter: clinic or pharmacy membership
   let clinicId: string | null = null
+  let pharmacyId: string | null = null
+
   if (!isAdmin && user) {
-    const admin = createAdminClient()
-    const { data: membership } = await admin
-      .from('clinic_members')
-      .select('clinic_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .single()
-    clinicId = membership?.clinic_id ?? null
+    if (isPharmacy) {
+      const { data: membership } = await admin
+        .from('pharmacy_members')
+        .select('pharmacy_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single()
+      pharmacyId = membership?.pharmacy_id ?? null
+    } else {
+      const { data: membership } = await admin
+        .from('clinic_members')
+        .select('clinic_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single()
+      clinicId = membership?.clinic_id ?? null
+    }
   }
 
   // ── Cursor-based pagination ─────────────────────────────────────────────
-  // Replaces OFFSET/LIMIT to avoid full-table scans at large page numbers.
-  //
-  // "after"  cursor → fetch records created BEFORE this ISO timestamp (next page)
-  // "before" cursor → fetch records created AFTER this ISO timestamp, ASC, then reverse (prev page)
-  //
-  // We fetch PAGE_SIZE + 1 to detect whether a next/prev page exists.
-  let query = supabase.from('orders').select(
+  // Use adminClient with explicit scope filter so CLINIC_ADMIN and PHARMACY_ADMIN
+  // always see their own orders regardless of RLS bootstrap state.
+  let query = admin.from('orders').select(
     `id, code, order_status, payment_status, transfer_status,
        total_price, created_at,
        clinics (trade_name), doctors (full_name), pharmacies (trade_name),
        order_items (product_id, products (name))`
   )
+
+  if (clinicId) query = query.eq('clinic_id', clinicId)
+  if (pharmacyId) query = query.eq('pharmacy_id', pharmacyId)
 
   if (after) {
     query = query.lt('created_at', after).order('created_at', { ascending: false })
