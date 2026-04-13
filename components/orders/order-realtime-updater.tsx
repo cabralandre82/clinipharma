@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/db/client'
+import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 
 const STATUS_LABELS: Record<string, string> = {
   AWAITING_DOCUMENTS: 'Aguardando Documentação',
@@ -25,75 +26,106 @@ const STATUS_LABELS: Record<string, string> = {
   WITH_ISSUE: 'Com Problema',
 }
 
+/** Fallback polling interval — keeps the page current when WebSockets fail. */
+const POLL_MS = 20_000
+
 interface Props {
   orderId: string
-  /** Rendered by parent to show live connection indicator */
+  /** Called when the Realtime connection state changes. */
   onConnectionChange?: (connected: boolean) => void
 }
 
 /**
- * Invisible component: subscribes to Supabase Realtime for the given order.
- * Calls router.refresh() on any order or status-history change so all
- * open sessions (clinic, pharmacy, admin) see updates without reloading.
+ * Invisible component that keeps the order detail page in sync via two layers:
  *
- * Requires Realtime enabled on `orders` and `order_status_history` tables
- * in the Supabase dashboard (Table Editor → Replication).
- * RLS SELECT policies must allow the authenticated user to read the row.
+ * 1. **Supabase Realtime** (primary) — instant WebSocket updates with a toast
+ *    on status change. Requires migration 034 + Realtime enabled on Supabase.
+ *
+ * 2. **Polling fallback** (secondary) — silent router.refresh() every 20 s so
+ *    the page stays current when WebSockets are blocked or Realtime auth fails.
  */
 export function OrderRealtimeUpdater({ orderId, onConnectionChange }: Props) {
   const router = useRouter()
-  const supabaseRef = useRef(createClient())
   const [connected, setConnected] = useState(false)
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  const clientRef = useRef<SupabaseClient | null>(null)
 
+  const setLive = useCallback(
+    (ok: boolean) => {
+      setConnected(ok)
+      onConnectionChange?.(ok)
+    },
+    [onConnectionChange]
+  )
+
+  // ── Polling fallback ──────────────────────────────────────────────────────
   useEffect(() => {
-    const supabase = supabaseRef.current
+    const id = setInterval(() => router.refresh(), POLL_MS)
+    return () => clearInterval(id)
+  }, [router])
 
-    const channel = supabase
-      .channel(`order:${orderId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders',
-          filter: `id=eq.${orderId}`,
-        },
-        () => {
-          router.refresh()
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'order_status_history',
-          filter: `order_id=eq.${orderId}`,
-        },
-        (payload) => {
-          const newStatus = (payload.new as Record<string, string>)?.new_status
-          if (newStatus) {
-            const label = STATUS_LABELS[newStatus] ?? newStatus
-            toast.info(`Pedido atualizado: ${label}`, {
-              description: 'O status foi alterado agora mesmo.',
-              duration: 5000,
-            })
+  // ── Realtime primary ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const supabase = createClient()
+    clientRef.current = supabase
+
+    // getSession() ensures the JWT is loaded into the client before subscribing,
+    // preventing the channel from connecting as unauthenticated (anon).
+    supabase.auth.getSession().then(({ data }) => {
+      // Bail out if the effect was already cleaned up
+      if (clientRef.current !== supabase) return
+
+      if (!data.session) {
+        // Not authenticated — polling fallback will keep the page current.
+        return
+      }
+
+      const channel = supabase
+        .channel(`order-detail:${orderId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` },
+          () => router.refresh()
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'order_status_history',
+            filter: `order_id=eq.${orderId}`,
+          },
+          (payload) => {
+            const newStatus = (payload.new as Record<string, string>)?.new_status
+            if (newStatus) {
+              toast.info(`Pedido atualizado: ${STATUS_LABELS[newStatus] ?? newStatus}`, {
+                description: 'O status foi alterado agora mesmo.',
+                duration: 5000,
+              })
+            }
+            router.refresh()
           }
-          router.refresh()
-        }
-      )
-      .subscribe((status) => {
-        const ok = status === 'SUBSCRIBED'
-        setConnected(ok)
-        onConnectionChange?.(ok)
-      })
+        )
+        .subscribe((status) => {
+          if (clientRef.current !== supabase) return
+          if (status === 'SUBSCRIBED') setLive(true)
+          else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) setLive(false)
+        })
+
+      channelRef.current = channel
+    })
 
     return () => {
-      supabase.removeChannel(channel)
-      setConnected(false)
-      onConnectionChange?.(false)
+      // Mark this client instance as stale so any pending getSession callback
+      // knows to bail out.
+      clientRef.current = null
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+      setLive(false)
     }
-  }, [orderId, router, onConnectionChange])
+  }, [orderId, router, setLive])
 
   return null
 }
