@@ -17,14 +17,20 @@ import { getActiveCouponsForOrder } from '@/services/coupons'
 import { sendSms, SMS } from '@/lib/sms'
 import { sendWhatsApp, WA } from '@/lib/whatsapp'
 
+// Supabase uses gen_random_uuid() which may produce UUIDs outside strict RFC 4122 v4
+// variant bits (e.g. variant starting with 6x). Use a loose regex instead of z.string().uuid().
+const uuidLoose = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'ID inválido')
+
 const createOrderSchema = z.object({
-  clinic_id: z.string().uuid(),
-  doctor_id: z.string().uuid().optional().nullable(),
+  clinic_id: uuidLoose,
+  doctor_id: uuidLoose.optional().nullable(),
   notes: z.string().optional(),
   items: z
     .array(
       z.object({
-        product_id: z.string().uuid(),
+        product_id: uuidLoose,
         quantity: z.number().int().positive(),
       })
     )
