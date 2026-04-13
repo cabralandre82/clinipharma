@@ -103,9 +103,9 @@ export default async function TransfersPage({ searchParams }: Props) {
             <TableHeader>
               <TableRow className="bg-gray-50">
                 <TableHead className="font-semibold">Pedido</TableHead>
-                <TableHead className="font-semibold">Farmácia</TableHead>
-                <TableHead className="text-right font-semibold">Bruto</TableHead>
-                <TableHead className="text-right font-semibold">Comissão</TableHead>
+                {isAdmin && <TableHead className="font-semibold">Farmácia</TableHead>}
+                {isAdmin && <TableHead className="text-right font-semibold">Bruto</TableHead>}
+                {isAdmin && <TableHead className="text-right font-semibold">Comissão</TableHead>}
                 <TableHead className="text-right font-semibold">Líquido</TableHead>
                 <TableHead className="font-semibold">Status</TableHead>
                 <TableHead className="font-semibold">Data</TableHead>
@@ -115,7 +115,7 @@ export default async function TransfersPage({ searchParams }: Props) {
             <TableBody>
               {transfers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-gray-400">
+                  <TableCell colSpan={isAdmin ? 8 : 4} className="py-10 text-center text-gray-400">
                     Nenhum repasse encontrado
                   </TableCell>
                 </TableRow>
@@ -127,17 +127,23 @@ export default async function TransfersPage({ searchParams }: Props) {
                         {t.orders?.code ?? '—'}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-gray-700">
-                        {t.pharmacies?.trade_name ?? '—'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right text-sm">
-                      {formatCurrency(Number(t.gross_amount))}
-                    </TableCell>
-                    <TableCell className="text-right text-sm text-red-600">
-                      - {formatCurrency(Number(t.commission_amount))}
-                    </TableCell>
+                    {isAdmin && (
+                      <TableCell>
+                        <span className="text-sm text-gray-700">
+                          {t.pharmacies?.trade_name ?? '—'}
+                        </span>
+                      </TableCell>
+                    )}
+                    {isAdmin && (
+                      <TableCell className="text-right text-sm">
+                        {formatCurrency(Number(t.gross_amount))}
+                      </TableCell>
+                    )}
+                    {isAdmin && (
+                      <TableCell className="text-right text-sm text-red-600">
+                        - {formatCurrency(Number(t.commission_amount))}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right text-sm font-semibold text-green-700">
                       {formatCurrency(Number(t.net_amount))}
                     </TableCell>

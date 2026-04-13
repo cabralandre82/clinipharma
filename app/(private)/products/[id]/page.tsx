@@ -107,13 +107,17 @@ export default async function ProductDetailAdminPage({ params }: PageProps) {
     notFound()
   }
 
-  const { data: settingRaw } = await supabase
-    .from('app_settings')
-    .select('value_json')
-    .eq('key', 'consultant_commission_rate')
-    .single()
-
-  const consultantRate = Number(settingRaw?.value_json ?? 5)
+  const consultantRate = isPharmacy
+    ? 0
+    : Number(
+        (
+          await supabase
+            .from('app_settings')
+            .select('value_json')
+            .eq('key', 'consultant_commission_rate')
+            .single()
+        ).data?.value_json ?? 5
+      )
 
   if (!productRaw) notFound()
 
@@ -122,16 +126,18 @@ export default async function ProductDetailAdminPage({ params }: PageProps) {
     pharmacies: Pharmacy | null
   }
 
-  const { data: priceHistoryRaw } = await supabase
-    .from('product_price_history')
-    .select('*, profiles(full_name)')
-    .eq('product_id', id)
-    .order('created_at', { ascending: false })
-    .limit(10)
-
-  const priceHistory = (priceHistoryRaw ?? []) as unknown as Array<
-    ProductPriceHistory & { profiles: { full_name: string } | null }
-  >
+  const priceHistory = isPharmacy
+    ? []
+    : (((
+        await supabase
+          .from('product_price_history')
+          .select('*, profiles(full_name)')
+          .eq('product_id', id)
+          .order('created_at', { ascending: false })
+          .limit(10)
+      ).data ?? []) as unknown as Array<
+        ProductPriceHistory & { profiles: { full_name: string } | null }
+      >)
 
   const { data: costHistoryRaw } = await supabase
     .from('product_pharmacy_cost_history')
@@ -243,11 +249,13 @@ export default async function ProductDetailAdminPage({ params }: PageProps) {
             </div>
           </div>
 
-          <MarginBreakdown
-            price={product.price_current}
-            cost={product.pharmacy_cost ?? 0}
-            consultantRate={consultantRate}
-          />
+          {!isPharmacy && (
+            <MarginBreakdown
+              price={product.price_current}
+              cost={product.pharmacy_cost ?? 0}
+              consultantRate={consultantRate}
+            />
+          )}
 
           <div className="flex min-h-[100px] flex-col items-center justify-center rounded-lg border bg-white p-6 text-gray-400">
             <Package className="mb-2 h-8 w-8" />
@@ -256,7 +264,7 @@ export default async function ProductDetailAdminPage({ params }: PageProps) {
         </div>
       </div>
 
-      {priceHistory.length > 0 && (
+      {!isPharmacy && priceHistory.length > 0 && (
         <div className="space-y-4 rounded-lg border bg-white p-6">
           <h2 className="font-semibold text-gray-900">Histórico de Preço</h2>
           <div className="overflow-x-auto">
