@@ -8,6 +8,8 @@ import { ReorderButton } from '@/components/orders/reorder-button'
 import { SaveTemplateModal } from '@/components/orders/templates/save-template-modal'
 import { getPrescriptionState } from '@/lib/prescription-rules'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Detalhe do pedido',
 }
