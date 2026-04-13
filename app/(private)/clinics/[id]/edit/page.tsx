@@ -4,8 +4,9 @@ import { requireRolePage } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/db/admin'
 import { ClinicForm } from '@/components/clinics/clinic-form'
 
-export const dynamic = 'force-dynamic'
 import type { Clinic } from '@/types'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Editar Clínica | Clinipharma' }
 

@@ -3,7 +3,6 @@ import { createAdminClient } from '@/lib/db/admin'
 import { requireRolePage } from '@/lib/rbac'
 import { formatDateTime } from '@/lib/utils'
 
-export const dynamic = 'force-dynamic'
 import { parseCursorParams, sliceCursorResult } from '@/lib/cursor-pagination'
 import { CursorPagination } from '@/components/ui/cursor-pagination'
 import {
@@ -14,6 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = { title: 'Auditoria | Clinipharma' }
 

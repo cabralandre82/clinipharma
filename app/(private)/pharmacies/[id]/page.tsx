@@ -4,11 +4,12 @@ import { requireRolePage } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/db/admin'
 import { formatCNPJ, formatPhone, formatDate, formatCurrency } from '@/lib/utils'
 
-export const dynamic = 'force-dynamic'
 import { EntityStatusBadge } from '@/components/shared/status-badge'
 import { ButtonLink } from '@/components/ui/button-link'
 import { PharmacyStatusActions } from '@/components/pharmacies/pharmacy-status-actions'
 import type { Pharmacy, EntityStatus } from '@/types'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Detalhe da Farmácia | Clinipharma' }
 

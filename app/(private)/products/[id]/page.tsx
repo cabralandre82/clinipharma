@@ -4,7 +4,6 @@ import { requireRolePage } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/db/admin'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
-export const dynamic = 'force-dynamic'
 import { ButtonLink } from '@/components/ui/button-link'
 import { PriceUpdateForm } from '@/components/products/price-update-form'
 import { PharmacyCostUpdateForm } from '@/components/products/pharmacy-cost-update-form'
@@ -13,6 +12,8 @@ import { Badge } from '@/components/ui/badge'
 import { Package } from 'lucide-react'
 import type { ProductWithRelations, ProductCategory, Pharmacy, ProductPriceHistory } from '@/types'
 import { getCurrentUser } from '@/lib/auth/session'
+
+export const dynamic = 'force-dynamic'
 
 function MarginBreakdown({
   price,

@@ -5,12 +5,13 @@ import { hasAnyRole, hasRole } from '@/lib/rbac'
 import { getClinicCoupons, getAdminCoupons } from '@/services/coupons'
 import { createAdminClient } from '@/lib/db/admin'
 
-export const dynamic = 'force-dynamic'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Tag, CheckCircle2, Clock, XCircle, AlertCircle, AlertTriangle } from 'lucide-react'
 import { CouponActivateForm } from '@/components/coupons/coupon-activate-form'
 import { AdminCouponPanel } from '@/components/coupons/admin-coupon-panel'
 import type { SelectOption } from '@/components/coupons/searchable-select'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = { title: 'Cupons de desconto | Clinipharma' }
 

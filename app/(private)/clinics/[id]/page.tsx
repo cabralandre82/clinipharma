@@ -3,14 +3,13 @@ import Link from 'next/link'
 import { requireRolePage } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/db/admin'
 import { formatCNPJ, formatPhone, formatDate } from '@/lib/utils'
-
-export const dynamic = 'force-dynamic'
 import { EntityStatusBadge } from '@/components/shared/status-badge'
 import { ButtonLink } from '@/components/ui/button-link'
 import { ClinicStatusActions } from '@/components/clinics/clinic-status-actions'
 import { AssignConsultantDialog } from '@/components/consultants/assign-consultant-dialog'
 import type { Clinic, EntityStatus, SalesConsultant } from '@/types'
 
+export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Detalhe da Clínica | Clinipharma' }
 
 interface PageProps {

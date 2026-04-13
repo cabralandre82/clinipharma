@@ -2,8 +2,9 @@ import { requireRolePage } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/db/admin'
 import { ProductForm } from '@/components/products/product-form'
 
-export const dynamic = 'force-dynamic'
 import type { ProductCategory, Pharmacy } from '@/types'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Novo Produto | Clinipharma' }
 

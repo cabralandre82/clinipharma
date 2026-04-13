@@ -2,9 +2,10 @@ import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/db/admin'
 import { requireRolePage } from '@/lib/rbac'
 
-export const dynamic = 'force-dynamic'
 import { ConsultantForm } from '@/components/consultants/consultant-form'
 import type { SalesConsultant } from '@/types'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Editar Consultor — Clinipharma' }
 

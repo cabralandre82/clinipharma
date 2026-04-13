@@ -1,11 +1,12 @@
 import { Metadata } from 'next'
 import { createAdminClient } from '@/lib/db/admin'
 
-export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/session'
 import { NewOrderForm, type NewOrderFormProduct } from '@/components/orders/new-order-form'
 import { parseCartParam } from '@/lib/orders/doctor-field-rules'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = { title: 'Novo pedido | Clinipharma' }
 

@@ -3,7 +3,6 @@ import { Metadata } from 'next'
 import { Suspense } from 'react'
 import { createAdminClient } from '@/lib/db/admin'
 
-export const dynamic = 'force-dynamic'
 import { requireRolePage } from '@/lib/rbac'
 import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,6 +36,8 @@ import {
   ConversionFunnel,
   ProductMarginChart,
 } from '@/components/reports/advanced-bi'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = { title: 'Relatórios | Clinipharma' }
 

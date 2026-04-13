@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { requireRolePage } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/db/admin'
 
-export const dynamic = 'force-dynamic'
 import { formatDate } from '@/lib/utils'
 import {
   Building2,
@@ -22,6 +21,8 @@ import {
   REGISTRATION_STATUS_COLORS,
 } from '@/lib/registration-constants'
 import { calculateLeadScore, type LeadLevel } from '@/lib/lead-score'
+
+export const dynamic = 'force-dynamic'
 
 const LEAD_BADGE: Record<LeadLevel, { label: string; icon: React.ReactNode; className: string }> = {
   hot: {

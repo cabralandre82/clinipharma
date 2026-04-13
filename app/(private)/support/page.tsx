@@ -4,7 +4,6 @@ import { requireRolePage } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/db/admin'
 import { getCurrentUser } from '@/lib/auth/session'
 
-export const dynamic = 'force-dynamic'
 import { TicketList } from '@/components/support/ticket-list'
 import { ButtonLink } from '@/components/ui/button-link'
 import {
@@ -14,6 +13,8 @@ import {
   TICKET_PRIORITY_LABELS,
   TICKET_PRIORITY_COLORS,
 } from '@/lib/support-constants'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Suporte | Clinipharma' }
 

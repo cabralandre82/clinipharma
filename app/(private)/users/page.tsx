@@ -2,12 +2,13 @@ import { requireRolePage } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/db/admin'
 import { ButtonLink } from '@/components/ui/button-link'
 
-export const dynamic = 'force-dynamic'
 import { UsersTable } from '@/components/users/users-table'
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper'
 import { parsePage, paginationRange } from '@/lib/utils'
 import { Plus } from 'lucide-react'
 import type { Metadata } from 'next'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = { title: 'Usuários | Clinipharma' }
 

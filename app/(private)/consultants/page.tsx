@@ -3,10 +3,11 @@ import { createAdminClient } from '@/lib/db/admin'
 import { requireRolePage } from '@/lib/rbac'
 import { getCurrentUser } from '@/lib/auth/session'
 
-export const dynamic = 'force-dynamic'
 import { ButtonLink } from '@/components/ui/button-link'
 import { formatCNPJ } from '@/lib/utils'
 import { UserPlus } from 'lucide-react'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Consultores de Vendas — Clinipharma' }
 

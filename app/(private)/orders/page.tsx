@@ -2,13 +2,14 @@ import { Metadata } from 'next'
 import { createAdminClient } from '@/lib/db/admin'
 import { getCurrentUser } from '@/lib/auth/session'
 
-export const dynamic = 'force-dynamic'
 import { OrdersTable, type OrderRow } from '@/components/orders/orders-table'
 import { ButtonLink } from '@/components/ui/button-link'
 import { CursorPagination } from '@/components/ui/cursor-pagination'
 import { ExportButton } from '@/components/shared/export-button'
 import { Plus } from 'lucide-react'
 import { TemplatesList } from '@/components/orders/templates/templates-list'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = { title: 'Pedidos | Clinipharma' }
 

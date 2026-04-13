@@ -3,7 +3,6 @@ import { createAdminClient } from '@/lib/db/admin'
 import { getCurrentUser } from '@/lib/auth/session'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
-export const dynamic = 'force-dynamic'
 import { parseCursorParams, sliceCursorResult } from '@/lib/cursor-pagination'
 import { CursorPagination } from '@/components/ui/cursor-pagination'
 import { TransferCompleteDialog } from '@/components/shared/transfer-complete-dialog'
@@ -16,6 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = { title: 'Repasses | Clinipharma' }
 

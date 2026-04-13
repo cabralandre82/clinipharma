@@ -3,12 +3,13 @@ import { getCurrentUser } from '@/lib/auth/session'
 import { redirect } from 'next/navigation'
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard'
 
-export const dynamic = 'force-dynamic'
 import { ClinicDashboard } from '@/components/dashboard/clinic-dashboard'
 import { DoctorDashboard } from '@/components/dashboard/doctor-dashboard'
 import { PharmacyDashboard } from '@/components/dashboard/pharmacy-dashboard'
 import { ConsultantDashboard } from '@/components/dashboard/consultant-dashboard'
 import { RegistrationStatusBanner } from '@/components/dashboard/registration-status-banner'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Dashboard',

@@ -2,10 +2,11 @@ import { Metadata } from 'next'
 import { requireRolePage } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/db/admin'
 
-export const dynamic = 'force-dynamic'
 import { formatDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { ChurnContactButton } from '@/components/churn/churn-contact-button'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = { title: 'Risco de Churn | Clinipharma' }
 

@@ -2,12 +2,13 @@ import { createAdminClient } from '@/lib/db/admin'
 import { requireRolePage } from '@/lib/rbac'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
-export const dynamic = 'force-dynamic'
 import { parseCursorParams, sliceCursorResult } from '@/lib/cursor-pagination'
 import { CursorPagination } from '@/components/ui/cursor-pagination'
 import { ConsultantTransferDialog } from '@/components/consultants/consultant-transfer-dialog'
 import { ExportButton } from '@/components/shared/export-button'
 import type { SalesConsultant, ConsultantCommission } from '@/types'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = { title: 'Repasses a Consultores — Clinipharma' }
 

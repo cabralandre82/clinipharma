@@ -4,12 +4,13 @@ import { requireRolePage } from '@/lib/rbac'
 import { getCurrentUser } from '@/lib/auth/session'
 import { createAdminClient } from '@/lib/db/admin'
 
-export const dynamic = 'force-dynamic'
 import { formatDate, formatPhone } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { ResetPasswordDialog } from '@/components/users/reset-password-dialog'
 import { DeactivateUserDialog } from '@/components/users/deactivate-user-dialog'
 import type { Metadata } from 'next'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = { title: 'Detalhe do Usuário | Clinipharma' }
 
