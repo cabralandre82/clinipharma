@@ -1,7 +1,9 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-12 | Versão da plataforma: **6.0.1** | **767 testes** | cobertura atualizada
+> Gerado em: 2026-04-13 | Versão da plataforma: **6.1.1** | **786 testes** | cobertura atualizada
 >
+> **v6.1.1:** Campos de receita médica expostos no formulário de produto (seção "Receita Médica"). `Product` type + `productSchema` atualizados. Produtos do catálogo inicial classificados em produção via API.
+> **v6.1.0:** Enforcement completo de receitas médicas — migration 030, `lib/prescription-rules.ts`, `POST /api/orders/[id]/advance` (gate único), `POST /api/orders/[id]/prescriptions` (upload por item), `PrescriptionManager` UI. 16 novos testes. 786 testes passando.
 > **v6.0.3:** 4 gaps da auditoria interna corrigidos em `lib/ai.ts`: validação de enum/boolean em `analyzeSentiment`, `temperature 0` em contratos, circuit breakers separados por feature. 3 novos TCs. 770 testes passando.
 > **v6.0.2:** Plano de auditoria de QA e segurança (incl. IA) — `docs/audit-qa-plena-2026-04.md` (~242 casos explícitos + matriz de expansão RBAC para 40 rotas API). Alinhado a `known-limitations`, LGPD e roadmap.
 > **v6.0.1:** Cobertura completa para features de IA — 44 novos testes (lead-score, lib/ai, 4 jobs Inngest, OCR route, recommendations route, 3 crons). Migration 029 aplicada em produção. `OPENAI_API_KEY` configurada no Vercel (Production + Preview). 767 testes passando.
@@ -149,7 +151,7 @@ Itens do roadmap que dependem de CNPJ ativo para implementar:
 | 🟢 Onboarding (após go-live)          | 7      | Comercial + Fundador      |
 | **Total**                             | **43** |                           |
 
-### Funcionalidades entregues (v4.7.0 → v6.0.1)
+### Funcionalidades entregues (v4.7.0 → v6.1.1)
 
 | Versão | Feature                                                                                                    | Testes |
 | ------ | ---------------------------------------------------------------------------------------------------------- | ------ |
@@ -168,8 +170,12 @@ Itens do roadmap que dependem de CNPJ ativo para implementar:
 | 5.3.2  | Fix `'use server'` coupons + sidebar Cupons reposicionado (posição 4)                                      | ✅     |
 | 6.0.0  | IA integrada: 8 features (churn, recompra, triagem, sentimento, OCR, contratos, recomendações, lead score) | ✅     |
 | 6.0.1  | Cobertura IA: 44 novos testes + migration 029 aplicada + OPENAI_API_KEY Vercel                             | ✅     |
+| 6.0.2  | Auditoria QA plena — `docs/audit-qa-plena-2026-04.md` (~242 casos + matriz RBAC)                           | —      |
+| 6.0.3  | Fix auditoria IA: `analyzeSentiment` validação enum/bool, `temperature 0` contratos, circuit breakers      | ✅     |
+| 6.1.0  | Enforcement receitas médicas: migration 030, gate `/advance`, upload por item, UI PrescriptionManager      | ✅     |
+| 6.1.1  | Formulário de produto: seção "Receita Médica" com toggle, tipo e unidades por receita                      | ✅     |
 
-**O que está 100% pronto:** plataforma técnica, autenticação, pedidos, pagamentos sandbox, notificações (push/email/SMS/push), LGPD portal, auditoria, compliance CNPJ, suporte por tickets com IA, cupons de desconto, gerenciamento de categorias, SKU automático, Política de Privacidade, Termos de Uso, E2E tests, CI/CD, documentação, **8 features de IA em produção**.
+**O que está 100% pronto:** plataforma técnica, autenticação, pedidos, pagamentos sandbox, notificações (push/email/SMS/push), LGPD portal, auditoria, compliance CNPJ, suporte por tickets com IA, cupons de desconto, gerenciamento de categorias, SKU automático, Política de Privacidade, Termos de Uso, E2E tests, CI/CD, documentação, **8 features de IA em produção**, **enforcement completo de receitas médicas com controle por produto e por unidade**.
 
 **O que bloqueia lançamento comercial:** CNPJ da empresa → Asaas produção → NF-e → DPA/LGPD (itens 1–5 e 7).
 

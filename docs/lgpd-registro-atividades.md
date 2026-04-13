@@ -4,8 +4,8 @@
 
 **Controlador:** Clinipharma (CNPJ pendente)
 **DPO:** André Cabral — privacidade@clinipharma.com.br
-**Última atualização:** 2026-04-12
-**Versão:** 1.1
+**Última atualização:** 2026-04-13
+**Versão:** 1.2
 
 ---
 
@@ -87,7 +87,21 @@
 | **Retenção**         | 5 anos                                                                   |
 | **Opt-out**          | Usuário pode desativar notificações não críticas em Configurações        |
 
-### 2.7 Logs de Auditoria
+### 2.7 Receitas Médicas (Dados de Saúde — Art. 11 LGPD)
+
+| Item                            | Descrição                                                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dados tratados**              | Imagem/PDF da receita, nome do paciente (opcional, informado pela clínica), número da receita (opcional), CRM do médico (via OCR, opcional) |
+| **Finalidade**                  | Comprovação regulatória de autorização de dispensação de medicamentos controlados (Portaria 344/98, antimicrobianos)                        |
+| **Classificação**               | **Dado de saúde (LGPD Art. 11)** — tratamento exige tutela reforçada                                                                        |
+| **Base legal**                  | Obrigação legal — ANVISA/Portaria 344/98 + execução de contrato (LGPD Art. 11, II, a e b)                                                   |
+| **Compartilhamento**            | Farmácia responsável pela manipulação (necessidade técnica/regulatória); OpenAI Vision API (OCR — apenas quando acionado sob demanda)       |
+| **OpenAI / dados enviados**     | Imagem do documento apenas quando OCR é solicitado pelo usuário. Sem nome ou CPF do paciente enviados por padrão.                           |
+| **Retenção**                    | 10 anos — obrigação ANVISA (RDC 67/2007 e correlatas)                                                                                       |
+| **Transferência internacional** | OpenAI (EUA) — apenas durante OCR. Sujeito a DPA com cláusula de zero data retention.                                                       |
+| **Medidas de segurança**        | Armazenamento em Supabase Storage com RLS; URLs pré-assinadas de curta duração; imutabilidade após upload (sem UPDATE/DELETE via RLS)       |
+
+### 2.8 Logs de Auditoria
 
 | Item                 | Descrição                                                      |
 | -------------------- | -------------------------------------------------------------- |
@@ -115,8 +129,9 @@
 
 | Rascunhos de cadastro (registration_drafts) | 7 dias (purge automático) | Legítimo interesse (lead capture) |
 | Mensagens de suporte (sentimento IA) | 5 anos | Legítimo interesse (segurança) |
+| Receitas médicas (`order_item_prescriptions`, `order_documents` tipo PRESCRIPTION) | 10 anos | Obrigação legal — ANVISA RDC 67/2007 |
 
-**Implementação técnica:** Cron mensal (`/api/cron/enforce-retention`, todo dia 1 às 02h UTC) executa anonymização e purge automático conforme tabela acima. Cron diário (`/api/cron/purge-drafts`, às 03:30 UTC) remove rascunhos expirados.
+**Implementação técnica:** Cron mensal (`/api/cron/enforce-retention`, todo dia 1 às 02h UTC) executa anonymização e purge automático conforme tabela acima. Cron diário (`/api/cron/purge-drafts`, às 03:30 UTC) remove rascunhos expirados. Receitas são imutáveis por RLS — não há purge automático aplicável.
 
 ---
 

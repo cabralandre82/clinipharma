@@ -2,6 +2,38 @@
 
 ---
 
+## [6.1.1] — 2026-04-13 — Campo de receita médica no formulário de edição de produto
+
+### UI — `components/products/product-form.tsx`
+
+- Nova seção **"Receita Médica"** no formulário de criação e edição de produto (admin):
+  - Toggle "Exige receita médica" (`requires_prescription`) — ao desligar, zera os campos dependentes.
+  - Select "Tipo de receita" (`prescription_type`): Receita Simples / Controle Especial (Portaria 344/98) / Antimicrobiano. Aparece apenas quando o toggle está ativo.
+  - Campo numérico "Unidades por receita" (`max_units_per_prescription`) com tooltip explicando os três modelos (em branco = Modelo A; 1 = por unidade; N = por N unidades).
+- `defaultValues` do formulário pré-carrega os três campos a partir do produto existente.
+
+### Tipos — `types/index.ts`
+
+- Adicionados `requires_prescription`, `prescription_type` e `max_units_per_prescription` à interface `Product`.
+
+### Validação — `lib/validators/index.ts`
+
+- Adicionados os três campos ao `productSchema` com tipos corretos: `boolean`, `enum nullable`, `integer nullable`.
+
+### Dados — Supabase (produção)
+
+- Produtos do catálogo atualizados manualmente via API REST com classificação regulatória:
+
+| Produto                      | `requires_prescription` | `prescription_type` | `max_units_per_prescription` |
+| ---------------------------- | ----------------------- | ------------------- | ---------------------------- |
+| Testosterona Gel 50mg        | ✅                      | `SPECIAL_CONTROL`   | **1**                        |
+| Progesterona 200mg           | ✅                      | `SIMPLE`            | null                         |
+| Ácido Retinoico 0.05%        | ✅                      | `SIMPLE`            | null                         |
+| Ondansetrona 8mg Supositório | ✅                      | `SIMPLE`            | null                         |
+| Vitamina D3 10000 UI         | ❌                      | null                | null                         |
+
+---
+
 ## [6.1.0] — 2026-04-13 — Controle de receitas médicas por produto e por unidade
 
 ### Contexto

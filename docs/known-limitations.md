@@ -60,7 +60,7 @@
   - **Modelo B (Por unidade)**: `max_units_per_prescription=1` exige uma receita por unidade; campo genérico `N` exige `ceil(quantity/N)` receitas.
   - Upload de receitas por item via `POST /api/orders/[id]/prescriptions`.
   - Gate único via `POST /api/orders/[id]/advance` — mesmo admins são bloqueados.
-  - **⚠️ PENDENTE:** Os produtos existentes no catálogo têm `requires_prescription=false` por padrão. O SUPER_ADMIN deve atualizar manualmente os produtos controlados no painel de administração (ou via SQL direto no Supabase).
+  - ~~**⚠️ PENDENTE:** Os produtos existentes no catálogo têm `requires_prescription=false` por padrão. O SUPER_ADMIN deve atualizar manualmente os produtos controlados no painel de administração.~~ ✅ **v6.1.1**: Campos expostos no formulário de edição de produto (seção "Receita Médica"). Produtos do catálogo inicial já atualizados em produção. Novos produtos podem ser configurados diretamente na UI.
   - **⚠️ NÃO IMPLEMENTADO:** Validação de _conteúdo_ da receita (nome do paciente, CRM do médico, data de validade) — fica sob responsabilidade da farmácia manipuladora.
   - **⚠️ NÃO IMPLEMENTADO:** OCR automático de receitas para extração de dados (previsto como feature de IA — `prescription_number` e `patient_name` são campos opcionais preenchidos manualmente pela clínica).
 
