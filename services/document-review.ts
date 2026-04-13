@@ -22,11 +22,13 @@ export async function reviewDocument(
     }
 
     // Fetch document + order
-    const { data: doc } = await admin
+    const { data: doc, error: docError } = await admin
       .from('order_documents')
-      .select('id, order_id, order_items_id')
+      .select('id, order_id')
       .eq('id', documentId)
       .single()
+
+    if (docError) logger.error('[reviewDocument] doc fetch error', { docError, documentId })
 
     if (!doc) return { error: 'Documento não encontrado' }
 

@@ -86,9 +86,10 @@ export function DocumentManager({
   const [uploading, setUploading] = useState(false)
   const [selectedType, setSelectedType] = useState('PRESCRIPTION')
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [reviewingId, setReviewingId] = useState<string | null>(null)
-  const [rejectionReason, setRejectionReason] = useState('')
+  const [processing, setProcessing] = useState<string | null>(null)
   const [downloading, setDownloading] = useState<string | null>(null)
+  // Per-document rejection reason state
+  const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({})
 
   const uploadedTypes = new Set(documents.map((d) => d.document_type))
 
@@ -140,72 +141,85 @@ export function DocumentManager({
   }
 
   async function handleReview(docId: string, decision: 'APPROVED' | 'REJECTED') {
-    if (decision === 'REJECTED' && !rejectionReason.trim()) {
-      toast.error('Informe o motivo da rejeição')
+    const reason = rejectionReasons[docId] ?? ''
+    if (decision === 'REJECTED' && !reason.trim()) {
+      toast.error('Informe o motivo da rejeição antes de rejeitar')
       return
     }
-    setReviewingId(docId)
+    setProcessing(docId + ':' + decision)
     try {
-      const result = await reviewDocument(docId, decision, rejectionReason || undefined)
+      const result = await reviewDocument(docId, decision, reason.trim() || undefined)
       if (result.error) {
         toast.error(result.error)
         return
       }
       toast.success(decision === 'APPROVED' ? 'Documento aprovado' : 'Documento rejeitado')
-      setRejectionReason('')
+      setRejectionReasons((prev) => {
+        const next = { ...prev }
+        delete next[docId]
+        return next
+      })
       router.refresh()
     } catch {
       toast.error('Erro ao revisar documento')
     } finally {
-      setReviewingId(null)
+      setProcessing(null)
     }
   }
 
   return (
     <div className="space-y-4">
-      {/* Required types checklist */}
-      <div className="space-y-2">
-        {REQUIRED_DOCUMENT_TYPES.filter((t) => t.required).map((docType) => {
-          const present = uploadedTypes.has(docType.type)
-          return (
-            <div
-              key={docType.type}
-              className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
-                present ? 'border-green-100 bg-green-50' : 'border-amber-100 bg-amber-50'
-              }`}
-            >
-              {present ? (
-                <CheckCircle className="h-4 w-4 flex-shrink-0 text-green-600" />
-              ) : (
-                <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-600" />
-              )}
-              <div className="flex-1">
-                <p
-                  className={`text-sm font-medium ${present ? 'text-green-800' : 'text-amber-800'}`}
-                >
-                  {docType.label}
-                </p>
-                <p className={`text-xs ${present ? 'text-green-600' : 'text-amber-600'}`}>
-                  {present ? 'Enviado' : docType.description + ' (obrigatório)'}
-                </p>
+      {/* Required types checklist — only meaningful for uploaders */}
+      {canUpload && (
+        <div className="space-y-2">
+          {REQUIRED_DOCUMENT_TYPES.filter((t) => t.required).map((docType) => {
+            const present = uploadedTypes.has(docType.type)
+            return (
+              <div
+                key={docType.type}
+                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
+                  present ? 'border-green-100 bg-green-50' : 'border-amber-100 bg-amber-50'
+                }`}
+              >
+                {present ? (
+                  <CheckCircle className="h-4 w-4 flex-shrink-0 text-green-600" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-600" />
+                )}
+                <div className="flex-1">
+                  <p
+                    className={`text-sm font-medium ${present ? 'text-green-800' : 'text-amber-800'}`}
+                  >
+                    {docType.label}
+                  </p>
+                  <p className={`text-xs ${present ? 'text-green-600' : 'text-amber-600'}`}>
+                    {present ? 'Enviado' : docType.description + ' (obrigatório)'}
+                  </p>
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Uploaded documents list */}
-      {documents.length > 0 && (
+      {documents.length > 0 ? (
         <ul className="space-y-3">
           {documents.map((doc) => {
             const statusCfg = DOC_STATUS_CONFIG[doc.status ?? 'PENDING']
             const isPending = !doc.status || doc.status === 'PENDING'
+            const isProcessing =
+              processing === doc.id + ':APPROVED' || processing === doc.id + ':REJECTED'
+
             return (
-              <li key={doc.id} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
+              <li key={doc.id} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-3">
+                {/* Document header */}
                 <div className="flex items-center gap-3">
                   <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-gray-800">{doc.original_filename}</p>
+                    <p className="truncate text-sm font-medium text-gray-800">
+                      {doc.original_filename}
+                    </p>
                     <p className="text-xs text-gray-400">
                       {(doc.file_size / 1024).toFixed(0)} KB · {formatDate(doc.created_at)}
                     </p>
@@ -233,48 +247,64 @@ export function DocumentManager({
                   </button>
                 </div>
 
-                {/* Rejection reason display */}
+                {/* Rejection reason display (for clinic to see why it was rejected) */}
                 {doc.status === 'REJECTED' && doc.rejection_reason && (
                   <div className="mt-2 flex items-start gap-2 rounded-md bg-red-50 px-2 py-1.5">
                     <XCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-red-500" />
-                    <p className="text-xs text-red-700">{doc.rejection_reason}</p>
+                    <p className="text-xs text-red-700">
+                      <span className="font-medium">Motivo da rejeição:</span>{' '}
+                      {doc.rejection_reason}
+                    </p>
                   </div>
                 )}
 
-                {/* Review controls — pharmacy only, pending docs only */}
+                {/* Review controls — pharmacy, pending docs only */}
                 {canReview && isPending && (
-                  <div className="mt-2 space-y-2 border-t border-gray-100 pt-2">
-                    <input
-                      type="text"
-                      placeholder="Motivo da rejeição (obrigatório se rejeitar)"
-                      value={reviewingId === doc.id ? rejectionReason : ''}
-                      onChange={(e) => {
-                        setReviewingId(doc.id)
-                        setRejectionReason(e.target.value)
-                      }}
-                      onFocus={() => setReviewingId(doc.id)}
-                      className="w-full rounded border border-gray-200 px-2 py-1 text-xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
-                    />
+                  <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600">
+                        Motivo da rejeição{' '}
+                        <span className="font-normal text-gray-400">(obrigatório se rejeitar)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: receita ilegível, documento vencido, assinatura ausente…"
+                        value={rejectionReasons[doc.id] ?? ''}
+                        onChange={(e) =>
+                          setRejectionReasons((prev) => ({ ...prev, [doc.id]: e.target.value }))
+                        }
+                        className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-400 focus:outline-none"
+                      />
+                    </div>
                     <div className="flex gap-2">
                       <Button
                         type="button"
                         size="sm"
-                        variant="outline"
-                        disabled={reviewingId === doc.id && uploading}
+                        disabled={isProcessing}
                         onClick={() => handleReview(doc.id, 'APPROVED')}
-                        className="gap-1.5 border-green-200 text-green-700 hover:bg-green-50"
+                        className="gap-1.5 border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+                        variant="outline"
                       >
-                        <CheckCircle className="h-3.5 w-3.5" />
+                        {processing === doc.id + ':APPROVED' ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-3.5 w-3.5" />
+                        )}
                         Aprovar
                       </Button>
                       <Button
                         type="button"
                         size="sm"
-                        variant="outline"
+                        disabled={isProcessing}
                         onClick={() => handleReview(doc.id, 'REJECTED')}
-                        className="gap-1.5 border-red-200 text-red-700 hover:bg-red-50"
+                        className="gap-1.5 border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                        variant="outline"
                       >
-                        <XCircle className="h-3.5 w-3.5" />
+                        {processing === doc.id + ':REJECTED' ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5" />
+                        )}
                         Rejeitar
                       </Button>
                     </div>
@@ -284,16 +314,14 @@ export function DocumentManager({
             )
           })}
         </ul>
-      )}
-
-      {documents.length === 0 && (
+      ) : (
         <div className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-700">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <p>Nenhum documento anexado. O pedido não avançará sem a receita médica.</p>
         </div>
       )}
 
-      {/* Upload form */}
+      {/* Upload form — only for clinic */}
       {canUpload && (
         <div className="space-y-3 rounded-lg border border-dashed border-gray-200 p-4">
           <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">

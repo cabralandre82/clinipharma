@@ -394,7 +394,9 @@ export function OrderDetail({ order, currentUser, prescriptionItems = [] }: Orde
               <DocumentManager
                 orderId={String(order.id)}
                 documents={documents}
-                canUpload={!['COMPLETED', 'CANCELED'].includes(String(order.order_status))}
+                canUpload={
+                  !isPharmacy && !['COMPLETED', 'CANCELED'].includes(String(order.order_status))
+                }
                 canReview={(isAdmin || isPharmacy) && order.order_status === 'READY_FOR_REVIEW'}
               />
             </CardContent>

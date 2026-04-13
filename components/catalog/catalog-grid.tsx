@@ -32,9 +32,11 @@ export interface ProductCard {
 
 interface CatalogGridProps {
   products: ProductCard[]
+  /** When true, show management CTAs (edit/toggle) instead of order CTAs */
+  pharmacyMode?: boolean
 }
 
-export function CatalogGrid({ products }: CatalogGridProps) {
+export function CatalogGrid({ products, pharmacyMode = false }: CatalogGridProps) {
   if (products.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -48,13 +50,13 @@ export function CatalogGrid({ products }: CatalogGridProps) {
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {products.map((product) => (
-        <ProductCard key={product.id} product={product} />
+        <ProductCard key={product.id} product={product} pharmacyMode={pharmacyMode} />
       ))}
     </div>
   )
 }
 
-function ProductCard({ product }: { product: ProductCard }) {
+function ProductCard({ product, pharmacyMode }: { product: ProductCard; pharmacyMode?: boolean }) {
   const [interestOpen, setInterestOpen] = useState(false)
   const unavailable = product.status === 'unavailable'
 
@@ -148,7 +150,33 @@ function ProductCard({ product }: { product: ProductCard }) {
             )}
           </div>
 
-          {unavailable ? (
+          {pharmacyMode ? (
+            <div className="mt-3 flex gap-2">
+              <ButtonLink
+                href={`/products/${product.id}/edit`}
+                className="flex-1"
+                size="sm"
+                variant="outline"
+              >
+                Editar produto
+              </ButtonLink>
+              <span
+                className={`flex items-center rounded-md px-2 py-1 text-xs font-medium ${
+                  product.status === 'active'
+                    ? 'bg-green-50 text-green-700'
+                    : product.status === 'unavailable'
+                      ? 'bg-amber-50 text-amber-700'
+                      : 'bg-gray-100 text-gray-500'
+                }`}
+              >
+                {product.status === 'active'
+                  ? 'Ativo'
+                  : product.status === 'unavailable'
+                    ? 'Indisponível'
+                    : 'Inativo'}
+              </span>
+            </div>
+          ) : unavailable ? (
             <Button
               variant="outline"
               size="sm"
