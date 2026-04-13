@@ -59,19 +59,43 @@ Inseridos via `supabase/seed.sql` (executado com `supabase db push --include-see
 
 Ao acessar `/orders/new`:
 
-- **`CLINIC_ADMIN` / `STAFF`** — a clínica é detectada automaticamente via `clinic_members`; nenhum dropdown é exibido.
+- **`CLINIC_ADMIN`** — a clínica é detectada automaticamente via `clinic_members` (usando `adminClient` para contornar RLS); nenhum dropdown é exibido.
 - **`DOCTOR`** — se vinculado a uma clínica, auto-selecionada; se a múltiplas, exibe dropdown apenas das suas clínicas.
 - **`SUPER_ADMIN` / `PLATFORM_ADMIN`** — dropdown com todas as clínicas ativas.
 
 **Campo "Médico solicitante":**
 
-| Clínica tem médicos vinculados? | Carrinho tem produto com `requires_prescription`? | Comportamento |
-| ------------------------------- | ------------------------------------------------- | ------------- |
-| Não                             | Qualquer                                          | Campo oculto  |
-| Sim                             | Não                                               | Opcional      |
-| Sim                             | Sim                                               | Obrigatório   |
+| Clínica tem médicos vinculados? | Carrinho tem produto com `requires_prescription`? | Comportamento                                                  |
+| ------------------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
+| Não                             | Qualquer                                          | Campo oculto + callout para cadastrar médico (se CLINIC_ADMIN) |
+| Sim                             | Não                                               | Opcional                                                       |
+| Sim                             | Sim                                               | Obrigatório                                                    |
 
-A coluna `orders.doctor_id` é nullable desde a migration 032.
+A coluna `orders.doctor_id` é nullable desde a migration `032_orders_doctor_optional.sql`.
+
+**Preservação do carrinho ao cadastrar médico:**
+
+Ao clicar em "Cadastrar novo médico" dentro do formulário de pedido, os itens do carrinho são serializados na URL (`?cart=id:qty,id:qty`) e restaurados ao retornar para `/orders/new`. A lógica de serialização/desserialização está em `lib/orders/doctor-field-rules.ts` (`parseCartParam`).
+
+**`CLINIC_ADMIN` criando médico:**
+
+- Acesso liberado para `/doctors/new` e `/doctors/[id]`.
+- Ao salvar, o médico é automaticamente vinculado à clínica do usuário (`doctor_clinic_links`) com status `ACTIVE`.
+- O redirect pós-criação vai para `/orders/new` (preservando o carrinho via URL).
+
+**Página de detalhe do pedido (`/orders/[id]`):**
+
+Usa `adminClient` (service role) para buscar o pedido e suas relações, evitando bloqueios de RLS para `CLINIC_ADMIN` após a criação do pedido.
+
+**Compliance:**
+
+O `canPlaceOrder` valida CNPJ da farmácia via API externa. CNPJs fictícios (dados seed) serão bloqueados. Para testes, execute no Supabase SQL Editor:
+
+```sql
+UPDATE public.pharmacies
+SET cnpj_validated_at = now(), cnpj_situation = 'ATIVA'
+WHERE id = 'b1000000-0000-0000-0000-000000000001';
+```
 
 ---
 
