@@ -73,6 +73,7 @@
 - ~~Sem rastreamento público~~ ✅ **v1.4.0**: `/track/[token]` sem login, timeline visual.
 - ~~**Clínica exibia dropdown desnecessário e médico sempre obrigatório**~~ ✅ **v6.4.0**: clínica auto-detectada pelo papel do usuário logado (sem seleção manual para `CLINIC_ADMIN`). Campo de médico solicitante é condicional: oculto quando a clínica não tem médicos vinculados, opcional quando tem, obrigatório apenas quando o carrinho contém produto com `requires_prescription = true`. `orders.doctor_id` é nullable (migration 032). Lógica extraída para `lib/orders/doctor-field-rules.ts` com 5 testes unitários.
 - ~~**RLS bootstrap impedia CLINIC_ADMIN de ver sua clínica**~~ ✅ **v6.4.2**: queries de `clinic_members` e `doctor_clinic_links` na página de novo pedido usam `adminClient` (service role) — contorna a política RLS que exige ser membro para ler membros. `CLINIC_ADMIN` pode cadastrar médicos em `/doctors/new` com auto-vínculo à sua clínica.
+- ~~**CLINIC_ADMIN recebia `/unauthorized` ao salvar médico**~~ ✅ **v6.4.3**: `/doctors/[id]` aberto para `CLINIC_ADMIN`. Após cadastrar médico, `CLINIC_ADMIN` é redirecionado de volta para `/orders/new` em vez da página de detalhe.
 
 ## Receitas Médicas
 

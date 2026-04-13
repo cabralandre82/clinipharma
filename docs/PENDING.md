@@ -1,6 +1,8 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-13 | Versão da plataforma: **6.4.2** | **851 testes** | cobertura atualizada
+> Gerado em: 2026-04-13 | Versão da plataforma: **6.4.3** | **851 testes** | cobertura atualizada
+>
+> **v6.4.3:** Fix redirect pós-cadastro de médico — `CLINIC_ADMIN` era jogado para `/unauthorized` ao salvar médico (página de detalhe exigia `SUPER_ADMIN`). `/doctors/[id]` aberto para `CLINIC_ADMIN`. `DoctorForm` aceita `redirectTo` prop; para `CLINIC_ADMIN` redireciona para `/orders/new` após cadastro. Página de novo médico informa que o médico será vinculado automaticamente.
 >
 > **v6.4.2:** Fix crítico no fluxo de pedidos — `adminClient` usado nas queries de `clinic_members` e `doctor_clinic_links` para contornar bootstrap de RLS (usuário não conseguia ler sua própria clínica com o client de usuário). `CLINIC_ADMIN` pode agora cadastrar médicos em `/doctors/new` com auto-vínculo à sua clínica. Atalhos no form de pedido: link "Cadastrar novo médico" ao lado do campo, e callout âmbar quando a clínica não tem médicos vinculados. 2 novos testes unitários.
 >
@@ -187,6 +189,7 @@ Itens do roadmap que dependem de CNPJ ativo para implementar:
 | 6.4.0  | Fluxo de pedidos: clínica auto-detectada, médico condicional por `requires_prescription`, migration 032     | ✅     |
 | 6.4.1  | Refactor: `lib/orders/doctor-field-rules.ts` — lógica extraída do componente, 5 testes unitários            | ✅     |
 | 6.4.2  | Fix RLS bootstrap, CLINIC_ADMIN cadastra médico com auto-vínculo, atalhos no form de pedido, 2 novos testes | ✅     |
+| 6.4.3  | Fix redirect pós-cadastro de médico: `/doctors/[id]` aberto para `CLINIC_ADMIN`, volta para `/orders/new`   | ✅     |
 
 **O que está 100% pronto:** plataforma técnica, autenticação, pedidos, pagamentos sandbox, notificações (push/email/SMS/push), LGPD portal, auditoria, compliance CNPJ, suporte por tickets com IA, cupons de desconto, gerenciamento de categorias, SKU automático, Política de Privacidade, Termos de Uso, E2E tests, CI/CD, documentação, **8 features de IA em produção**, **enforcement completo de receitas médicas com controle por produto e por unidade**.
 
