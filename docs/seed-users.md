@@ -110,6 +110,8 @@ Ao usar `adminClient` (que bypassa RLS), o isolamento entre tenants passa a ser 
 
 Regra geral: **nenhuma page da área privada deve usar `createClient()`, todas devem ter `force-dynamic`, e toda ação que recebe um ID externo deve verificar se o usuário tem acesso ao recurso antes de retornar ou modificar dados**.
 
+> ⚠️ **Joins embutidos PostgREST:** evitar `.select('*, outra_tabela(campos)')` em páginas de detalhe. Se o relacionamento FK não for resolvido pelo PostgREST em produção, a query retorna `error` com `data: null` silenciosamente, disparando `notFound()`. Usar sempre duas queries independentes: `select('*')` na tabela principal + query separada por `foreign_key_id`.
+
 **Documentos no pedido:**
 
 No formulário de criação, cada arquivo anexado recebe um tipo escolhido pela clínica via seletor inline. Os tipos disponíveis (definidos em `components/orders/document-manager.tsx`) são:

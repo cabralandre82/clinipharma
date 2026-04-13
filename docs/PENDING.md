@@ -1,6 +1,8 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-13 | Versão da plataforma: **6.5.6** | **872 testes** | cobertura atualizada
+> Gerado em: 2026-04-13 | Versão da plataforma: **6.5.7** | **872 testes** | cobertura atualizada
+>
+> **v6.5.7:** Fix `notFound()` em `/clinics/[id]` — a query usava join embutido PostgREST (`.select('*, sales_consultants(...)')`) que falhava silenciosamente em produção retornando `data: null` e disparando `notFound()`. Substituído por duas queries independentes (`select('*')` na clínica + query separada para o consultor via `consultant_id`). Adicionado `console.error` para logar erros de query nos logs do Vercel. Padrão agora consistente com farmácias e médicos.
 >
 > **v6.5.6:** Fix crítico de posicionamento do `export const dynamic = 'force-dynamic'` — o prettier auto-formatter estava inserindo a diretiva no meio de blocos `import {` (incluindo imports multi-linha) em 31 páginas privadas. O Next.js ignora a diretiva quando ela não é um export de módulo válido, fazendo a página cair em SSG silenciosamente. Resultado: páginas de detalhe como `/clinics/[id]` retornavam 404 em produção mesmo após a migração para `adminClient`. Corrigido: diretiva movida para após o último `import` em todos os arquivos afetados.
 >
@@ -212,6 +214,7 @@ Itens do roadmap que dependem de CNPJ ativo para implementar:
 | 6.4.4   | Fix carrinho perdido: `?cart=` serializado na URL, `parseCartParam` com 7 testes unitários                  | ✅     |
 | 6.5.3–5 | Fix SSG + adminClient em todas as pages privadas + gaps de segurança de tenant isolation                    | ✅     |
 | 6.5.6   | Fix posicionamento `force-dynamic`: diretiva estava dentro de blocos `import {` em 31 pages (404 em prod)   | ✅     |
+| 6.5.7   | Fix `/clinics/[id]`: join embutido PostgREST falhava silenciosamente → queries independentes                | ✅     |
 
 **O que está 100% pronto:** plataforma técnica, autenticação, pedidos, pagamentos sandbox, notificações (push/email/SMS/push), LGPD portal, auditoria, compliance CNPJ, suporte por tickets com IA, cupons de desconto, gerenciamento de categorias, SKU automático, Política de Privacidade, Termos de Uso, E2E tests, CI/CD, documentação, **8 features de IA em produção**, **enforcement completo de receitas médicas com controle por produto e por unidade**.
 
