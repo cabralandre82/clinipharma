@@ -19,15 +19,25 @@
 - ~~Sem notificações push~~ ✅ **Implementado na v1.3.0**: Firebase FCM com service worker.
   - VAPID key configurada: `BNrMF4L9UwGqH3dHkIZp9-plConcw5YXpcTbfL-mF6_XTv6oIlV10Buw1sgCqd-YVveXECTWcxvWxXgbgf_VQ-U` ✅
   - ~~Push não disparado nos eventos de negócio~~ ✅ **v6.2.0**: `push: true` wired em status de pedido (criação, READY, SHIPPED, DELIVERED, CANCELED) e novos pedidos para admins.
-  - ~~**⚠️ PENDENTE FRONTEND:** service worker + Firebase SDK no cliente ainda não implementados.~~ ✅ **v6.3.0**: `PushInitializer` component montado no layout privado — solicita permissão, registra token via `POST /api/push/subscribe`, e exibe toasts para mensagens em foreground. Ícones PWA (`public/icons/icon-192x192.png`, `icon-512x512.png`) criados.
+  - ~~**⚠️ PENDENTE FRONTEND:** service worker + Firebase SDK no cliente ainda não implementados.~~ ✅ **v6.3.0**: `PushInitializer` component montado no layout privado — solicita permissão, registra token via `POST /api/push/subscribe`, e exibe toasts para mensagens em foreground. Ícones PWA (`public/icons/icon-192x192.png`, `icon-512x512.png`) criados. Todas as 7 variáveis `NEXT_PUBLIC_FIREBASE_*` configuradas no Vercel (Production + Development).
 
 - ~~Sem SMS~~ ✅ **Implementado na v1.3.0**: Twilio integrado.
   - ~~SMS não disparado nos fluxos principais~~ ✅ **v6.2.0**: SMS agora enviado em: aprovação/rejeição/docs pendentes de cadastro; criação de pedido; transições READY, SHIPPED, DELIVERED, CANCELED.
-  - **⚠️ PENDENTE PRODUÇÃO:** test credentials ativas (SMS não chegam ao destinatário). Fazer upgrade para conta real Twilio → adquirir número BR → atualizar `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` no Vercel.
+  - **⚠️ PENDENTE PRODUÇÃO (ação manual):** credenciais de teste ativas — SMS não chegam ao destinatário real. Para ativar:
+    1. Fazer upgrade da conta Twilio para conta paga
+    2. Adquirir número brasileiro (+55) no painel Twilio
+    3. `vercel env add TWILIO_ACCOUNT_SID production` (substituir pelo SID real)
+    4. `vercel env add TWILIO_AUTH_TOKEN production` (substituir pelo token real)
+    5. `vercel env add TWILIO_PHONE_NUMBER production` (ex: `+5511999999999`)
 
 - **WhatsApp não ativo**: infraestrutura e templates prontos (Evolution API).
   - ~~WhatsApp só ativo em 2 eventos~~ ✅ **v6.2.0**: WhatsApp agora disparado em aprovação/rejeição de cadastros e nas transições READY, SHIPPED, DELIVERED de pedidos.
-  - **⚠️ PENDENTE PRODUÇÃO:** adquirir número WhatsApp dedicado + deploy Evolution API em Docker (Render plano pago ou Railway) + atualizar `EVOLUTION_API_URL` no Vercel. Guia completo em `docs/infra/evolution-api-setup.md`.
+  - **⚠️ PENDENTE PRODUÇÃO (ação manual):** `EVOLUTION_API_URL=PENDING_DEPLOY` — mensagens WhatsApp silenciosamente ignoradas. Para ativar:
+    1. Deploy Evolution API em Docker (ver `docs/infra/evolution-api-setup.md`)
+    2. Adquirir número WhatsApp dedicado e escanear QR code
+    3. `vercel env add EVOLUTION_API_URL production` (URL pública do servidor)
+    4. `vercel env add EVOLUTION_API_KEY production` (chave da API)
+    5. `vercel env add EVOLUTION_INSTANCE_NAME production` (ex: `clinipharma`)
 
 - ~~Sem preferências de notificação por usuário~~ ✅ **v1.2.0**: toggles em `/profile`
 - ~~Sem alertas de pedidos parados~~ ✅ **v1.2.0**: widget + Vercel Cron diário + email digest
