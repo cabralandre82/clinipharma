@@ -2,6 +2,8 @@ import { Metadata } from 'next'
 import { createAdminClient } from '@/lib/db/admin'
 import { requireRolePage } from '@/lib/rbac'
 import { EntityTable } from '@/components/shared/entity-table'
+
+export const dynamic = 'force-dynamic'
 import { ButtonLink } from '@/components/ui/button-link'
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper'
 import { parsePage, paginationRange } from '@/lib/utils'

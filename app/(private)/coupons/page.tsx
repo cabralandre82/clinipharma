@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation'
 import { hasAnyRole, hasRole } from '@/lib/rbac'
 import { getClinicCoupons, getAdminCoupons } from '@/services/coupons'
 import { createAdminClient } from '@/lib/db/admin'
+
+export const dynamic = 'force-dynamic'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Tag, CheckCircle2, Clock, XCircle, AlertCircle, AlertTriangle } from 'lucide-react'
 import { CouponActivateForm } from '@/components/coupons/coupon-activate-form'

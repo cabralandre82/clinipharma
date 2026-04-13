@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { requireRolePage } from '@/lib/rbac'
 import { createServerClient } from '@/lib/db/server'
+
+export const dynamic = 'force-dynamic'
 import { getCurrentUser } from '@/lib/auth/session'
 import { TicketList } from '@/components/support/ticket-list'
 import { ButtonLink } from '@/components/ui/button-link'

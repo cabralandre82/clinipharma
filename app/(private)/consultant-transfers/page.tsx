@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/db/server'
 import { requireRolePage } from '@/lib/rbac'
+
+export const dynamic = 'force-dynamic'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { parseCursorParams, sliceCursorResult } from '@/lib/cursor-pagination'
 import { CursorPagination } from '@/components/ui/cursor-pagination'

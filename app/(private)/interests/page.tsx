@@ -1,6 +1,8 @@
 import { Metadata } from 'next'
 import { requireRolePage } from '@/lib/rbac'
 import { createAdminClient } from '@/lib/db/admin'
+
+export const dynamic = 'force-dynamic'
 import { Bell, MessageCircle, Package, User } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'

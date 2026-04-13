@@ -1,5 +1,7 @@
 import { requireRolePage } from '@/lib/rbac'
 import { createServerClient } from '@/lib/db/server'
+
+export const dynamic = 'force-dynamic'
 import { ButtonLink } from '@/components/ui/button-link'
 import { UsersTable } from '@/components/users/users-table'
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper'

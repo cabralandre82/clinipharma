@@ -24,22 +24,11 @@ export default async function DoctorsPage({ searchParams }: Props) {
   const page = parsePage(pageRaw)
   const { from, to } = paginationRange(page, PAGE_SIZE)
 
-  const {
-    data: doctors,
-    count,
-    error: doctorsError,
-  } = await admin
+  const { data: doctors, count } = await admin
     .from('doctors')
     .select('id, full_name, crm, crm_state, specialty, email, phone, status', { count: 'exact' })
     .order('full_name')
     .range(from, to)
-
-  console.error(
-    '[doctors/page] count=%s error=%s rows=%s',
-    count,
-    JSON.stringify(doctorsError),
-    doctors?.length
-  )
 
   const columns = [
     { key: 'full_name', label: 'Nome' },

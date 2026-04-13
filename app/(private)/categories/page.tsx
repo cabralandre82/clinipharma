@@ -2,6 +2,8 @@ import { requireRolePage } from '@/lib/rbac'
 import { createServerClient } from '@/lib/db/server'
 import { CategoriesManager } from '@/components/categories/categories-manager'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = { title: 'Categorias de Produtos | Clinipharma' }
 
 export default async function CategoriesPage() {

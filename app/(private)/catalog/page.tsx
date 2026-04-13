@@ -1,6 +1,8 @@
 import { Metadata } from 'next'
 import { createAdminClient } from '@/lib/db/admin'
 import { CatalogGrid, type ProductCard } from '@/components/catalog/catalog-grid'
+
+export const dynamic = 'force-dynamic'
 import { CatalogFilters } from '@/components/catalog/catalog-filters'
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper'
 import { parsePage, paginationRange } from '@/lib/utils'

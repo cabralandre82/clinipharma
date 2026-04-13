@@ -1,6 +1,8 @@
 import { Metadata } from 'next'
 import { createAdminClient } from '@/lib/db/admin'
 import { getCurrentUser } from '@/lib/auth/session'
+
+export const dynamic = 'force-dynamic'
 import { OrdersTable, type OrderRow } from '@/components/orders/orders-table'
 import { ButtonLink } from '@/components/ui/button-link'
 import { CursorPagination } from '@/components/ui/cursor-pagination'

@@ -2,6 +2,8 @@ import { Metadata } from 'next'
 import { createAdminClient } from '@/lib/db/admin'
 import { requireRolePage } from '@/lib/rbac'
 import { formatCurrency, formatDate } from '@/lib/utils'
+
+export const dynamic = 'force-dynamic'
 import { parseCursorParams, sliceCursorResult } from '@/lib/cursor-pagination'
 import { CursorPagination } from '@/components/ui/cursor-pagination'
 import { PaymentConfirmDialog } from '@/components/shared/payment-confirm-dialog'
