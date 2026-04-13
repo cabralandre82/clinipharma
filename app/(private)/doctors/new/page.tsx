@@ -4,7 +4,7 @@ import { DoctorForm } from '@/components/doctors/doctor-form'
 export const metadata = { title: 'Novo Médico | Clinipharma' }
 
 export default async function NewDoctorPage() {
-  await requireRolePage(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
+  await requireRolePage(['SUPER_ADMIN', 'PLATFORM_ADMIN', 'CLINIC_ADMIN'])
 
   return (
     <div className="space-y-6">

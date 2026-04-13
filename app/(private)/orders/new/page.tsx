@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import { createClient } from '@/lib/db/server'
+import { createAdminClient } from '@/lib/db/admin'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/session'
 import { NewOrderForm, type NewOrderFormProduct } from '@/components/orders/new-order-form'
@@ -20,6 +21,7 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
   }
 
   const supabase = await createClient()
+  const admin = createAdminClient()
 
   const { data: productsRaw } = await supabase
     .from('products')
@@ -33,14 +35,14 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
   const initialProduct = params.product ? products.find((p) => p.id === params.product) : undefined
 
   // Resolve the clinic the current user belongs to.
-  // CLINIC_ADMIN / STAFF → exactly one clinic via clinic_members.
-  // DOCTOR → one or more clinics via doctor_clinic_links.
-  // SUPER_ADMIN / PLATFORM_ADMIN → all active clinics (admin placing order on behalf).
+  // Uses adminClient to bypass RLS bootstrap problem on clinic_members:
+  // a user can only read clinic_members if already a member — but on first
+  // login after being added, the RLS check would fail with the user client.
   let resolvedClinic: { id: string; trade_name: string } | null = null
   let adminClinics: { id: string; trade_name: string }[] | null = null
 
   if (user.roles.includes('CLINIC_ADMIN')) {
-    const { data: membership } = await supabase
+    const { data: membership } = await admin
       .from('clinic_members')
       .select('clinics(id, trade_name)')
       .eq('user_id', user.id)
@@ -49,14 +51,14 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
     resolvedClinic =
       (membership?.clinics as unknown as { id: string; trade_name: string } | null) ?? null
   } else if (user.roles.includes('DOCTOR')) {
-    const { data: doctorRecord } = await supabase
+    const { data: doctorRecord } = await admin
       .from('doctors')
       .select('id')
       .eq('email', user.email)
       .maybeSingle()
 
     if (doctorRecord) {
-      const { data: linked } = await supabase
+      const { data: linked } = await admin
         .from('doctor_clinic_links')
         .select('clinics(id, trade_name)')
         .eq('doctor_id', doctorRecord.id)
@@ -73,7 +75,7 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
     }
   } else {
     // SUPER_ADMIN / PLATFORM_ADMIN see all clinics
-    const { data } = await supabase
+    const { data } = await admin
       .from('clinics')
       .select('id, trade_name')
       .eq('status', 'ACTIVE')
@@ -81,11 +83,11 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
     adminClinics = data ?? []
   }
 
-  // Fetch doctors linked to the resolved clinic (if known), or all active doctors for admins.
+  // Fetch doctors linked to the resolved clinic via adminClient (bypasses RLS).
   let linkedDoctors: { id: string; full_name: string; crm: string; crm_state: string }[] = []
 
   if (resolvedClinic) {
-    const { data } = await supabase
+    const { data } = await admin
       .from('doctor_clinic_links')
       .select('doctors(id, full_name, crm, crm_state)')
       .eq('clinic_id', resolvedClinic.id)
@@ -97,7 +99,7 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
       )
       .filter(Boolean)
   } else {
-    const { data } = await supabase
+    const { data } = await admin
       .from('doctors')
       .select('id, full_name, crm, crm_state')
       .eq('status', 'ACTIVE')
@@ -119,6 +121,7 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
         resolvedClinic={resolvedClinic}
         adminClinics={adminClinics}
         doctors={linkedDoctors}
+        isClinicAdmin={user.roles.includes('CLINIC_ADMIN')}
       />
     </div>
   )

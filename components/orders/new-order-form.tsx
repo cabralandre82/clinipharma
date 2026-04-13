@@ -12,7 +12,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, Package, Upload, X, FileText, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Package, Upload, X, FileText, Plus, Trash2, UserPlus } from 'lucide-react'
+import Link from 'next/link'
 
 export interface NewOrderFormProduct {
   id: string
@@ -40,6 +41,8 @@ interface NewOrderFormProps {
   /** When the user is admin or a doctor linked to multiple clinics, show a selector. */
   adminClinics: { id: string; trade_name: string }[] | null
   doctors: { id: string; full_name: string; crm: string; crm_state: string }[]
+  /** Whether the current user is a CLINIC_ADMIN (shows doctor shortcut links). */
+  isClinicAdmin?: boolean
 }
 
 export function NewOrderForm({
@@ -48,6 +51,7 @@ export function NewOrderForm({
   resolvedClinic,
   adminClinics,
   doctors,
+  isClinicAdmin = false,
 }: NewOrderFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -272,17 +276,28 @@ export function NewOrderForm({
             </div>
           )}
 
-          {/* Doctor — only shown when the clinic has linked doctors */}
-          {showDoctorField && (
+          {/* Doctor field or shortcut when clinic has no linked doctors */}
+          {showDoctorField ? (
             <div className="space-y-1.5">
-              <Label htmlFor="doctor_id">
-                Médico solicitante{' '}
-                {doctorRequired ? (
-                  '*'
-                ) : (
-                  <span className="font-normal text-gray-400">(opcional)</span>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="doctor_id">
+                  Médico solicitante{' '}
+                  {doctorRequired ? (
+                    '*'
+                  ) : (
+                    <span className="font-normal text-gray-400">(opcional)</span>
+                  )}
+                </Label>
+                {isClinicAdmin && (
+                  <Link
+                    href="/doctors/new"
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                  >
+                    <UserPlus className="h-3 w-3" />
+                    Cadastrar novo médico
+                  </Link>
                 )}
-              </Label>
+              </div>
               <select
                 id="doctor_id"
                 value={doctorId}
@@ -298,6 +313,30 @@ export function NewOrderForm({
               </select>
               {errors.doctor_id && <p className="text-xs text-red-500">{errors.doctor_id}</p>}
             </div>
+          ) : (
+            isClinicAdmin && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-sm font-medium text-amber-800">Nenhum médico vinculado</p>
+                <p className="mt-0.5 text-xs text-amber-700">
+                  Para pedir produtos com receita, vincule um médico à sua clínica.
+                </p>
+                <div className="mt-2 flex gap-3">
+                  <Link
+                    href="/doctors/new"
+                    className="flex items-center gap-1 text-xs font-medium text-amber-900 underline hover:no-underline"
+                  >
+                    <UserPlus className="h-3 w-3" />
+                    Cadastrar novo médico
+                  </Link>
+                  <Link
+                    href="/doctors"
+                    className="text-xs font-medium text-amber-900 underline hover:no-underline"
+                  >
+                    Ver médicos disponíveis
+                  </Link>
+                </div>
+              </div>
+            )
           )}
 
           <div className="space-y-1.5">
