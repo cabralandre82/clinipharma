@@ -236,7 +236,11 @@ export async function updateProductPrice(
 
     const { error } = await adminClient
       .from('products')
-      .update({ price_current: parsed.data.new_price, updated_at: new Date().toISOString() })
+      .update({
+        price_current: parsed.data.new_price,
+        needs_price_review: false,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', productId)
 
     if (error) return { error: 'Erro ao atualizar preço' }
@@ -253,6 +257,7 @@ export async function updateProductPrice(
 
     revalidatePath('/products')
     revalidatePath('/catalog')
+    revalidateTag('dashboard')
     return {}
   } catch {
     return { error: 'Erro interno' }
@@ -307,6 +312,8 @@ export async function updatePharmacyCost(
     const updatePayload: Record<string, unknown> = {
       pharmacy_cost: newCost,
       updated_at: new Date().toISOString(),
+      // flag for admin to review price_current whenever pharmacy changes their cost
+      ...(priceCurrentNum > 0 ? { needs_price_review: true } : {}),
     }
     if (shouldDeactivate) {
       updatePayload.active = false

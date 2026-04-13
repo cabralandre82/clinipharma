@@ -1,6 +1,8 @@
 # Clinipharma — Lista Consolidada de Pendências
 
-> Gerado em: 2026-04-13 | Versão da plataforma: **6.5.22** | **881 testes** | cobertura atualizada
+> Gerado em: 2026-04-13 | Versão da plataforma: **6.5.23** | **881 testes** | cobertura atualizada
+>
+> **v6.5.23:** Card "Revisar preço" no dashboard admin — coluna `needs_price_review boolean DEFAULT false` adicionada à tabela `products` (migration 036 + índice parcial). `updatePharmacyCost`: seta `needs_price_review=true` quando `price_current > 0` (qualquer alteração de repasse exige revisão do preço ao cliente). `updateProductPrice`: zera `needs_price_review=false` quando admin atualiza o preço + `revalidateTag('dashboard')`. Dashboard: novo card "Revisar preço" laranja com alerta vermelho quando count > 0, verde quando zerado. Cor `orange` adicionada ao `COLOR_CLASSES` do `KpiCard`.
 >
 > **v6.5.22:** Dois bugs corrigidos. (1) Dashboard "pedidos em aberto": status `DELIVERED` não estava na lista de exclusão (`['COMPLETED','CANCELED']`), fazendo pedidos entregues aparecerem como abertos. Adicionado `DELIVERED` ao filtro. (2) Sino de notificações não atualizava em tempo real: tabela `notifications` nunca foi adicionada à publication `supabase_realtime` (migration 035), e o componente `NotificationBell` sofria o mesmo auth-race corrigido no `OrderRealtimeUpdater` (WebSocket conectava como anon antes da sessão carregar). Corrigido com `auth.getSession()` antes de subscrever + polling fallback de 30 s.
 >

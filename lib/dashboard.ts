@@ -28,7 +28,7 @@ export const getAdminDashboardData = unstable_cache(
         .limit(200),
       supabase.from('payments').select('id, status, gross_amount'),
       supabase.from('transfers').select('id, status, net_amount'),
-      supabase.from('products').select('id, active, price_current'),
+      supabase.from('products').select('id, active, price_current, needs_price_review'),
       supabase.from('clinics').select('id, status'),
       supabase.from('pharmacies').select('id, status'),
     ])
@@ -37,6 +37,7 @@ export const getAdminDashboardData = unstable_cache(
     const pendingTransfers = (transfers.data ?? []).filter((t) => t.status === 'PENDING')
     const activeProducts = (products.data ?? []).filter((p) => p.active)
     const awaitingPricing = (products.data ?? []).filter((p) => Number(p.price_current) === 0)
+    const needsPriceReview = (products.data ?? []).filter((p) => p.needs_price_review)
     const activeClinics = (clinics.data ?? []).filter((c) => c.status === 'ACTIVE')
     const activePharmacies = (pharmacies.data ?? []).filter((p) => p.status === 'ACTIVE')
 
@@ -57,6 +58,7 @@ export const getAdminDashboardData = unstable_cache(
       pendingTransfersAmount: pendingTransfers.reduce((s, t) => s + Number(t.net_amount), 0),
       activeProductsCount: activeProducts.length,
       awaitingPricingCount: awaitingPricing.length,
+      needsPriceReviewCount: needsPriceReview.length,
       activeClinicsCount: activeClinics.length,
       activePharmaciesCount: activePharmacies.length,
       openOrdersCount: openOrders.length,
