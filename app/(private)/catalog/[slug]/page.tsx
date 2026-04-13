@@ -1,5 +1,4 @@
 import { Metadata } from 'next'
-import { createClient } from '@/lib/db/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { notFound } from 'next/navigation'
 import { ProductDetail } from '@/components/catalog/product-detail'
@@ -11,16 +10,16 @@ interface ProductPageProps {
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params
-  const supabase = await createClient()
-  const { data } = await supabase.from('products').select('name').eq('slug', slug).single()
+  const admin = createAdminClient()
+  const { data } = await admin.from('products').select('name').eq('slug', slug).single()
   return { title: data?.name ?? 'Produto' }
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params
-  const supabase = await createClient()
+  const admin = createAdminClient()
 
-  const { data: product } = await supabase
+  const { data: product } = await admin
     .from('products')
     .select(
       `
@@ -38,7 +37,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
   if (!product) notFound()
 
   // Fetch recommendations (server-side, no extra waterfall)
-  const admin = createAdminClient()
   const { data: assocData } = await admin
     .from('product_associations')
     .select(

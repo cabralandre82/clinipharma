@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import { createClient } from '@/lib/db/server'
+import { createAdminClient } from '@/lib/db/admin'
 import { CatalogGrid, type ProductCard } from '@/components/catalog/catalog-grid'
 import { CatalogFilters } from '@/components/catalog/catalog-filters'
 import { PaginationWrapper } from '@/components/ui/pagination-wrapper'
@@ -22,7 +22,7 @@ interface CatalogPageProps {
 
 export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const params = await searchParams
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const page = parsePage(params.page)
   const { from, to } = paginationRange(page, PAGE_SIZE)

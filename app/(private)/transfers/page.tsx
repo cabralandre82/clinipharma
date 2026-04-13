@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import { createClient } from '@/lib/db/server'
+import { createAdminClient } from '@/lib/db/admin'
 import { getCurrentUser } from '@/lib/auth/session'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { parseCursorParams, sliceCursorResult } from '@/lib/cursor-pagination'
@@ -39,12 +39,25 @@ type TransferRow = {
 export default async function TransfersPage({ searchParams }: Props) {
   const { after, before } = await searchParams
   const user = await getCurrentUser()
-  const supabase = await createClient()
+  const admin = createAdminClient()
   const isAdmin = user?.roles.some((r) => ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(r))
+  const isPharmacy = user?.roles.includes('PHARMACY_ADMIN')
+
+  // Resolve pharmacy scope for PHARMACY_ADMIN
+  let pharmacyId: string | null = null
+  if (isPharmacy && user) {
+    const { data: membership } = await admin
+      .from('pharmacy_members')
+      .select('pharmacy_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .single()
+    pharmacyId = membership?.pharmacy_id ?? null
+  }
 
   const cursor = parseCursorParams({ after, before, pageSize: PAGE_SIZE })
 
-  let q = supabase
+  let q = admin
     .from('transfers')
     .select(
       `id, gross_amount, commission_amount, net_amount, status,
@@ -52,6 +65,10 @@ export default async function TransfersPage({ searchParams }: Props) {
        pharmacies (trade_name), orders (code)`
     )
     .order('created_at', { ascending: cursor.ascending })
+
+  // Scope: admins see all; pharmacy sees own; others see nothing
+  if (!isAdmin && pharmacyId) q = q.eq('pharmacy_id', pharmacyId)
+  else if (!isAdmin && !pharmacyId) q = q.eq('pharmacy_id', 'none')
 
   if (cursor.after) q = q.lt('created_at', cursor.after)
   if (cursor.before) q = q.gt('created_at', cursor.before)
