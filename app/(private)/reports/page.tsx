@@ -171,12 +171,15 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const prevPayments = prevPaymentsRes.data ?? []
 
   // ── KPIs ──────────────────────────────────────────────
+  // Terminal success statuses: DELIVERED (operational end) and COMPLETED (administrative closure).
+  // Both are considered "concluídos" for reporting purposes.
+  const TERMINAL_SUCCESS = ['COMPLETED', 'DELIVERED']
+  const TERMINAL_ALL = ['COMPLETED', 'DELIVERED', 'CANCELED']
+
   const totalOrders = orders.length
-  const completedOrders = orders.filter((o) => o.order_status === 'COMPLETED').length
+  const completedOrders = orders.filter((o) => TERMINAL_SUCCESS.includes(o.order_status)).length
   const canceledOrders = orders.filter((o) => o.order_status === 'CANCELED').length
-  const openOrders = orders.filter(
-    (o) => !['COMPLETED', 'CANCELED'].includes(o.order_status)
-  ).length
+  const openOrders = orders.filter((o) => !TERMINAL_ALL.includes(o.order_status)).length
 
   const confirmedPayments = payments.filter((p) => p.status === 'CONFIRMED')
   const pendingPayments = payments.filter((p) => p.status === 'PENDING').length
@@ -278,7 +281,8 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     {
       metric: 'Concluídos',
       current: completedOrders,
-      previous: (prevOrders as any[]).filter((o) => o.order_status === 'COMPLETED').length,
+      previous: (prevOrders as any[]).filter((o) => TERMINAL_SUCCESS.includes(o.order_status))
+        .length,
       unit: 'number' as const,
     },
   ]
