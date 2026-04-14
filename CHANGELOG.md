@@ -2,6 +2,19 @@
 
 ---
 
+## [6.7.2] — 2026-04-14 — UX: botão de voltar em todas as páginas filhas
+
+### Added
+
+- `components/ui/back-button.tsx`: componente `BackButton` reutilizável com seta `←`, `router.back()` no click e `href` semântico como fallback para right-click / link direto.
+- Botão adicionado em 29 páginas: detalhe e edição de pedidos, produtos, clínicas, farmácias, distribuidoras, médicos, consultores, usuários, registros, suporte, catálogo, minha farmácia e perfil.
+
+### Changed
+
+- Breadcrumbs textuais anteriores (padrão `Seção / Nome / Editar`) substituídos pelo `BackButton`, reduzindo código e mantendo a mesma semântica de navegação.
+
+---
+
 ## [6.7.1] — 2026-04-14 — feat: guarda de receita para pedidos de clínica sem médico
 
 ### Added
