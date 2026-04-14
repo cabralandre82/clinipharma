@@ -2,6 +2,19 @@
 
 ---
 
+## [6.6.2] — 2026-04-14 — UX: classificação visível no detalhe do produto + radio cards de receita
+
+### Melhorias
+
+- **`app/(private)/products/[id]/page.tsx`**: Nova seção "Classificação" no card de informações do produto com badges visuais:
+  - Badge "Produto manipulado" (roxo) ou "Produto industrializado" (cinza) — visível apenas para farmácias, omitido em distribuidoras.
+  - Badge "Exige receita — [Tipo]" (âmbar) ou "Sem receita obrigatória" (verde).
+  - Detalhe do tipo de receita e limite de unidades por receita exibidos diretamente, sem necessidade de abrir o formulário de edição.
+- **`components/products/product-form.tsx`**: Campo de seleção de tipo de receita substituído por **radio cards** expandidos — cada opção exibe ícone, nome e explicação completa sempre visível, resolvendo a legibilidade do campo anterior (dropdown estreito).
+- **`tests/unit/validators.test.ts`**: +8 casos de teste cobrindo `prescription_type` (valores válidos e inválido), `requires_prescription`, `max_units_per_prescription` (positivo, zero, nulo) e `is_manipulated` no `productSchema`.
+
+---
+
 ## [6.6.1] — 2026-04-14 — Fix: linguagem de manipulação zerada para distribuidoras
 
 ### Corrigido

@@ -230,6 +230,68 @@ describe('productSchema', () => {
   it('rejects short_description shorter than 10 chars', () => {
     expect(productSchema.safeParse({ ...valid, short_description: 'curta' }).success).toBe(false)
   })
+
+  it('accepts requires_prescription=true with a valid prescription_type', () => {
+    expect(
+      productSchema.safeParse({
+        ...valid,
+        requires_prescription: true,
+        prescription_type: 'SIMPLE',
+      }).success
+    ).toBe(true)
+  })
+
+  it('accepts all valid prescription_type values', () => {
+    for (const type of ['SIMPLE', 'SPECIAL_CONTROL', 'ANTIMICROBIAL'] as const) {
+      expect(
+        productSchema.safeParse({ ...valid, requires_prescription: true, prescription_type: type })
+          .success
+      ).toBe(true)
+    }
+  })
+
+  it('rejects unknown prescription_type', () => {
+    expect(
+      productSchema.safeParse({
+        ...valid,
+        requires_prescription: true,
+        prescription_type: 'INVALID',
+      }).success
+    ).toBe(false)
+  })
+
+  it('accepts prescription_type as null (no type selected)', () => {
+    expect(productSchema.safeParse({ ...valid, prescription_type: null }).success).toBe(true)
+  })
+
+  it('accepts max_units_per_prescription as positive integer', () => {
+    expect(
+      productSchema.safeParse({
+        ...valid,
+        requires_prescription: true,
+        prescription_type: 'SPECIAL_CONTROL',
+        max_units_per_prescription: 2,
+      }).success
+    ).toBe(true)
+  })
+
+  it('rejects max_units_per_prescription of 0 or negative', () => {
+    expect(productSchema.safeParse({ ...valid, max_units_per_prescription: 0 }).success).toBe(false)
+    expect(productSchema.safeParse({ ...valid, max_units_per_prescription: -1 }).success).toBe(
+      false
+    )
+  })
+
+  it('accepts max_units_per_prescription as null (no limit)', () => {
+    expect(productSchema.safeParse({ ...valid, max_units_per_prescription: null }).success).toBe(
+      true
+    )
+  })
+
+  it('accepts is_manipulated boolean flag', () => {
+    expect(productSchema.safeParse({ ...valid, is_manipulated: true }).success).toBe(true)
+    expect(productSchema.safeParse({ ...valid, is_manipulated: false }).success).toBe(true)
+  })
 })
 
 // ── productInterestSchema ─────────────────────────────────────────────────────
