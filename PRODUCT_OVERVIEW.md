@@ -14,13 +14,13 @@ Clinipharma resolve isso com uma plataforma intermediária B2B que:
 
 ## Quem usa
 
-| Perfil         | O que faz                                                                  |
-| -------------- | -------------------------------------------------------------------------- |
-| SUPER_ADMIN    | Controle total da plataforma                                               |
-| PLATFORM_ADMIN | Opera o dia a dia: catálogo, pedidos, repasses                             |
-| CLINIC_ADMIN   | Gerencia a própria clínica, cria pedidos                                   |
-| DOCTOR         | Cria pedidos, anexa documentos                                             |
-| PHARMACY_ADMIN | Executa pedidos, atualiza status, vê repasses (farmácias e distribuidoras) |
+| Perfil         | O que faz                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| SUPER_ADMIN    | Controle total da plataforma                                                               |
+| PLATFORM_ADMIN | Opera o dia a dia: catálogo, pedidos, repasses                                             |
+| CLINIC_ADMIN   | Gerencia a própria clínica, cria pedidos                                                   |
+| DOCTOR         | Cria pedidos como clínica vinculada **ou** como pessoa física (CPF solo), anexa documentos |
+| PHARMACY_ADMIN | Executa pedidos, atualiza status, vê repasses (farmácias e distribuidoras)                 |
 
 ## Como funciona o fluxo principal
 
@@ -31,15 +31,17 @@ Plataforma cadastra produtos no catálogo
         ↓
 Médico/Clínica entra logado e visualiza catálogo
         ↓
-Escolhe produto → cria pedido → anexa documentação
+Escolhe produto → cria pedido
+   ├── Comprar como clínica: seleciona clínica vinculada (CNPJ) → buyer_type=CLINIC
+   └── Comprar como médico:  usa CPF + endereço de entrega   → buyer_type=DOCTOR
         ↓
-Paga para a plataforma
+Anexa documentação → paga para a plataforma
         ↓
 Admin confirma pagamento → calcula comissão → registra repasse
         ↓
-Pedido liberado para farmácia
+Pedido liberado para farmácia/distribuidora
         ↓
-Farmácia executa → atualiza status → entrega para clínica
+Farmácia executa → atualiza status → entrega
         ↓
 Pedido COMPLETED
 ```
@@ -81,6 +83,16 @@ A comissão é configurável globalmente por administrador.
 | Distribuidora           | `DISTRIBUTOR` | Apenas industrializados (`is_manipulated = false`) | Timeline usa linguagem de separação/expedição |
 
 Ambos os tipos compartilham o mesmo fluxo de pedidos, pagamentos e repasses. A distinção é transparente para as clínicas.
+
+## Compra solo pelo médico (v6.7.0)
+
+Médicos podem realizar pedidos diretamente, sem precisar estar vinculados a uma clínica:
+
+- **CPF obrigatório** no cadastro do médico para habilitação da compra solo.
+- **Livro de endereços** (estilo Amazon): médico cadastra um ou mais endereços de entrega permanentes; o escolhido fica associado ao pedido.
+- **Escolha no momento do pedido:** médico vinculado a clínica(s) pode optar por `buyer_type=CLINIC` (seleciona qual clínica) ou `buyer_type=DOCTOR` (usa CPF).
+- **Compliance:** pedidos solo pulam validação de CNPJ; cupons podem ser emitidos para o CPF do médico.
+- **NF-e:** a farmácia emite a nota fiscal em nome do médico (CPF), retendo o imposto diretamente.
 
 ## Estado atual
 

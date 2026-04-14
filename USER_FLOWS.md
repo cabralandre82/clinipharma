@@ -10,8 +10,10 @@
 5. Na página do produto (/catalog/[slug]), clica em "Solicitar Pedido"
 6. Formulário de novo pedido (/orders/new?product=<id>):
    - Produto já carregado
-   - Seleciona clínica
-   - Seleciona médico
+   - Se o usuário é DOCTOR: escolhe "Comprar como clínica" ou "Comprar como médico (CPF)"
+     - Clínica: seleciona qual clínica vinculada → fluxo normal
+     - Médico solo: seleciona endereço de entrega do livro de endereços
+   - Se o usuário é CLINIC_ADMIN: seleciona a própria clínica e um médico vinculado
    - Define quantidade
    - Adiciona observações (opcional)
    - Faz upload dos documentos obrigatórios
@@ -141,6 +143,31 @@ Pedido de documentos:
 3. Se o médico tiver apenas uma clínica vinculada, ela é auto-selecionada
 4. Médico seleciona a clínica desejada para o pedido
 5. Fluxo normal de pedido continua (selecionar produtos, quantidade, documentos)
+```
+
+## UF-11: Médico comprando como pessoa física (CPF solo)
+
+```
+1. Médico acessa /orders/new
+2. No seletor "Comprar como", escolhe "Pessoa Física (CPF)"
+3. Sistema exibe o livro de endereços do médico
+4. Médico seleciona o endereço de entrega desejado
+   - Se não houver endereços cadastrados, exibe aviso com link para /profile/addresses
+5. Médico define quantidade e faz upload dos documentos obrigatórios
+6. Pedido criado com buyer_type=DOCTOR, clinic_id=NULL, delivery_address_id preenchido
+7. Validação de CNPJ/compliance é pulada; CPF do médico é usado como referência
+8. Cupons válidos para o CPF do médico são aplicados automaticamente se disponíveis
+```
+
+## UF-12: Médico gerenciando livro de endereços
+
+```
+1. Médico acessa /profile/addresses
+2. Visualiza endereços cadastrados com indicação do endereço padrão
+3. Pode adicionar novo endereço (label, logradouro, cidade, estado, CEP)
+4. Pode editar ou excluir endereços existentes
+   - Endereços vinculados a pedidos não podem ser excluídos (ON DELETE RESTRICT)
+5. Pode marcar um endereço como padrão (o anterior é desmarcado automaticamente)
 ```
 
 ## UF-07: Login e recuperação de senha

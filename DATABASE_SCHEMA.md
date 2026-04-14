@@ -8,7 +8,7 @@ O banco é organizado em 5 schemas lógicos:
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `auth`             | Gerenciado pelo Supabase Auth                                                                                                                       |
 | `public.auth_ext`  | `profiles`, `user_roles`                                                                                                                            |
-| `public.orgs`      | `clinics`, `clinic_members`, `doctors`, `doctor_clinic_links`, `pharmacies`, `pharmacy_members`                                                     |
+| `public.orgs`      | `clinics`, `clinic_members`, `doctors`, `doctor_clinic_links`, `doctor_addresses`, `pharmacies`, `pharmacy_members`                                 |
 | `public.catalog`   | `product_categories`, `products`, `product_images`, `product_price_history`, `pharmacy_products`, `product_variants`                                |
 | `public.orders`    | `orders`, `order_items`, `order_documents`, `order_status_history`, `order_operational_updates`, `order_templates`, `order_tracking_tokens`         |
 | `public.financial` | `payments`, `commissions`, `transfers`                                                                                                              |
@@ -88,18 +88,45 @@ UNIQUE(clinic_id, user_id)
 ## Tabela: doctors
 
 ```sql
-id         uuid PRIMARY KEY DEFAULT gen_random_uuid()
-full_name  text NOT NULL
-crm        text NOT NULL
-crm_state  text NOT NULL
-specialty  text
-email      text NOT NULL
-phone      text
-status     text NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','ACTIVE','BLOCKED'))
-created_at timestamptz DEFAULT now()
-updated_at timestamptz DEFAULT now()
+id                uuid PRIMARY KEY DEFAULT gen_random_uuid()
+full_name         text NOT NULL
+crm               text NOT NULL
+crm_state         text NOT NULL
+specialty         text
+email             text NOT NULL
+phone             text
+cpf               text UNIQUE                              -- CPF do médico; obrigatório para compras solo (buyer_type=DOCTOR)
+user_id           uuid REFERENCES auth.users(id)           -- FK explícita para o usuário Auth; preferir ao match por email
+crm_validated_at  timestamptz                              -- preenchido na aprovação quando API CFM confirma CRM ativo
+status            text NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','ACTIVE','BLOCKED'))
+created_at        timestamptz DEFAULT now()
+updated_at        timestamptz DEFAULT now()
 UNIQUE(crm, crm_state)
 ```
+
+> Adicionado na migration `041`: `cpf`, `user_id`, `crm_validated_at`.
+
+## Tabela: doctor_addresses
+
+> Criada na migration `041`. Livro de endereços de entrega do médico para compras solo (buyer_type=DOCTOR).
+
+```sql
+id              uuid        PRIMARY KEY DEFAULT gen_random_uuid()
+doctor_id       uuid        NOT NULL REFERENCES doctors(id) ON DELETE CASCADE
+label           text        NOT NULL DEFAULT 'Principal'   -- ex: "Consultório", "Residência"
+address_line_1  text        NOT NULL
+address_line_2  text
+city            text        NOT NULL
+state           char(2)     NOT NULL
+zip_code        text        NOT NULL
+is_default      boolean     NOT NULL DEFAULT false
+created_at      timestamptz NOT NULL DEFAULT now()
+updated_at      timestamptz NOT NULL DEFAULT now()
+UNIQUE INDEX ON (doctor_id) WHERE is_default = true       -- no máximo 1 endereço padrão por médico
+```
+
+> Trigger `trg_doctor_address_updated_at` mantém `updated_at` atualizado automaticamente.
+> `ON DELETE RESTRICT` no lado de `orders.delivery_address_id` impede excluir endereços vinculados a pedidos.
 
 ## Tabela: doctor_clinic_links
 
@@ -311,20 +338,31 @@ UNIQUE(pharmacy_id, product_id)
 > Desde v0.6.0: `orders` é o **cabeçalho** do pedido. Os campos de produto/quantidade/preço por item migraram para `order_items`.
 
 ```sql
-id                  uuid PRIMARY KEY DEFAULT gen_random_uuid()
-code                text NOT NULL UNIQUE             -- gerado por trigger: CP-YYYY-NNNNNN
-clinic_id           uuid NOT NULL REFERENCES clinics(id)
-doctor_id           uuid NOT NULL REFERENCES doctors(id)
-pharmacy_id         uuid NOT NULL REFERENCES pharmacies(id)
-total_price         numeric(12,2) NOT NULL DEFAULT 0 -- recalculado por trigger após insert/update em order_items
-payment_status      text NOT NULL DEFAULT 'PENDING'
-transfer_status     text NOT NULL DEFAULT 'NOT_READY'
-order_status        text NOT NULL DEFAULT 'DRAFT'
-notes               text
-created_by_user_id  uuid NOT NULL REFERENCES profiles(id)
-created_at          timestamptz DEFAULT now()
-updated_at          timestamptz DEFAULT now()
+id                   uuid PRIMARY KEY DEFAULT gen_random_uuid()
+code                 text NOT NULL UNIQUE              -- gerado por trigger: CP-YYYY-NNNNNN
+buyer_type           text NOT NULL DEFAULT 'CLINIC'
+                       CHECK (buyer_type IN ('CLINIC','DOCTOR'))
+                                                       -- CLINIC = compra via clínica (CNPJ); DOCTOR = compra solo (CPF)
+clinic_id            uuid REFERENCES clinics(id)       -- NOT NULL quando buyer_type='CLINIC'; NULL quando buyer_type='DOCTOR'
+doctor_id            uuid REFERENCES doctors(id)       -- NOT NULL quando buyer_type='DOCTOR'; opcional quando buyer_type='CLINIC'
+delivery_address_id  uuid REFERENCES doctor_addresses(id) ON DELETE RESTRICT
+                                                       -- obrigatório quando buyer_type='DOCTOR'
+pharmacy_id          uuid NOT NULL REFERENCES pharmacies(id)
+total_price          numeric(12,2) NOT NULL DEFAULT 0  -- recalculado por trigger após insert/update em order_items
+payment_status       text NOT NULL DEFAULT 'PENDING'
+transfer_status      text NOT NULL DEFAULT 'NOT_READY'
+order_status         text NOT NULL DEFAULT 'DRAFT'
+notes                text
+created_by_user_id   uuid NOT NULL REFERENCES profiles(id)
+created_at           timestamptz DEFAULT now()
+updated_at           timestamptz DEFAULT now()
+CHECK orders_chk_buyer_entity:
+  (buyer_type='CLINIC' AND clinic_id IS NOT NULL) OR
+  (buyer_type='DOCTOR' AND doctor_id IS NOT NULL)
 ```
+
+> `clinic_id` era `NOT NULL` na migration `001`, tornado nullable na `032` (clínicas sem médico), agora também NULL em pedidos solo de médico (`041`).
+> `buyer_type`, `delivery_address_id` e o CHECK constraint adicionados na migration `041`.
 
 **Valores válidos de order_status:**
 `DRAFT, AWAITING_DOCUMENTS, READY_FOR_REVIEW, AWAITING_PAYMENT, PAYMENT_UNDER_REVIEW, PAYMENT_CONFIRMED, COMMISSION_CALCULATED, TRANSFER_PENDING, TRANSFER_COMPLETED, RELEASED_FOR_EXECUTION, RECEIVED_BY_PHARMACY, IN_EXECUTION, READY, SHIPPED, DELIVERED, COMPLETED, CANCELED, WITH_ISSUE`
@@ -670,3 +708,30 @@ created_at    timestamptz DEFAULT now()
 **Alerta:** se `is_new_device = true`, uma notificação in-app é disparada automaticamente via `lib/session-logger.ts`.
 
 **Índices:** `idx_access_logs_user_id`, `idx_access_logs_created_at`
+
+---
+
+## Tabela: coupons
+
+> Suporte a cupons direcionados para clínicas ou médicos individualmente.
+
+```sql
+id          uuid PRIMARY KEY DEFAULT gen_random_uuid()
+clinic_id   uuid REFERENCES clinics(id) ON DELETE CASCADE   -- alvo clínica (nullable desde migration 041)
+doctor_id   uuid REFERENCES doctors(id) ON DELETE CASCADE   -- alvo médico  (adicionado na migration 041)
+product_id  uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE
+code        text NOT NULL UNIQUE
+discount    numeric(5,2) NOT NULL CHECK (discount > 0 AND discount <= 100)
+active      boolean NOT NULL DEFAULT true
+created_at  timestamptz DEFAULT now()
+updated_at  timestamptz DEFAULT now()
+CHECK coupons_chk_target: clinic_id IS NOT NULL OR doctor_id IS NOT NULL
+```
+
+**Restrições:**
+
+- Um cupom pertence a **uma clínica** ou a **um médico** — nunca aos dois nem a nenhum.
+- No máximo um cupom ativo por `(clinic_id, product_id)` — `idx_coupons_one_active_per_clinic_product`.
+- No máximo um cupom ativo por `(doctor_id, product_id)` — `idx_coupons_one_active_per_doctor_product`.
+
+> `doctor_id` e o CHECK `coupons_chk_target` adicionados na migration `041`.

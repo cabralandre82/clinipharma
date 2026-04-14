@@ -2,14 +2,14 @@
 
 ## Papéis
 
-| Papel              | Descrição                                                          |
-| ------------------ | ------------------------------------------------------------------ |
-| `SUPER_ADMIN`      | Acesso total, configurações globais, gestão de consultores         |
-| `PLATFORM_ADMIN`   | Operação diária: catálogo, pedidos, financeiro, entidades          |
-| `CLINIC_ADMIN`     | Gerencia sua clínica, cria pedidos, acompanha financeiro           |
-| `DOCTOR`           | Cria pedidos, anexa documentos, acompanha status                   |
-| `PHARMACY_ADMIN`   | Executa pedidos, atualiza status, vê repasses da farmácia          |
-| `SALES_CONSULTANT` | Visualiza suas clínicas vinculadas e extrato de comissões próprias |
+| Papel              | Descrição                                                                                       |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| `SUPER_ADMIN`      | Acesso total, configurações globais, gestão de consultores                                      |
+| `PLATFORM_ADMIN`   | Operação diária: catálogo, pedidos, financeiro, entidades                                       |
+| `CLINIC_ADMIN`     | Gerencia sua clínica, cria pedidos, acompanha financeiro                                        |
+| `DOCTOR`           | Cria pedidos (como clínica ou CPF solo), gerencia endereços, anexa documentos, acompanha status |
+| `PHARMACY_ADMIN`   | Executa pedidos, atualiza status, vê repasses da farmácia                                       |
+| `SALES_CONSULTANT` | Visualiza suas clínicas vinculadas e extrato de comissões próprias                              |
 
 ---
 
@@ -144,3 +144,23 @@
 | Registrar interesse     |      —      |       —        |      ✅      |   ✅   |       ❌       |        ❌        |
 | Ver todos os interesses |     ✅      |       ❌       |      ❌      |   ❌   |       ❌       |        ❌        |
 | Receber notificação     |     ✅      |       ❌       |      ❌      |   ❌   |       ❌       |        ❌        |
+
+## Módulo: Endereços de entrega do médico
+
+| Ação                         | SUPER_ADMIN | PLATFORM_ADMIN | CLINIC_ADMIN |     DOCTOR      | PHARMACY_ADMIN | SALES_CONSULTANT |
+| ---------------------------- | :---------: | :------------: | :----------: | :-------------: | :------------: | :--------------: |
+| Ver próprios endereços       |      —      |       —        |      ❌      |  ✅ (próprios)  |       ❌       |        ❌        |
+| Adicionar endereço           |      —      |       —        |      ❌      |  ✅ (próprios)  |       ❌       |        ❌        |
+| Editar endereço              |      —      |       —        |      ❌      |  ✅ (próprios)  |       ❌       |        ❌        |
+| Excluir endereço             |      —      |       —        |      ❌      | ✅ (sem pedido) |       ❌       |        ❌        |
+| Definir endereço como padrão |      —      |       —        |      ❌      |  ✅ (próprios)  |       ❌       |        ❌        |
+
+## Módulo: Cupons
+
+| Ação                          | SUPER_ADMIN | PLATFORM_ADMIN | CLINIC_ADMIN |      DOCTOR      | PHARMACY_ADMIN | SALES_CONSULTANT |
+| ----------------------------- | :---------: | :------------: | :----------: | :--------------: | :------------: | :--------------: |
+| Criar cupom (para clínica)    |     ✅      |       ✅       |      ❌      |        ❌        |       ❌       |        ❌        |
+| Criar cupom (para médico/CPF) |     ✅      |       ✅       |      ❌      |        ❌        |       ❌       |        ❌        |
+| Ativar cupom próprio          |      —      |       —        |      ✅      | ✅ (próprio CPF) |       ❌       |        ❌        |
+| Desativar cupom               |     ✅      |       ✅       |      ❌      |        ❌        |       ❌       |        ❌        |
+| Listar todos os cupons        |     ✅      |       ✅       |      ❌      |        ❌        |       ❌       |        ❌        |
