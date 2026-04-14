@@ -79,6 +79,12 @@ export function OrderDetail({ order, currentUser, prescriptionItems = [] }: Orde
   const router = useRouter()
   const isAdmin = currentUser.roles.some((r) => ['SUPER_ADMIN', 'PLATFORM_ADMIN'].includes(r))
   const isPharmacy = currentUser.roles.includes('PHARMACY_ADMIN')
+
+  // Determines if any item in the order is a manipulated (compounded) product.
+  // Used to switch between pharmacy/distributor language in the execution stepper.
+  const hasManipulatedProduct = (
+    (order.order_items as Array<{ products?: { is_manipulated?: boolean } }>) ?? []
+  ).some((item) => item.products?.is_manipulated === true)
   const [removingItemId, setRemovingItemId] = useState<string | null>(null)
   const [liveConnected, setLiveConnected] = useState(false)
 
@@ -236,6 +242,7 @@ export function OrderDetail({ order, currentUser, prescriptionItems = [] }: Orde
         <PharmacyOrderActions
           orderId={String(order.id)}
           currentStatus={String(order.order_status) as OrderStatus}
+          isManipulated={hasManipulatedProduct}
         />
       )}
 

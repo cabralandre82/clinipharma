@@ -30,13 +30,13 @@ export default async function OrderPage({ params }: OrderPageProps) {
       *,
       clinics (id, trade_name, corporate_name, city, state),
       doctors (id, full_name, crm, crm_state, specialty),
-      pharmacies (id, trade_name, city, state),
+      pharmacies (id, trade_name, city, state, entity_type),
       order_items (
         id, product_id, quantity, unit_price, total_price,
         pharmacy_cost_per_unit, platform_commission_per_unit,
         coupon_id, discount_amount, original_total_price,
         doc_status,
-        products (id, name, concentration, presentation, requires_prescription)
+        products (id, name, concentration, presentation, requires_prescription, is_manipulated)
       ),
       order_documents (id, document_type, original_filename, mime_type, file_size, created_at, status, rejection_reason),
       order_status_history (

@@ -16,7 +16,15 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import type { OrderStatus } from '@/types'
-import { PackageCheck, FlaskConical, CheckCircle, Truck, MapPin, ChevronRight } from 'lucide-react'
+import {
+  PackageCheck,
+  FlaskConical,
+  Package,
+  CheckCircle,
+  Truck,
+  MapPin,
+  ChevronRight,
+} from 'lucide-react'
 
 interface StepConfig {
   status: OrderStatus
@@ -25,44 +33,46 @@ interface StepConfig {
   icon: React.ComponentType<{ className?: string }>
 }
 
-const STEPS: StepConfig[] = [
-  {
-    status: 'RELEASED_FOR_EXECUTION',
-    label: 'Pedido Liberado',
-    shortLabel: 'Liberado',
-    icon: PackageCheck,
-  },
-  {
-    status: 'RECEIVED_BY_PHARMACY',
-    label: 'Recebido pela Farmácia',
-    shortLabel: 'Recebido',
-    icon: PackageCheck,
-  },
-  {
-    status: 'IN_EXECUTION',
-    label: 'Em Manipulação',
-    shortLabel: 'Manipulação',
-    icon: FlaskConical,
-  },
-  {
-    status: 'READY',
-    label: 'Pronto para Envio',
-    shortLabel: 'Pronto',
-    icon: CheckCircle,
-  },
-  {
-    status: 'SHIPPED',
-    label: 'Despachado',
-    shortLabel: 'Enviado',
-    icon: Truck,
-  },
-  {
-    status: 'DELIVERED',
-    label: 'Entregue',
-    shortLabel: 'Entregue',
-    icon: MapPin,
-  },
-]
+function buildSteps(isManipulated: boolean): StepConfig[] {
+  return [
+    {
+      status: 'RELEASED_FOR_EXECUTION',
+      label: 'Pedido Liberado',
+      shortLabel: 'Liberado',
+      icon: PackageCheck,
+    },
+    {
+      status: 'RECEIVED_BY_PHARMACY',
+      label: isManipulated ? 'Recebido pela Farmácia' : 'Recebido',
+      shortLabel: 'Recebido',
+      icon: PackageCheck,
+    },
+    {
+      status: 'IN_EXECUTION',
+      label: isManipulated ? 'Em Manipulação' : 'Em Separação',
+      shortLabel: isManipulated ? 'Manipulação' : 'Separação',
+      icon: isManipulated ? FlaskConical : Package,
+    },
+    {
+      status: 'READY',
+      label: 'Pronto para Envio',
+      shortLabel: 'Pronto',
+      icon: CheckCircle,
+    },
+    {
+      status: 'SHIPPED',
+      label: 'Despachado',
+      shortLabel: 'Enviado',
+      icon: Truck,
+    },
+    {
+      status: 'DELIVERED',
+      label: 'Entregue',
+      shortLabel: 'Entregue',
+      icon: MapPin,
+    },
+  ]
+}
 
 interface ActionConfig {
   next: OrderStatus
@@ -74,59 +84,71 @@ interface ActionConfig {
   trackingField?: boolean
 }
 
-const ACTIONS: Partial<Record<OrderStatus, ActionConfig>> = {
-  RELEASED_FOR_EXECUTION: {
-    next: 'RECEIVED_BY_PHARMACY',
-    buttonLabel: 'Confirmar Recebimento do Pedido',
-    description:
-      'Confirme que sua farmácia recebeu e aceita executar este pedido. A partir daqui você será responsável pela manipulação e entrega.',
-    notesLabel: 'Observações (opcional)',
-    notesPlaceholder: 'Ex: pedido recebido em perfeitas condições, conferido com a guia…',
-  },
-  RECEIVED_BY_PHARMACY: {
-    next: 'IN_EXECUTION',
-    buttonLabel: 'Iniciar Manipulação',
-    description: 'Informe que a manipulação ou preparação do produto foi iniciada.',
-    notesLabel: 'Observações (opcional)',
-    notesPlaceholder: 'Ex: farmacêutico responsável, lote iniciado…',
-  },
-  IN_EXECUTION: {
-    next: 'READY',
-    buttonLabel: 'Marcar como Pronto',
-    description: 'O produto está manipulado, embalado e pronto para envio ou retirada.',
-    notesLabel: 'Observações (opcional)',
-    notesPlaceholder: 'Ex: produto embalado e lacrado, aguardando coleta…',
-  },
-  READY: {
-    next: 'SHIPPED',
-    buttonLabel: 'Registrar Envio / Despacho',
-    description:
-      'Informe que o pedido foi despachado. Adicione o código de rastreamento se disponível.',
-    notesLabel: 'Observações (opcional)',
-    notesPlaceholder: 'Ex: transportadora utilizada, previsão de entrega…',
-    trackingField: true,
-  },
-  SHIPPED: {
-    next: 'DELIVERED',
-    buttonLabel: 'Confirmar Entrega',
-    description: 'Confirme que o pedido foi entregue ao destinatário final.',
-    notesLabel: 'Observações (opcional)',
-    notesPlaceholder: 'Ex: entregue em mãos, assinatura coletada, canhoto retornado…',
-  },
+function buildActions(isManipulated: boolean): Partial<Record<OrderStatus, ActionConfig>> {
+  return {
+    RELEASED_FOR_EXECUTION: {
+      next: 'RECEIVED_BY_PHARMACY',
+      buttonLabel: 'Confirmar Recebimento do Pedido',
+      description: isManipulated
+        ? 'Confirme que sua farmácia recebeu e aceita executar este pedido. A partir daqui você será responsável pela manipulação e entrega.'
+        : 'Confirme que sua distribuidora recebeu e aceita executar este pedido. A partir daqui você será responsável pela separação e entrega.',
+      notesLabel: 'Observações (opcional)',
+      notesPlaceholder: 'Ex: pedido recebido em perfeitas condições, conferido com a guia…',
+    },
+    RECEIVED_BY_PHARMACY: {
+      next: 'IN_EXECUTION',
+      buttonLabel: isManipulated ? 'Iniciar Manipulação' : 'Iniciar Separação',
+      description: isManipulated
+        ? 'Informe que a manipulação ou preparação do produto foi iniciada.'
+        : 'Informe que a separação e preparação do pedido foi iniciada.',
+      notesLabel: 'Observações (opcional)',
+      notesPlaceholder: isManipulated
+        ? 'Ex: farmacêutico responsável, lote iniciado…'
+        : 'Ex: operador responsável, produtos conferidos…',
+    },
+    IN_EXECUTION: {
+      next: 'READY',
+      buttonLabel: 'Marcar como Pronto',
+      description: isManipulated
+        ? 'O produto está manipulado, embalado e pronto para envio ou retirada.'
+        : 'O pedido está separado, embalado e pronto para envio ou retirada.',
+      notesLabel: 'Observações (opcional)',
+      notesPlaceholder: 'Ex: produto embalado e lacrado, aguardando coleta…',
+    },
+    READY: {
+      next: 'SHIPPED',
+      buttonLabel: 'Registrar Envio / Despacho',
+      description:
+        'Informe que o pedido foi despachado. Adicione o código de rastreamento se disponível.',
+      notesLabel: 'Observações (opcional)',
+      notesPlaceholder: 'Ex: transportadora utilizada, previsão de entrega…',
+      trackingField: true,
+    },
+    SHIPPED: {
+      next: 'DELIVERED',
+      buttonLabel: 'Confirmar Entrega',
+      description: 'Confirme que o pedido foi entregue ao destinatário final.',
+      notesLabel: 'Observações (opcional)',
+      notesPlaceholder: 'Ex: entregue em mãos, assinatura coletada, canhoto retornado…',
+    },
+  }
 }
 
 interface Props {
   orderId: string
   currentStatus: OrderStatus
+  isManipulated?: boolean
 }
 
-export function PharmacyOrderActions({ orderId, currentStatus }: Props) {
+export function PharmacyOrderActions({ orderId, currentStatus, isManipulated = false }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [notes, setNotes] = useState('')
   const [trackingCode, setTrackingCode] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const STEPS = buildSteps(isManipulated)
+  const ACTIONS = buildActions(isManipulated)
   const action = ACTIONS[currentStatus]
   const currentStepIndex = STEPS.findIndex((s) => s.status === currentStatus)
   const isCompleted = currentStatus === 'DELIVERED' || currentStatus === 'COMPLETED'

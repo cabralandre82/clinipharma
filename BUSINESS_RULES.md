@@ -142,9 +142,20 @@ Ao aprovar uma solicitação de cadastro, o sistema automaticamente:
 3. Atualiza `profiles.registration_status` para `APPROVED`
 4. Envia email de boas-vindas com link para o usuário definir a própria senha (via `generateLink` com `type: recovery`)
 
-## RN-23: Farmácias não possuem auto-cadastro
+## RN-23: Farmácias e distribuidoras não possuem auto-cadastro
 
-O cadastro de farmácias é exclusivo do SUPER_ADMIN. Ao criar a farmácia, o sistema cria o usuário `PHARMACY_ADMIN` vinculado sem senha e envia welcome email com link para definição de senha. O admin nunca define a senha manualmente.
+O cadastro de farmácias e distribuidoras é exclusivo do SUPER_ADMIN. Ao criar a entidade, o sistema cria o usuário `PHARMACY_ADMIN` vinculado sem senha e envia welcome email com link para definição de senha. O admin nunca define a senha manualmente.
+
+## RN-26: Distribuidoras não trabalham com produtos manipulados
+
+Distribuidoras (`pharmacies.entity_type = 'DISTRIBUTOR'`) operam exclusivamente com produtos industrializados. As seguintes regras se aplicam:
+
+- O campo `is_manipulated` de um produto pertencente a uma distribuidora é sempre `false` — o serviço de criação de produtos impõe isso no servidor, independente do que o cliente enviar.
+- O formulário de cadastro de produto oculta o toggle "Produto manipulado" quando a entidade selecionada é uma distribuidora.
+- A timeline de execução de pedidos usa linguagem de separação/expedição ("Iniciar Separação", "Em Separação") em vez de linguagem de manipulação ("Iniciar Manipulação", "Em Manipulação") quando nenhum item do pedido tem `is_manipulated = true`.
+- O catálogo exibe "Produto industrializado" no lugar de "Produto manipulado certificado" para produtos com `is_manipulated = false`.
+
+Farmácias (`entity_type = 'PHARMACY'`) e distribuidoras compartilham: mesma tabela `pharmacies`, mesmo role `PHARMACY_ADMIN`, mesmo fluxo de pedidos/pagamentos/repasses, mesma estrutura de membros.
 
 ## RN-24: Médico com múltiplas clínicas deve selecionar a clínica no pedido
 

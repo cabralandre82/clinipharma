@@ -22,6 +22,7 @@ interface ProductDetailProps {
     price_current: number
     estimated_deadline_days: number
     featured: boolean
+    is_manipulated?: boolean
     product_categories: { id: string; name: string; slug: string } | null
     pharmacies: { id: string; trade_name: string; city: string; state: string } | null
     product_images: {
@@ -204,7 +205,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
           {/* Trust signals */}
           <div className="grid grid-cols-2 gap-2">
             {[
-              'Produto manipulado certificado',
+              product.is_manipulated ? 'Produto manipulado certificado' : 'Produto industrializado',
               'Preço fixo garantido',
               'Entrega rastreada para clínica',
               'Plataforma B2B fechada',
