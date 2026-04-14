@@ -14,6 +14,7 @@
 | Migration 035 — Realtime notifications         | ✅ Concluído (manual via SQL Editor) |
 | Migration 036 — needs_price_review             | ✅ Concluído (manual via SQL Editor) |
 | Migration 037 — CANCELED em payments/transfers | ✅ Concluído (manual via SQL Editor) |
+| Migration 038 — needs_manual_refund/reversal   | ⏳ Pendente (rodar via SQL Editor)   |
 | Buckets de storage criados                     | ✅ Concluído                         |
 | Seed de categorias/produtos                    | ✅ Concluído                         |
 | Usuários iniciais criados                      | ✅ Concluído                         |
@@ -77,6 +78,24 @@ ALTER TABLE public.transfers
 ALTER TABLE public.transfers
   ADD CONSTRAINT transfers_status_check
     CHECK (status IN ('NOT_READY','PENDING','COMPLETED','FAILED','CANCELED'));
+```
+
+**038 — Flags de ação manual (estorno/reversão)** (`supabase/migrations/038_financial_manual_action_flags.sql`)
+
+```sql
+ALTER TABLE public.payments
+  ADD COLUMN IF NOT EXISTS needs_manual_refund boolean NOT NULL DEFAULT false;
+
+ALTER TABLE public.transfers
+  ADD COLUMN IF NOT EXISTS needs_manual_reversal boolean NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS idx_payments_needs_manual_refund
+  ON public.payments (needs_manual_refund)
+  WHERE needs_manual_refund = true;
+
+CREATE INDEX IF NOT EXISTS idx_transfers_needs_manual_reversal
+  ON public.transfers (needs_manual_reversal)
+  WHERE needs_manual_reversal = true;
 ```
 
 ---
