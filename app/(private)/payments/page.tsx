@@ -6,6 +6,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { parseCursorParams, sliceCursorResult } from '@/lib/cursor-pagination'
 import { CursorPagination } from '@/components/ui/cursor-pagination'
 import { PaymentConfirmDialog } from '@/components/shared/payment-confirm-dialog'
+import { RefundPaymentDialog } from '@/components/shared/refund-payment-dialog'
 import { ExportButton } from '@/components/shared/export-button'
 import {
   Table,
@@ -32,6 +33,7 @@ const STATUS_STYLES: Record<string, string> = {
   CONFIRMED: 'bg-green-100 text-green-800',
   FAILED: 'bg-red-100 text-red-800',
   REFUNDED: 'bg-gray-100 text-gray-700',
+  CANCELED: 'bg-gray-100 text-gray-500',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -40,6 +42,7 @@ const STATUS_LABELS: Record<string, string> = {
   CONFIRMED: 'Confirmado',
   FAILED: 'Falhou',
   REFUNDED: 'Estornado',
+  CANCELED: 'Cancelado',
 }
 
 export default async function PaymentsPage({ searchParams }: Props) {
@@ -52,7 +55,7 @@ export default async function PaymentsPage({ searchParams }: Props) {
   let q = supabase
     .from('payments')
     .select(
-      `id, gross_amount, status, payment_method, reference_code,
+      `id, gross_amount, status, needs_manual_refund, payment_method, reference_code,
        confirmed_at, notes, created_at,
        orders (code, clinics (trade_name), doctors (full_name))`
     )
@@ -67,6 +70,7 @@ export default async function PaymentsPage({ searchParams }: Props) {
     id: string
     gross_amount: number
     status: string
+    needs_manual_refund: boolean
     payment_method: string | null
     reference_code: string | null
     confirmed_at: string | null
@@ -155,6 +159,13 @@ export default async function PaymentsPage({ searchParams }: Props) {
                     <TableCell>
                       {p.status === 'PENDING' && (
                         <PaymentConfirmDialog
+                          paymentId={p.id}
+                          amount={p.gross_amount}
+                          orderCode={p.orders?.code ?? ''}
+                        />
+                      )}
+                      {p.needs_manual_refund && (
+                        <RefundPaymentDialog
                           paymentId={p.id}
                           amount={p.gross_amount}
                           orderCode={p.orders?.code ?? ''}

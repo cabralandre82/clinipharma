@@ -13,6 +13,8 @@ import {
   TrendingUp,
   Tag,
   RefreshCw,
+  RotateCcw,
+  Undo2,
 } from 'lucide-react'
 import type { ProfileWithRoles } from '@/types'
 import Link from 'next/link'
@@ -77,6 +79,32 @@ export async function AdminDashboard({ user }: AdminDashboardProps) {
           href="/reports"
         />
       </div>
+
+      {/* Financial action cards — only show when there is something to action */}
+      {(data.refundsNeededCount > 0 || data.reversalsNeededCount > 0) && (
+        <div className="grid grid-cols-2 gap-4">
+          {data.refundsNeededCount > 0 && (
+            <KpiCard
+              title="Estornos pendentes"
+              value={data.refundsNeededCount.toString()}
+              icon={RotateCcw}
+              color="red"
+              href="/payments"
+              alert
+            />
+          )}
+          {data.reversalsNeededCount > 0 && (
+            <KpiCard
+              title="Reversões de repasse"
+              value={data.reversalsNeededCount.toString()}
+              icon={Undo2}
+              color="orange"
+              href="/transfers"
+              alert
+            />
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard
@@ -160,6 +188,7 @@ const COLOR_CLASSES: Record<string, { bg: string; icon: string; border: string }
   blue: { bg: 'bg-blue-50', icon: 'text-blue-600', border: 'border-blue-100' },
   amber: { bg: 'bg-amber-50', icon: 'text-amber-600', border: 'border-amber-100' },
   orange: { bg: 'bg-orange-50', icon: 'text-orange-600', border: 'border-orange-100' },
+  red: { bg: 'bg-red-50', icon: 'text-red-600', border: 'border-red-100' },
   green: { bg: 'bg-green-50', icon: 'text-green-600', border: 'border-green-100' },
   indigo: { bg: 'bg-indigo-50', icon: 'text-indigo-600', border: 'border-indigo-100' },
   teal: { bg: 'bg-teal-50', icon: 'text-teal-600', border: 'border-teal-100' },

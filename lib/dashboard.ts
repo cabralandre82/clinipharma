@@ -26,8 +26,8 @@ export const getAdminDashboardData = unstable_cache(
         .select('id, order_status, total_price, created_at, code')
         .order('created_at', { ascending: false })
         .limit(200),
-      supabase.from('payments').select('id, status, gross_amount'),
-      supabase.from('transfers').select('id, status, net_amount'),
+      supabase.from('payments').select('id, status, gross_amount, needs_manual_refund'),
+      supabase.from('transfers').select('id, status, net_amount, needs_manual_reversal'),
       supabase.from('products').select('id, active, price_current, needs_price_review'),
       supabase.from('clinics').select('id, status'),
       supabase.from('pharmacies').select('id, status'),
@@ -35,6 +35,8 @@ export const getAdminDashboardData = unstable_cache(
 
     const pendingPayments = (payments.data ?? []).filter((p) => p.status === 'PENDING')
     const pendingTransfers = (transfers.data ?? []).filter((t) => t.status === 'PENDING')
+    const refundsNeeded = (payments.data ?? []).filter((p) => p.needs_manual_refund)
+    const reversalsNeeded = (transfers.data ?? []).filter((t) => t.needs_manual_reversal)
     const activeProducts = (products.data ?? []).filter((p) => p.active)
     const awaitingPricing = (products.data ?? []).filter((p) => Number(p.price_current) === 0)
     const needsPriceReview = (products.data ?? []).filter((p) => p.needs_price_review)
@@ -56,6 +58,8 @@ export const getAdminDashboardData = unstable_cache(
       pendingPaymentsAmount: pendingPayments.reduce((s, p) => s + Number(p.gross_amount), 0),
       pendingTransfersCount: pendingTransfers.length,
       pendingTransfersAmount: pendingTransfers.reduce((s, t) => s + Number(t.net_amount), 0),
+      refundsNeededCount: refundsNeeded.length,
+      reversalsNeededCount: reversalsNeeded.length,
       activeProductsCount: activeProducts.length,
       awaitingPricingCount: awaitingPricing.length,
       needsPriceReviewCount: needsPriceReview.length,

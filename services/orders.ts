@@ -555,12 +555,15 @@ async function handleOrderCancellationFinancials(
         },
       })
     } else if (payment.status === 'CONFIRMED') {
+      // Flag for manual refund — also notify so the admin knows immediately
+      await adminClient.from('payments').update({ needs_manual_refund: true }).eq('id', payment.id)
+
       const amount = formatCurrency(Number(payment.gross_amount))
       const payload = {
         type: 'GENERIC' as const,
         title: '⚠️ Pedido cancelado com pagamento confirmado',
-        body: `O pedido foi cancelado, mas o pagamento de ${amount} já foi confirmado. Verifique a necessidade de estorno manual.`,
-        link: `/orders/${orderId}`,
+        body: `O pedido foi cancelado, mas o pagamento de ${amount} já foi confirmado. Registre o estorno em Pagamentos quando concluído.`,
+        link: `/payments`,
         push: true,
       }
       await Promise.all([
@@ -597,12 +600,18 @@ async function handleOrderCancellationFinancials(
         },
       })
     } else if (transfer.status === 'COMPLETED') {
+      // Flag for manual reversal — also notify so the admin knows immediately
+      await adminClient
+        .from('transfers')
+        .update({ needs_manual_reversal: true })
+        .eq('id', transfer.id)
+
       const amount = formatCurrency(Number(transfer.net_amount))
       const payload = {
         type: 'GENERIC' as const,
         title: '⚠️ Pedido cancelado com repasse já processado',
-        body: `O pedido foi cancelado, mas o repasse de ${amount} à farmácia já foi concluído. Verifique a necessidade de reversão manual.`,
-        link: `/orders/${orderId}`,
+        body: `O pedido foi cancelado, mas o repasse de ${amount} à farmácia já foi concluído. Registre a reversão em Repasses quando concluído.`,
+        link: `/transfers`,
         push: true,
       }
       await Promise.all([

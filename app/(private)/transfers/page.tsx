@@ -6,6 +6,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { parseCursorParams, sliceCursorResult } from '@/lib/cursor-pagination'
 import { CursorPagination } from '@/components/ui/cursor-pagination'
 import { TransferCompleteDialog } from '@/components/shared/transfer-complete-dialog'
+import { AcknowledgeReversalDialog } from '@/components/shared/acknowledge-reversal-dialog'
 import { ExportButton } from '@/components/shared/export-button'
 import {
   Table,
@@ -32,6 +33,7 @@ type TransferRow = {
   commission_amount: number
   net_amount: number
   status: string
+  needs_manual_reversal: boolean
   transfer_reference: string | null
   processed_at: string | null
   created_at: string
@@ -63,7 +65,7 @@ export default async function TransfersPage({ searchParams }: Props) {
   let q = admin
     .from('transfers')
     .select(
-      `id, gross_amount, commission_amount, net_amount, status,
+      `id, gross_amount, commission_amount, net_amount, status, needs_manual_reversal,
        transfer_reference, processed_at, created_at,
        pharmacies (trade_name), orders (code)`
     )
@@ -152,10 +154,20 @@ export default async function TransfersPage({ searchParams }: Props) {
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                           t.status === 'COMPLETED'
                             ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                            : t.status === 'CANCELED'
+                              ? 'bg-gray-100 text-gray-500'
+                              : t.status === 'FAILED'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-yellow-100 text-yellow-800'
                         }`}
                       >
-                        {t.status === 'COMPLETED' ? 'Concluído' : 'Pendente'}
+                        {t.status === 'COMPLETED'
+                          ? 'Concluído'
+                          : t.status === 'CANCELED'
+                            ? 'Cancelado'
+                            : t.status === 'FAILED'
+                              ? 'Falhou'
+                              : 'Pendente'}
                       </span>
                     </TableCell>
                     <TableCell className="text-xs text-gray-500">
@@ -165,6 +177,13 @@ export default async function TransfersPage({ searchParams }: Props) {
                       <TableCell>
                         {t.status === 'PENDING' && (
                           <TransferCompleteDialog
+                            transferId={t.id}
+                            amount={Number(t.net_amount)}
+                            pharmacyName={t.pharmacies?.trade_name ?? ''}
+                          />
+                        )}
+                        {t.needs_manual_reversal && (
+                          <AcknowledgeReversalDialog
                             transferId={t.id}
                             amount={Number(t.net_amount)}
                             pharmacyName={t.pharmacies?.trade_name ?? ''}

@@ -243,6 +243,102 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ erro
   }
 }
 
+export async function processRefund(
+  paymentId: string,
+  notes?: string
+): Promise<{ error?: string }> {
+  try {
+    const user = await requireRole(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
+    const adminClient = createAdminClient()
+
+    const { data: payment, error: fetchError } = await adminClient
+      .from('payments')
+      .select('id, order_id, gross_amount, status, needs_manual_refund')
+      .eq('id', paymentId)
+      .single()
+
+    if (fetchError || !payment) return { error: 'Pagamento não encontrado' }
+    if (payment.status !== 'CONFIRMED')
+      return { error: 'Apenas pagamentos confirmados podem ser estornados' }
+
+    const { error: updateErr } = await adminClient
+      .from('payments')
+      .update({
+        status: 'REFUNDED',
+        needs_manual_refund: false,
+        notes: notes ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', paymentId)
+    if (updateErr) return { error: 'Erro ao registrar estorno' }
+
+    await createAuditLog({
+      actorUserId: user.id,
+      actorRole: user.roles[0],
+      entityType: AuditEntity.PAYMENT,
+      entityId: paymentId,
+      action: AuditAction.PAYMENT_REFUNDED,
+      oldValues: { status: 'CONFIRMED' },
+      newValues: { status: 'REFUNDED', notes: notes ?? null },
+    })
+
+    revalidateTag('dashboard')
+    return {}
+  } catch (err) {
+    logger.error('processRefund error:', { error: err })
+    if (err instanceof Error && err.message === 'FORBIDDEN') return { error: 'Sem permissão' }
+    return { error: 'Erro interno' }
+  }
+}
+
+export async function acknowledgeTransferReversal(
+  transferId: string,
+  notes?: string
+): Promise<{ error?: string }> {
+  try {
+    const user = await requireRole(['SUPER_ADMIN', 'PLATFORM_ADMIN'])
+    const adminClient = createAdminClient()
+
+    const { data: transfer, error: fetchError } = await adminClient
+      .from('transfers')
+      .select('id, order_id, net_amount, status, needs_manual_reversal')
+      .eq('id', transferId)
+      .single()
+
+    if (fetchError || !transfer) return { error: 'Repasse não encontrado' }
+    if (transfer.status !== 'COMPLETED')
+      return { error: 'Apenas repasses concluídos podem ser revertidos' }
+
+    const { error: updateErr } = await adminClient
+      .from('transfers')
+      .update({
+        status: 'CANCELED',
+        needs_manual_reversal: false,
+        notes: notes ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', transferId)
+    if (updateErr) return { error: 'Erro ao registrar reversão' }
+
+    await createAuditLog({
+      actorUserId: user.id,
+      actorRole: user.roles[0],
+      entityType: AuditEntity.TRANSFER,
+      entityId: transferId,
+      action: AuditAction.TRANSFER_REVERSED,
+      oldValues: { status: 'COMPLETED' },
+      newValues: { status: 'CANCELED', notes: notes ?? null },
+    })
+
+    revalidateTag('dashboard')
+    return {}
+  } catch (err) {
+    logger.error('acknowledgeTransferReversal error:', { error: err })
+    if (err instanceof Error && err.message === 'FORBIDDEN') return { error: 'Sem permissão' }
+    return { error: 'Erro interno' }
+  }
+}
+
 export async function completeTransfer(
   transferId: string,
   reference: string,

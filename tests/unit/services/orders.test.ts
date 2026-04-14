@@ -811,7 +811,7 @@ describe('updateOrderStatus — order cancellation financial cleanup', () => {
 
     const result = await updateOrderStatus(OID, 'CANCELED', 'motivo')
     expect(result.error).toBeUndefined()
-    // update should NOT have been called on the CONFIRMED payment
-    expect(updateSpy).not.toHaveBeenCalled()
+    // update IS called to set needs_manual_refund = true for admin action
+    expect(updateSpy).toHaveBeenCalledWith({ needs_manual_refund: true })
   })
 })
