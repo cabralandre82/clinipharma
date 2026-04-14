@@ -32,7 +32,7 @@ export const staleOrdersJob = inngest.createFunction(
       const { data, error } = await admin
         .from('orders')
         .select('id, code, order_status, updated_at')
-        .not('order_status', 'in', '("COMPLETED","CANCELLED","REJECTED")')
+        .not('order_status', 'in', '("COMPLETED","DELIVERED","CANCELED","DRAFT")')
         .lt('updated_at', threshold)
         .order('updated_at', { ascending: true })
         .limit(50)
