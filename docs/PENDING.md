@@ -119,14 +119,14 @@ Não bloqueiam o primeiro cliente, mas impactam operação, conversão e complia
 
 ### Infraestrutura / DevOps
 
-| #   | Pendência                                                                          | Onde documentado              |
-| --- | ---------------------------------------------------------------------------------- | ----------------------------- |
-| 8   | **Supabase Staging** — criar projeto `clinipharma-staging`                         | `docs/staging-environment.md` |
-| 9   | **Branch `staging`** — criar e configurar auto-deploy no Vercel                    | `docs/staging-environment.md` |
-| 10  | **Load testing com k6** — rodar contra staging após provisionamento                | `docs/load-testing.md`        |
-| 11  | **DR simulação** — restore de backup em staging + medir RTO/RPO reais              | `docs/disaster-recovery.md`   |
-| 12  | **Cloudflare WAF** — ativar OWASP Core Ruleset + rate limit 100 req/min em `/api/` | `docs/roadmap-90pts.md` A2    |
-| 13  | **Inngest dashboard** — criar conta em app.inngest.com e sincronizar funções       | `docs/go-live-checklist.md`   |
+| #     | Pendência                                                                          | Onde documentado                                                                                                                                      |
+| ----- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| ~~8~~ | ~~**Supabase Staging**~~                                                           | ✅ **CONCLUÍDO (2026-04-16)** — `clinipharma-staging` criado, 42 migrations aplicadas, seed executado                                                 | —   |
+| ~~9~~ | ~~**Branch `staging` → Vercel**~~                                                  | ✅ **CONCLUÍDO (2026-04-16)** — branch `staging` com deploy automático ativo. URL: `b2b-med-platform-7n3qv5itg-cabralandre-3009s-projects.vercel.app` | —   |
+| 10    | **Load testing com k6** — rodar contra staging após provisionamento                | `docs/load-testing.md`                                                                                                                                |
+| 11    | **DR simulação** — restore de backup em staging + medir RTO/RPO reais              | `docs/disaster-recovery.md`                                                                                                                           |
+| 12    | **Cloudflare WAF** — ativar OWASP Core Ruleset + rate limit 100 req/min em `/api/` | `docs/roadmap-90pts.md` A2                                                                                                                            |
+| 13    | **Inngest dashboard** — criar conta em app.inngest.com e sincronizar funções       | `docs/go-live-checklist.md`                                                                                                                           |
 
 ### Notificações
 
