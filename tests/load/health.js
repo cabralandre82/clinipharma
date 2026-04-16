@@ -1,14 +1,15 @@
 /**
  * Load test 1: Health check endpoint — no auth required.
- * Validates the platform stays responsive under concurrent requests.
+ * Tests platform responsiveness under concurrent requests.
  *
- * Run: BASE_URL=https://... k6 run tests/load/health.js
+ * Run: BASE_URL=https://clinipharma.com.br k6 run tests/load/health.js
  */
 import http from 'k6/http'
 import { check, sleep } from 'k6'
-import { Rate } from 'k6/metrics'
+import { Rate, Trend } from 'k6/metrics'
 
 const errorRate = new Rate('errors')
+const dbLatency = new Trend('db_latency_ms')
 
 export const options = {
   stages: [
@@ -23,7 +24,7 @@ export const options = {
   },
 }
 
-const BASE_URL = __ENV.BASE_URL || 'https://b2b-med-platform-7n3qv5itg-cabralandre-3009s-projects.vercel.app'
+const BASE_URL = __ENV.BASE_URL || 'https://clinipharma.com.br'
 
 export default function () {
   const res = http.get(`${BASE_URL}/api/health`, {
@@ -31,11 +32,17 @@ export default function () {
     timeout: '10s',
   })
 
+  const body = res.json()
   const ok = check(res, {
     'status is 200': (r) => r.status === 200,
-    'has supabase status': (r) => r.json('supabase') !== undefined,
+    'database ok': () => body && body.checks && body.checks.database && body.checks.database.ok === true,
+    'env ok': () => body && body.checks && body.checks.env && body.checks.env.ok === true,
     'response time < 800ms': (r) => r.timings.duration < 800,
   })
+
+  if (body && body.checks && body.checks.database) {
+    dbLatency.add(body.checks.database.latencyMs || 0)
+  }
 
   errorRate.add(!ok)
   sleep(0.5)
