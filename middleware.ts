@@ -16,6 +16,8 @@ const PUBLIC_ROUTES = [
   '/api/payments/asaas/webhook',
   '/api/contracts/webhook',
   '/api/cron/',
+  // Inngest serve handler — authenticated by INNGEST_SIGNING_KEY, not user session
+  '/api/inngest',
   // Firebase service worker
   '/firebase-messaging-sw.js',
   // Public order tracking (no login required)
