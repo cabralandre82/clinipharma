@@ -16,7 +16,7 @@
 
 | Item                         | Descrição                                                                                             |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------- |
-| **Controlador**              | [Razão Social Clinipharma] — CNPJ [CNPJ]                                                              |
+| **Controlador**              | ALC INTERMEDIAÇÃO E REPRESENTAÇÃO LTDA — CNPJ 66.279.691/0001-12                                      |
 | **Encarregado (DPO)**        | André Cabral                                                                                          |
 | **Contato DPO**              | privacidade@clinipharma.com.br                                                                        |
 | **Cocontroladores**          | Clínicas parceiras (originadoras das receitas) — relacionamento regulado no DPA Clínicas v1.0         |

@@ -12,11 +12,11 @@
 
 **CONTRATANTE / CONTROLADORA DA PLATAFORMA:**
 
-**[RAZÃO SOCIAL COMPLETA DA CLINIPHARMA]**, pessoa jurídica de direito privado, inscrita no CNPJ sob nº **[CNPJ]**, com sede na **[ENDEREÇO COMPLETO, CEP, CIDADE/UF]**, neste ato representada na forma de seus atos constitutivos, doravante denominada **"CLINIPHARMA"** ou **"PLATAFORMA"**;
+**ALC INTERMEDIAÇÃO E REPRESENTAÇÃO LTDA**, pessoa jurídica de direito privado, inscrita no CNPJ sob nº **66.279.691/0001-12**, com sede na **SQS 212, Bloco K, Apto 402, Asa Sul, Brasília-DF, CEP 70275-110**, neste ato representada na forma de seus atos constitutivos, doravante denominada **"CLINIPHARMA"** ou **"PLATAFORMA"**;
 
 **CONTRATADA / CLÍNICA ADERENTE:**
 
-**[RAZÃO SOCIAL DA CLÍNICA]**, pessoa jurídica de direito privado, inscrita no CNPJ sob nº **[CNPJ CLÍNICA]**, registrada no Conselho Regional de Medicina sob nº **[CRM-PJ/UF]** (ou nº equivalente junto ao conselho de classe competente), com licença sanitária nº **[NÚMERO]** expedida pelo **[ÓRGÃO EMISSOR]**, com sede na **[ENDEREÇO COMPLETO, CEP, CIDADE/UF]**, **diretor técnico médico [NOME]**, CRM/[UF] nº [CRM], neste ato representada por **[NOME DO REPRESENTANTE LEGAL]**, **[CARGO]**, portador(a) do CPF nº **[CPF]**, doravante denominada **"CLÍNICA"**;
+**[RAZÃO SOCIAL DA CLÍNICA]**, pessoa jurídica de direito privado, inscrita no CNPJ sob nº **[CNPJ CLÍNICA]**, registrada no Conselho Regional de Medicina sob nº **[CRM-PJ/UF]** (ou nº equivalente junto ao conselho de classe competente), com licença sanitária nº **[NÚMERO]** expedida pelo **[ÓRGÃO EMISSOR]**, com sede na **SQS 212, Bloco K, Apto 402, Asa Sul, Brasília-DF, CEP 70275-110**, **diretor técnico médico [NOME]**, CRM/[UF] nº [CRM], neste ato representada por **[NOME DO REPRESENTANTE LEGAL]**, **[CARGO]**, portador(a) do CPF nº **[CPF]**, doravante denominada **"CLÍNICA"**;
 
 As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataforma e Acordo de Tratamento de Dados Pessoais** ("Contrato").
 
@@ -477,7 +477,7 @@ As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataf
 
 23.1. Este Contrato é regido pelas leis da República Federativa do Brasil, especialmente pela LGPD (Lei nº 13.709/2018), pelo Código Civil (Lei nº 10.406/2002), pelo Marco Civil da Internet (Lei nº 12.965/2014), pelas normas do CFM, ANVISA e ANPD.
 
-23.2. Fica eleito o foro da comarca de **[CIDADE/UF DA CLINIPHARMA]** para dirimir controvérsias, ressalvada a competência da ANPD.
+23.2. Fica eleito o foro da comarca de **Brasília-DF** para dirimir controvérsias, ressalvada a competência da ANPD.
 
 23.3. As PARTES comprometem-se à tentativa de resolução amigável antes de recorrer ao Poder Judiciário.
 
@@ -501,7 +501,7 @@ A CLÍNICA, ao assinar este Contrato, **declara expressamente** que:
 
 As PARTES assinam eletronicamente este Contrato via Clicksign, com validade jurídica equivalente à assinatura física, nos termos do Art. 10, §2º, da MP 2.200-2/2001 e do Art. 6º da Lei nº 14.063/2020.
 
-**Local e data:** ********\_********, **\_ de ****\_\_****** de 20\_\_\_.
+**Local e data:** **\*\*\*\***\_**\*\*\*\***, **\_ de \*\***\_\_**\*\*** de 20\_\_\_.
 
 ---
 
@@ -511,7 +511,7 @@ As PARTES assinam eletronicamente este Contrato via Clicksign, com validade jur�
 
 [Nome do Representante Legal]
 [Cargo]
-CNPJ: [CNPJ Clinipharma]
+CNPJ: 66.279.691/0001-12
 CPF: [CPF do signatário]
 
 ---

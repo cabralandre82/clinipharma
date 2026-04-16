@@ -12,11 +12,11 @@
 
 **CONTRATANTE / CONTROLADORA PRINCIPAL:**
 
-**[RAZÃO SOCIAL COMPLETA DA CLINIPHARMA]**, pessoa jurídica de direito privado, inscrita no CNPJ sob nº **[CNPJ]**, com sede na **[ENDEREÇO COMPLETO, CEP, CIDADE/UF]**, neste ato representada na forma de seus atos constitutivos, doravante denominada simplesmente **"CLINIPHARMA"** ou **"CONTROLADORA"**;
+**ALC INTERMEDIAÇÃO E REPRESENTAÇÃO LTDA**, pessoa jurídica de direito privado, inscrita no CNPJ sob nº **66.279.691/0001-12**, com sede na **SQS 212, Bloco K, Apto 402, Asa Sul, Brasília-DF, CEP 70275-110**, neste ato representada na forma de seus atos constitutivos, doravante denominada simplesmente **"CLINIPHARMA"** ou **"CONTROLADORA"**;
 
 **CONTRATADA / OPERADORA E CONTROLADORA INDEPENDENTE:**
 
-**[RAZÃO SOCIAL DA FARMÁCIA]**, pessoa jurídica de direito privado, inscrita no CNPJ sob nº **[CNPJ FARMÁCIA]**, com Autorização de Funcionamento (AFE) nº **[AFE]** expedida pela ANVISA, com sede na **[ENDEREÇO COMPLETO, CEP, CIDADE/UF]**, responsável técnico **[NOME DO RT]**, inscrito no CRF/**[UF]** sob nº **[CRF]**, neste ato representada por **[NOME DO REPRESENTANTE LEGAL]**, **[CARGO]**, portador(a) do CPF nº **[CPF]**, doravante denominada simplesmente **"FARMÁCIA"** ou **"OPERADORA"**;
+**[RAZÃO SOCIAL DA FARMÁCIA]**, pessoa jurídica de direito privado, inscrita no CNPJ sob nº **[CNPJ FARMÁCIA]**, com Autorização de Funcionamento (AFE) nº **[AFE]** expedida pela ANVISA, com sede na **SQS 212, Bloco K, Apto 402, Asa Sul, Brasília-DF, CEP 70275-110**, responsável técnico **[NOME DO RT]**, inscrito no CRF/**[UF]** sob nº **[CRF]**, neste ato representada por **[NOME DO REPRESENTANTE LEGAL]**, **[CARGO]**, portador(a) do CPF nº **[CPF]**, doravante denominada simplesmente **"FARMÁCIA"** ou **"OPERADORA"**;
 
 As partes acima qualificadas, em conjunto denominadas **"PARTES"**, celebram o presente **Contrato de Parceria Comercial e Acordo de Tratamento de Dados Pessoais** ("Contrato"), que se regerá pelas cláusulas e condições seguintes.
 
@@ -512,7 +512,7 @@ Para os fins deste Contrato, adotam-se as definições da LGPD (Art. 5º) e as s
 
 23.1. Este Contrato é regido pelas leis da República Federativa do Brasil, especialmente pela Lei nº 13.709/2018 (LGPD), pelo Código Civil (Lei nº 10.406/2002) e pelas normas regulatórias da ANVISA, ANPD e CFF.
 
-23.2. Fica eleito o foro da comarca de **[CIDADE/UF DA CLINIPHARMA]** para dirimir quaisquer controvérsias decorrentes deste Contrato, com expressa renúncia de qualquer outro, por mais privilegiado que seja, **ressalvada** a competência da ANPD para apuração de infrações à LGPD.
+23.2. Fica eleito o foro da comarca de **Brasília-DF** para dirimir quaisquer controvérsias decorrentes deste Contrato, com expressa renúncia de qualquer outro, por mais privilegiado que seja, **ressalvada** a competência da ANPD para apuração de infrações à LGPD.
 
 23.3. As PARTES comprometem-se a envidar esforços para resolução amigável de eventuais conflitos antes de recorrer ao Poder Judiciário, podendo acionar o DPO da CLINIPHARMA como mediador em questões exclusivamente relacionadas à proteção de dados.
 
@@ -522,7 +522,7 @@ Para os fins deste Contrato, adotam-se as definições da LGPD (Art. 5º) e as s
 
 Por estarem justas e acordadas com todos os termos deste Contrato, as PARTES o assinam eletronicamente via Clicksign, nos termos do Art. 10, §2º, da MP 2.200-2/2001, tendo as assinaturas digitais o mesmo valor jurídico das assinaturas físicas.
 
-**Local e data:** ********\_********, **\_ de ****\_\_****** de 20\_\_\_.
+**Local e data:** **\*\*\*\***\_**\*\*\*\***, **\_ de \*\***\_\_**\*\*** de 20\_\_\_.
 
 ---
 
@@ -532,7 +532,7 @@ Por estarem justas e acordadas com todos os termos deste Contrato, as PARTES o a
 
 [Nome do Representante Legal]
 [Cargo]
-CNPJ: [CNPJ Clinipharma]
+CNPJ: 66.279.691/0001-12
 CPF: [CPF do signatário]
 
 ---

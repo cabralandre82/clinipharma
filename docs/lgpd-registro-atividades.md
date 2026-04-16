@@ -2,7 +2,7 @@
 
 ### (Conforme LGPD Art. 37 e ANPD Resolução CD/ANPD nº 2/2022)
 
-**Controlador:** Clinipharma (CNPJ pendente)
+**Controlador:** ALC INTERMEDIAÇÃO E REPRESENTAÇÃO LTDA — CNPJ 66.279.691/0001-12
 **DPO:** André Cabral — privacidade@clinipharma.com.br
 **Última atualização:** 2026-04-13
 **Versão:** 1.2
@@ -11,13 +11,13 @@
 
 ## 1. Identificação do Controlador
 
-| Campo             | Valor                          |
-| ----------------- | ------------------------------ |
-| Razão Social      | Clinipharma (nome provisório)  |
-| CNPJ              | Pendente de registro           |
-| Endereço          | A definir                      |
-| E-mail de contato | privacidade@clinipharma.com.br |
-| Encarregado (DPO) | André Cabral                   |
+| Campo             | Valor                                                           |
+| ----------------- | --------------------------------------------------------------- |
+| Razão Social      | ALC INTERMEDIAÇÃO E REPRESENTAÇÃO LTDA                          |
+| CNPJ              | Pendente de registro                                            |
+| Endereço          | SQS 212, Bloco K, Apto 402, Asa Sul, Brasília-DF, CEP 70275-110 |
+| E-mail de contato | privacidade@clinipharma.com.br                                  |
+| Encarregado (DPO) | André Cabral                                                    |
 
 ---
 
