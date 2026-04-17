@@ -105,7 +105,7 @@
 - [ ] **🔴 AÇÃO PENDENTE DO PROPRIETÁRIO:** Provisionar projeto Supabase `clinipharma-staging` — ver `docs/staging-environment.md` para passo a passo completo
 - [ ] Criar branch `staging` e configurar deploy automático no Vercel
 - [ ] Executar scripts k6 contra staging (ver `docs/load-testing.md`)
-- [ ] **Cloudflare WAF** — ativar OWASP Core Ruleset + rate limit 100 req/min por IP em `/api/`
+- [x] **Cloudflare WAF** ✅ CONCLUÍDO (2026-04-17) — Cloudflare Managed Free Ruleset ativo (26 regras block). Rate limit 17 req/10 s por IP em `/api/` (≈100 req/min). ⚠️ OWASP Core Ruleset requer plano Pro ($20/mês); upgradar quando houver tráfego real.
 - [ ] **Pentest externo** — contratar antes do go-live comercial (Tempest, Conviso, Kondado)
 
 ## LGPD e Privacidade (Semana 7–8)
