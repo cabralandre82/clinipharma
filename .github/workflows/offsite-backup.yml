@@ -38,14 +38,14 @@ jobs:
     env:
       TZ: America/Sao_Paulo
       # Required secrets (configured on the repository):
-      #   SUPABASE_DB_URL        postgres URL with credentials for pg_dump
-      #   AGE_PUBLIC_KEY         age recipient (starts with `age1...`)
-      #   R2_ACCOUNT_ID          Cloudflare R2 account id
-      #   R2_ACCESS_KEY_ID       R2 S3-compatible access key
-      #   R2_SECRET_ACCESS_KEY   R2 S3-compatible secret
-      #   R2_BUCKET              bucket name (e.g. clinipharma-offsite)
-      #   SUPABASE_PROJECT_REF   project ref for Storage download (e.g. jomdntqlgrupvhrqoyai)
-      #   SUPABASE_ACCESS_TOKEN  personal access token with Storage read
+      #   SUPABASE_DB_URL              postgres URL with credentials for pg_dump
+      #   AGE_PUBLIC_KEY               age recipient (starts with `age1...`)
+      #   R2_ACCOUNT_ID                Cloudflare R2 account id
+      #   R2_ACCESS_KEY_ID             R2 S3-compatible access key
+      #   R2_SECRET_ACCESS_KEY         R2 S3-compatible secret
+      #   R2_BUCKET                    bucket name (e.g. clinipharma-offsite)
+      #   SUPABASE_PROJECT_REF         project ref (e.g. jomdntqlgrupvhrqoyai)
+      #   SUPABASE_SERVICE_ROLE_KEY    service_role JWT for Storage REST API
       R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
 
     steps:
@@ -108,42 +108,67 @@ jobs:
 
       - name: Storage snapshot (contracts + prescriptions + order-documents)
         env:
-          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # Storage REST API requires a key with Storage read privileges.
+          # The Supabase *personal access token* (sbp_…) is scoped to the
+          # Management API only and is rejected by /storage/v1/*. We use the
+          # service_role JWT instead (server-only, never shipped to client).
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
           set -euo pipefail
           OUT_DIR="${{ steps.meta.outputs.archive_dir }}/storage"
           mkdir -p "$OUT_DIR"
 
+          if [ -z "${PROJECT_REF:-}" ] || [ -z "${SERVICE_KEY:-}" ]; then
+            echo "::error::SUPABASE_PROJECT_REF or SUPABASE_SERVICE_ROLE_KEY is empty"; exit 1
+          fi
+          BASE="https://$PROJECT_REF.supabase.co/storage/v1"
+
+          # Sanity ping: list available buckets. Fails fast if the credential
+          # is wrong or the project_ref has whitespace/typos.
+          curl -fsS -H "Authorization: Bearer $SERVICE_KEY" -H "apikey: $SERVICE_KEY" \
+            "$BASE/bucket" | jq '[.[] | .name] // []'
+
           # Minimal Storage export: list + download every object in the
           # buckets that matter. We do NOT capture public buckets (product
           # images) — those can be re-uploaded from source of truth.
           for BUCKET in contracts order-documents; do
+            # Skip buckets that don't exist yet (e.g. brand-new environment).
+            if ! curl -fsS -H "Authorization: Bearer $SERVICE_KEY" -H "apikey: $SERVICE_KEY" \
+                   "$BASE/bucket/$BUCKET" >/dev/null 2>&1; then
+              echo "Bucket $BUCKET not found — skipping"
+              continue
+            fi
+
             mkdir -p "$OUT_DIR/$BUCKET"
             echo "Listing $BUCKET…"
             PAGE=0
             while :; do
               RESP=$(curl -fsS \
-                -H "Authorization: Bearer $TOKEN" \
-                -H "apikey: $TOKEN" \
+                -H "Authorization: Bearer $SERVICE_KEY" \
+                -H "apikey: $SERVICE_KEY" \
                 -H 'Content-Type: application/json' \
                 -d "{\"limit\": 1000, \"offset\": $((PAGE * 1000))}" \
-                "https://$PROJECT_REF.supabase.co/storage/v1/object/list/$BUCKET")
+                "$BASE/object/list/$BUCKET")
               COUNT=$(echo "$RESP" | jq 'length')
               [ "$COUNT" = "0" ] && break
               echo "$RESP" | jq -r '.[].name' | while read -r KEY; do
                 [ -z "$KEY" ] && continue
                 SAFE=$(echo "$KEY" | tr '/' '_')
                 curl -fsS \
-                  -H "Authorization: Bearer $TOKEN" \
-                  -H "apikey: $TOKEN" \
-                  "https://$PROJECT_REF.supabase.co/storage/v1/object/$BUCKET/$KEY" \
+                  -H "Authorization: Bearer $SERVICE_KEY" \
+                  -H "apikey: $SERVICE_KEY" \
+                  "$BASE/object/$BUCKET/$KEY" \
                   -o "$OUT_DIR/$BUCKET/$SAFE"
               done
               PAGE=$((PAGE + 1))
               [ "$COUNT" -lt 1000 ] && break
             done
           done
+
+          # Ensure at least one file lands in the storage archive so that
+          # the tarball is always non-empty (and the age step has a target).
+          echo "snapshot $(date -u +%FT%TZ)" > "$OUT_DIR/.manifest"
 
           tar -czf "${{ steps.meta.outputs.archive_dir }}/storage-${{ steps.meta.outputs.stamp }}.tgz" \
             -C "${{ steps.meta.outputs.archive_dir }}" storage
