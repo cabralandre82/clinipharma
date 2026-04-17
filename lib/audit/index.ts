@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/db/admin'
+import { logger } from '@/lib/logger'
 import type { UserRole } from '@/types'
 
 interface AuditLogParams {
@@ -31,7 +32,13 @@ export async function createAuditLog(params: AuditLogParams): Promise<void> {
     })
   } catch (err) {
     // Audit log failures should never crash the main operation
-    console.error('[AUDIT] Failed to create audit log:', err)
+    logger.error('Failed to create audit log', {
+      module: 'audit',
+      action: params.action,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      error: err,
+    })
   }
 }
 

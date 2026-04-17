@@ -1,5 +1,6 @@
 import { fcmMessaging } from '@/lib/firebase-admin'
 import { createAdminClient } from '@/lib/db/admin'
+import { logger } from '@/lib/logger'
 
 export interface PushPayload {
   title: string
@@ -44,7 +45,7 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
       await admin.from('fcm_tokens').delete().in('token', invalidTokens)
     }
   } catch (err) {
-    console.warn('[push] failed to send push notification:', err)
+    logger.warn('failed to send push notification', { module: 'push', error: err })
   }
 }
 
@@ -56,6 +57,6 @@ export async function sendPushToRole(role: string, payload: PushPayload): Promis
     if (!roles?.length) return
     await Promise.all(roles.map((r) => sendPushToUser(r.user_id, payload)))
   } catch (err) {
-    console.warn('[push] failed to send push to role:', err)
+    logger.warn('failed to send push to role', { module: 'push', role, error: err })
   }
 }

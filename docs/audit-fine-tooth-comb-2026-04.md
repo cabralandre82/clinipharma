@@ -127,7 +127,7 @@ Convenção de migrations: arquivos `101+` foram introduzidos por esta auditoria
 | `offsite-backup.yml`        | Backup semanal cifrado (`age`) → S3 externo                         |
 | `restore-drill.yml`         | Restore drill mensal em staging com verify-chain                    |
 | `synthetic-monitor.yml`     | 4 jornadas Playwright a cada 5 min                                  |
-| `post-deploy.yml`           | Sentry release + Slack announce pós-deploy                          |
+| `post-deploy.yml`           | Sentry release notification pós-deploy                              |
 | `setup-uptime-monitors.yml` | Provisiona UptimeRobot programaticamente                            |
 | `ci.yml` (revisado)         | `lint-typecheck-format`, `db-tests`, `security-scan`, `e2e-preview` |
 

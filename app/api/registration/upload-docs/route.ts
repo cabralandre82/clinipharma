@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/db/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { Resend } from 'resend'
+import { logger } from '@/lib/logger'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const APP_URL = 'https://clinipharma.com.br'
@@ -169,7 +170,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, uploaded: uploadedLabels.length })
   } catch (err) {
-    console.error('[upload-docs]', err)
+    logger.error('upload-docs failed', { action: 'registration-upload-docs', error: err })
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }

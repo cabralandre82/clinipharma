@@ -1,4 +1,5 @@
 import { captureError } from '@/lib/monitoring'
+import { logger } from '@/lib/logger'
 
 /**
  * Circuit Breaker — prevents cascade failures when external services are down.
@@ -105,7 +106,11 @@ export async function withCircuitBreaker<T>(
           action: 'circuit_breaker_open',
           extra: { service: name, failures: circuit.failures },
         })
-        console.error(`[circuit-breaker] OPEN: ${name} (${circuit.failures} failures)`)
+        logger.error('Circuit breaker OPENED', {
+          module: 'circuit-breaker',
+          circuit: name,
+          failures: circuit.failures,
+        })
       }
     }
 

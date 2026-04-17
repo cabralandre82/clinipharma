@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/auth/session'
 import { toCSV, toXLSX } from '@/lib/export'
 import { formatCurrency } from '@/lib/utils'
 import { exportLimiter } from '@/lib/rate-limit'
+import { logger } from '@/lib/logger'
 
 const ADMIN_ROLES = ['SUPER_ADMIN', 'PLATFORM_ADMIN']
 const BATCH_SIZE = 1000
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest) {
 
         controller.close()
       } catch (err) {
-        console.error('[export] stream error:', err)
+        logger.error('export stream error', { action: 'export', error: err })
         controller.error(err)
       }
     },

@@ -175,22 +175,3 @@ jobs:
             echo "**Status:** ✅ completed"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Notify Slack on success
-        if: success() && env.SLACK_WEBHOOK != ''
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_OPS }}
-        run: |
-          curl -fsS -X POST "$SLACK_WEBHOOK" \
-            -H 'Content-Type: application/json' \
-            -d "{\"text\":\"✅ Restore drill OK — ${{ steps.find.outputs.prefix }} restored in ${restore_seconds:-?}s\"}" \
-            || true
-
-      - name: Notify Slack on failure
-        if: failure() && env.SLACK_WEBHOOK != ''
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_OPS }}
-        run: |
-          curl -fsS -X POST "$SLACK_WEBHOOK" \
-            -H 'Content-Type: application/json' \
-            -d "{\"text\":\"🔴 Restore drill FAILED — investigate run ${{ github.run_id }}\"}" \
-            || true

@@ -60,10 +60,25 @@ async function checkRevocation(jti: string, userId: string): Promise<boolean> {
 }
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+  // Request correlation id: honour one propagated from an upstream LB/CDN
+  // (important for end-to-end tracing when a CF Worker or similar sits in
+  // front of us) otherwise mint a fresh UUID. Runs on the Edge runtime so
+  // we cannot populate Node's AsyncLocalStorage here — the id is passed to
+  // downstream Node handlers via the `x-request-id` *request* header, and
+  // to the client via the `X-Request-ID` *response* header.
+  const inboundId = request.headers.get('x-request-id')
+  const isValidInbound =
+    inboundId &&
+    inboundId.length <= 128 &&
+    // Only allow the subset that cannot break log parsers (uuid, hex, digits
+    // and dashes). Anything else gets replaced to prevent log injection.
+    /^[A-Za-z0-9_.:-]+$/.test(inboundId)
+  const requestId = isValidInbound ? inboundId : crypto.randomUUID()
 
-  // Attach a unique request ID to every response for distributed tracing
-  const requestId = crypto.randomUUID()
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-request-id', requestId)
+
+  let supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } })
   supabaseResponse.headers.set('X-Request-ID', requestId)
 
   const supabase = createServerClient(
@@ -76,7 +91,7 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
+          supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } })
           supabaseResponse.headers.set('X-Request-ID', requestId)
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)

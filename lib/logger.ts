@@ -1,18 +1,48 @@
 /**
- * Structured logger for Clinipharma.
+ * Structured logger for Clinipharma (Wave 1).
  *
- * Outputs JSON-formatted logs to stdout (captured by Vercel).
- * error and warn levels are also persisted to server_logs table in Supabase
- * for long-term retention and admin visibility (90-day retention via cron).
+ * Responsibilities:
  *
- * Fields per log entry:
- *   level, message, timestamp, requestId?, userId?, action?, durationMs?, error?, [context]
+ *  1. **Emit JSON one-line-per-entry** to stdout (captured by Vercel), with
+ *     stable keys so downstream tooling (logtail, vector, grep) can parse.
+ *
+ *  2. **Auto-enrich** every entry with the active request context
+ *     (`requestId`, `traceId`, `spanId`, `userId`, `path`, `method`) pulled
+ *     from AsyncLocalStorage — no more manual `logger.child({ requestId })`
+ *     threading through every service.
+ *
+ *  3. **Redact PII** via `lib/logger/redact.ts` before serialization — CPF,
+ *     CNPJ, emails, phones, JWTs, bearer tokens, service-role keys, card
+ *     numbers, and any value under a sensitive key (password, secret,
+ *     access_token, cookie, …) are replaced with opaque placeholders.
+ *
+ *  4. **Persist `warn` and `error`** to `public.server_logs` in production
+ *     for admin visibility in the UI (90-day retention via cron).
+ *
+ *  5. **Enrich Sentry scope** so errors captured by Sentry's global
+ *     handlers automatically carry the same requestId/userId/path that
+ *     appear in the log line — correlated cross-tool debugging.
+ *
+ * Non-goals:
+ *
+ *  - Log shipping beyond stdout + server_logs (Vercel already ships stdout
+ *    to their log drain; Sentry already ships errors).
+ *  - Sampling. Volume is low enough today.
+ *  - Formatters. JSON-only is the contract.
+ *
+ * This module is import-side-effect free: loading it does NOT open a DB
+ * connection nor hit Sentry. All expensive work is deferred to first call.
  */
+
+import { redact } from './logger/redact'
+import { getRequestContext } from './logger/context'
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
-interface LogContext {
+export interface LogContext {
   requestId?: string
+  traceId?: string
+  spanId?: string
   userId?: string
   action?: string
   entityType?: string
@@ -20,6 +50,7 @@ interface LogContext {
   durationMs?: number
   statusCode?: number
   path?: string
+  method?: string
   [key: string]: unknown
 }
 
@@ -31,13 +62,35 @@ interface LogEntry extends LogContext {
 }
 
 function buildEntry(level: LogLevel, message: string, context?: LogContext): LogEntry {
-  return {
+  const ctx = getRequestContext()
+  const ambient: LogContext = ctx
+    ? {
+        requestId: ctx.requestId,
+        traceId: ctx.traceId,
+        spanId: ctx.spanId,
+        userId: ctx.userId,
+        path: ctx.path,
+        method: ctx.method,
+      }
+    : {}
+
+  // Strip undefined so JSON output stays clean.
+  const merged: LogContext = {}
+  for (const src of [ambient, context ?? {}]) {
+    for (const [k, v] of Object.entries(src)) {
+      if (v !== undefined) merged[k] = v
+    }
+  }
+
+  const entry: LogEntry = {
     level,
     message,
     timestamp: new Date().toISOString(),
     env: process.env.NODE_ENV ?? 'development',
-    ...context,
+    ...merged,
   }
+
+  return redact(entry as unknown as Record<string, unknown>) as unknown as LogEntry
 }
 
 function output(entry: LogEntry): void {
@@ -56,12 +109,19 @@ function output(entry: LogEntry): void {
       console.log(line)
   }
 
-  // Persist error/warn to Supabase for long-term retention (fire-and-forget)
   if (
     (entry.level === 'error' || entry.level === 'warn') &&
     process.env.NODE_ENV === 'production'
   ) {
     persistLog(entry).catch(() => null)
+  }
+
+  // Breadcrumb into Sentry for every warn/error so the run-up to an
+  // exception is visible in the Sentry trace. Loaded lazily and wrapped
+  // in try/catch to avoid any feedback loop if Sentry itself is the
+  // source of the error we're logging.
+  if (entry.level === 'error' || entry.level === 'warn') {
+    reportToSentry(entry).catch(() => null)
   }
 }
 
@@ -71,9 +131,11 @@ async function persistLog(entry: LogEntry): Promise<void> {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!url || !key) return
 
-    const { requestId, path, ...context } = entry as LogEntry & {
+    const { requestId, path, traceId, spanId, ...context } = entry as LogEntry & {
       requestId?: string
       path?: string
+      traceId?: string
+      spanId?: string
     }
     await fetch(`${url}/rest/v1/server_logs`, {
       method: 'POST',
@@ -88,11 +150,47 @@ async function persistLog(entry: LogEntry): Promise<void> {
         message: entry.message,
         route: path ?? null,
         request_id: requestId ?? null,
-        context: Object.keys(context).length > 1 ? context : null,
+        // `context` is already redacted (redact() ran in buildEntry); the
+        // only non-PII fields we peel off are the top-level correlation ids.
+        context: {
+          ...context,
+          traceId,
+          spanId,
+        },
       }),
     })
   } catch {
     // Never throw from logger — fail silently
+  }
+}
+
+async function reportToSentry(entry: LogEntry): Promise<void> {
+  try {
+    // Skip in tests and when Sentry DSN isn't set (no-op mode).
+    if (!process.env.NEXT_PUBLIC_SENTRY_DSN) return
+    const Sentry = await import('@sentry/nextjs').catch(() => null)
+    if (!Sentry) return
+
+    Sentry.withScope((scope) => {
+      scope.setLevel(entry.level === 'error' ? 'error' : 'warning')
+      if (entry.requestId) scope.setTag('request_id', String(entry.requestId))
+      if (entry.traceId) scope.setTag('trace_id', String(entry.traceId))
+      if (entry.userId) scope.setUser({ id: String(entry.userId) })
+      if (entry.path) scope.setTag('route', String(entry.path))
+      scope.setContext('log_entry', entry as unknown as Record<string, unknown>)
+      if (entry.level === 'error') {
+        Sentry.captureMessage(entry.message, 'error')
+      } else {
+        Sentry.addBreadcrumb({
+          category: 'log',
+          level: 'warning',
+          message: entry.message,
+          data: entry as unknown as Record<string, unknown>,
+        })
+      }
+    })
+  } catch {
+    // Swallow — the logger must never fail the request.
   }
 }
 
@@ -124,7 +222,12 @@ export const logger = {
     output(buildEntry('error', message, errorContext))
   },
 
-  /** Returns a child logger with fixed context (e.g. per-request requestId). */
+  /**
+   * Returns a child logger with fixed context. Rarely needed after Wave 1 —
+   * the ambient request context already covers the common case — but still
+   * useful for per-iteration context in batch jobs (e.g. `child({ orderId })`
+   * inside a loop over 10k orders).
+   */
   child(fixedContext: LogContext) {
     return {
       debug: (message: string, ctx?: LogContext) =>
@@ -141,3 +244,12 @@ export const logger = {
 
 export type Logger = typeof logger
 export type ChildLogger = ReturnType<typeof logger.child>
+
+export {
+  runWithRequestContext,
+  withCronContext,
+  withWebhookContext,
+  updateRequestContext,
+  getRequestContext,
+} from './logger/context'
+export type { RequestContext } from './logger/context'

@@ -260,22 +260,16 @@ jobs:
           done
           echo "Uploaded $(ls *.age | wc -l) files to s3://${{ secrets.R2_BUCKET }}/$PREFIX/"
 
-      - name: Notify Slack on success
-        if: success() && env.SLACK_WEBHOOK != ''
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_OPS }}
+      - name: Write run summary
+        if: always()
         run: |
-          curl -fsS -X POST "$SLACK_WEBHOOK" \
-            -H 'Content-Type: application/json' \
-            -d "{\"text\":\"✅ Offsite backup OK — label=${{ steps.meta.outputs.label }} stamp=${{ steps.meta.outputs.stamp }}\"}" \
-            || true
-
-      - name: Notify Slack on failure
-        if: failure() && env.SLACK_WEBHOOK != ''
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_OPS }}
-        run: |
-          curl -fsS -X POST "$SLACK_WEBHOOK" \
-            -H 'Content-Type: application/json' \
-            -d "{\"text\":\"🔴 Offsite backup FAILED — run ${{ github.run_id }} — investigate immediately\"}" \
-            || true
+          {
+            echo "# Offsite backup — ${{ steps.meta.outputs.stamp }}"
+            echo ""
+            echo "**Label:** ${{ steps.meta.outputs.label }}"
+            echo "**Commit:** ${{ github.sha }}"
+            echo "**Outcome:** ${{ job.status }}"
+            echo ""
+            echo "Failures on this workflow trigger an email to the repository's"
+            echo "notification address (via GitHub Actions default behaviour)."
+          } >> "$GITHUB_STEP_SUMMARY"

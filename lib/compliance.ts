@@ -12,6 +12,7 @@
  */
 
 import { createAdminClient } from '@/lib/db/admin'
+import { logger } from '@/lib/logger'
 
 // ── CNPJ Validation via ReceitaWS ────────────────────────────────────────────
 
@@ -44,7 +45,10 @@ export async function validateCNPJ(cnpj: string): Promise<CNPJValidationResult> 
 
     if (res.status === 429) {
       // Rate limited — fail open to avoid blocking legitimate operations
-      console.warn('[compliance] ReceitaWS rate limited — failing open')
+      logger.warn('ReceitaWS rate limited — failing open', {
+        module: 'compliance',
+        action: 'validateCNPJ',
+      })
       return { valid: true, situation: 'UNKNOWN', error: 'rate_limited' }
     }
 
@@ -70,10 +74,13 @@ export async function validateCNPJ(cnpj: string): Promise<CNPJValidationResult> 
   } catch (err) {
     if (err instanceof Error && err.name === 'TimeoutError') {
       // Fail open on timeout to not block order flows
-      console.warn('[compliance] ReceitaWS timeout — failing open')
+      logger.warn('ReceitaWS timeout — failing open', {
+        module: 'compliance',
+        action: 'validateCNPJ',
+      })
       return { valid: true, situation: 'TIMEOUT', error: 'timeout' }
     }
-    console.error('[compliance] validateCNPJ error:', err)
+    logger.error('validateCNPJ error', { module: 'compliance', action: 'validateCNPJ', error: err })
     // Fail open on unexpected errors
     return { valid: true, situation: 'UNKNOWN', error: String(err) }
   }

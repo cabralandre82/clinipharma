@@ -33,16 +33,21 @@ describe('lib/monitoring — no-op mode (no DSN)', () => {
     expect(() => captureError(new Error('test'), { action: 'test' })).not.toThrow()
   })
 
-  it('captureError falls back to console.error when no DSN', async () => {
+  it('captureError falls back to structured JSON log when no DSN', async () => {
+    // After Wave 1, monitoring.ts routes its fallback through the unified
+    // logger, which emits a JSON blob to console.error (PII-redacted).
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { captureError } = await import('@/lib/monitoring')
     captureError(new Error('fallback error'), { userId: 'u1', action: 'test_action' })
-    expect(consoleSpy).toHaveBeenCalledWith(
-      '[error]',
-      expect.objectContaining({
-        message: 'fallback error',
-      })
-    )
+
+    expect(consoleSpy).toHaveBeenCalledOnce()
+    const raw = consoleSpy.mock.calls[0][0] as string
+    const parsed = JSON.parse(raw)
+    expect(parsed.level).toBe('error')
+    expect(parsed.message).toBe('fallback error')
+    expect(parsed.userId).toBe('u1')
+    expect(parsed.action).toBe('test_action')
+    expect(parsed.errorMessage).toBe('fallback error')
     consoleSpy.mockRestore()
   })
 

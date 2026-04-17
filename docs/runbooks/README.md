@@ -22,7 +22,7 @@
 | Runbook                        | Sintoma disparador                              | Alerta de origem           |
 | ------------------------------ | ----------------------------------------------- | -------------------------- |
 | `external-integration-down.md` | Circuit breaker aberto (Asaas/Clicksign/Resend) | `/api/health/deep`         |
-| `cron-job-failing.md`          | Cron em loop de falha                           | `cron_runs` + Slack        |
+| `cron-job-failing.md`          | Cron em loop de falha                           | `cron_runs` + email        |
 | `email-deliverability-low.md`  | Taxa de bounce > 5% em 24h                      | Resend dashboard           |
 | `connection-pool-exhausted.md` | Supabase pool > 80% por >5 min                  | `/api/cron/db-pool-health` |
 
@@ -53,9 +53,9 @@ Use `_template.md` como base. Cada runbook deve ter:
 ## Regras gerais
 
 1. **Nunca** modifique dados em produção sem registro em `audit_logs` + comentário `incident:<id>`.
-2. **Sempre** abra um canal `#incident-<yyyy-mm-dd>` no Slack ao iniciar um P1.
+2. **Sempre** abra uma issue no GitHub com label `incident` ao iniciar um P1 — comentários cronológicos substituem o canal de chat.
 3. **Sempre** tire um "snapshot" do estado (queries de diagnóstico) **antes** de qualquer mitigação.
-4. Se usar `terminate_idle_transactions()` em produção, **logue quem autorizou** em `#ops-approvals`.
+4. Se usar `terminate_idle_transactions()` em produção, **registre quem autorizou** como comentário na issue de incidente.
 5. Após resolver P1/P2, abrir post-mortem em ≤ 72h (template em `.github/ISSUE_TEMPLATE/postmortem.md`).
 
 ---

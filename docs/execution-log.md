@@ -122,7 +122,7 @@
   - Download de buckets `contracts` e `order-documents` (Storage API, paginado 1000 itens).
   - Cifragem com `age` usando `AGE_PUBLIC_KEY` (recipient; chave privada fica offline com fundador).
   - Upload para Cloudflare R2 (`clinipharma-offsite/weekly/<stamp>/`).
-  - Slack notify sucesso/falha via `SLACK_WEBHOOK_OPS`.
+  - Summary step no GITHUB_STEP_SUMMARY; falhas disparam a notificação default do GitHub Actions por e-mail.
 - `.github/workflows/restore-drill.yml` — executa dia 1 de cada mês:
   - Spin up de Postgres 16 service container.
   - Sync do snapshot mais recente de R2 (ou prefixo especificado).
@@ -131,10 +131,10 @@
   - `pg_restore` medindo duração (RTO real).
   - Queries de integridade (counts em `auth.users`, `orders`, `payments`, `audit_logs`, `feature_flags`).
   - Validação estrutural do tarball de Storage.
-  - Summary + Slack notify.
+  - Summary step no GITHUB_STEP_SUMMARY; falhas disparam a notificação default do GitHub Actions por e-mail.
 - `docs/disaster-recovery.md` — seção 5 revisada com linha `DB offsite` e `Storage offsite`, detalhamento do workflow, lista de 10 secrets necessários, regras de lifecycle no R2.
 
-**Secrets pendentes de configuração manual no repositório:** `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `AGE_PUBLIC_KEY`, `AGE_PRIVATE_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `SLACK_WEBHOOK_OPS`.
+**Secrets pendentes de configuração manual no repositório:** `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_SERVICE_ROLE_KEY`, `AGE_PUBLIC_KEY`, `AGE_PRIVATE_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
 
 ---
 
@@ -206,15 +206,11 @@ Ações executadas diretamente pelo agente via `gh`, `psql` e binários locais:
    - Configurar no repo: `SUPABASE_ACCESS_TOKEN`.
    - Necessário para o job de Storage snapshot (contracts + order-documents).
 
-3. **Slack (opcional)**
-   - Criar Incoming Webhook no canal #ops.
-   - Configurar no repo: `SLACK_WEBHOOK_OPS`.
-
-4. **Backup offline da chave privada AGE**
+3. **Backup offline da chave privada AGE**
    - Chave em `~/.config/clinipharma/age-offsite.key` no ambiente onde rodou Wave 0.
    - Mover uma cópia para cofre offline (1Password, Bitwarden vault export, ou USB criptografado + impressão em papel). Essa é a última linha de defesa se R2 + GitHub forem comprometidos simultaneamente.
 
-Assim que os 6 secrets do bloco R2/Supabase/Slack estiverem configurados, dar `workflow_dispatch` em `offsite-backup.yml` para validar end-to-end antes de confiar no cron semanal.
+Assim que os secrets de R2 e Supabase estiverem configurados, dar `workflow_dispatch` em `offsite-backup.yml` para validar end-to-end antes de confiar no cron semanal. **Notificações:** decidiu-se em 2026-04-17 não adotar Slack — falhas dos workflows usam a notificação default do GitHub Actions por e-mail.
 
 ---
 
@@ -250,7 +246,7 @@ SUPABASE_DB_URL         2026-04-17   ← atualizado (pooler correto)
 SUPABASE_PROJECT_REF    2026-04-17
 ```
 
-**Faltam:** `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, opcional `SLACK_WEBHOOK_OPS`.
+**Faltam:** `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
 
 ---
 
@@ -331,7 +327,7 @@ SUPABASE_PROJECT_REF         2026-04-17
 SUPABASE_SERVICE_ROLE_KEY    2026-04-17
 ```
 
-`SLACK_WEBHOOK_OPS` segue opcional — o workflow tem guard `if: env.SLACK_WEBHOOK != ''` e pula silenciosamente.
+Slack removido do escopo em 2026-04-17 (decisão do fundador). Falhas dos workflows de backup/restore usam a notificação default do GitHub Actions por e-mail.
 
 ---
 
@@ -352,8 +348,97 @@ SUPABASE_SERVICE_ROLE_KEY    2026-04-17
 
 1. **Rotacionar PAT Supabase `sbp_…9c9`**: exposto nesta conversa. Gerar novo em https://supabase.com/dashboard/account/tokens e rodar `printf NEW | gh secret set SUPABASE_ACCESS_TOKEN`.
 2. **Guardar `~/.config/clinipharma/age-offsite.key` offline**: o usuário confirmou que já copiou. Reforçar que sem essa chave **não há recuperação** dos backups R2.
-3. (Opcional) Criar webhook Slack `#ops` e configurar `SLACK_WEBHOOK_OPS`.
+3. (Decisão 2026-04-17) Slack **não** será adotado — notificações de CI/workflows via e-mail padrão do GitHub Actions.
 
 **Wave 0 está fechada. Apto a iniciar Wave 1 quando o usuário autorizar.**
+
+---
+
+### Wave 1 — Logger com redação PII + correlação (request-id/trace-id) — 2026-04-17
+
+**Status:** 🟢 concluído (pendente merge + deploy staging)
+
+**Escopo original (plano):** Logger com redação PII + correlação via request-id / trace-id / span-id. Substituir `console.*` em código de negócio. Propagar contexto por AsyncLocalStorage.
+
+**Escopo ajustado em tempo de execução:**
+
+- **Slack excluído** (decisão do fundador 2026-04-17): removido de `offsite-backup.yml`, `restore-drill.yml`, `runbooks/README.md`, `implementation-plan.md` (Wave 6), `disaster-recovery.md`, `audit-fine-tooth-comb-2026-04.md`, `slos.md`. Secret `SLACK_WEBHOOK_OPS` não existia em produção — comando `gh secret delete` retornou no-op.
+- **Feature flag `observability.pii_redaction_v2` descartada**: o redator já tem fail-safe (`try/catch → "[redactor-failed]"` sentinel). Uma flag remota adiciona ponto de falha extra em vez de reduzir risco. Rollback = `git revert`.
+
+**Arquivos novos**
+
+- `lib/logger/redact.ts` — redator puro e determinístico. 10 regex (CPF, CNPJ, e-mail, telefone BR, JWT, Bearer/Basic, cartão, postgres URL, API-key prefixes `sk_live_`/`sbp_`/`cfat_`/`re_`/`whsec_`/…), set de SENSITIVE_KEYS (password, secret, access_token, cookie, cpf, cnpj, full_name, card_number, …), set de ALLOWED_KEYS (requestId, traceId, userId, path, method, durationMs, …), depth-capped (8), string-capped (4096), array-capped (100), cycle-safe (WeakSet), nunca throw. ~280 linhas.
+- `lib/logger/context.ts` — AsyncLocalStorage<RequestContext> (requestId, traceId, spanId, userId, path, method, clientIp, startedAt). Exports: `runWithRequestContext`, `getRequestContext`, `updateRequestContext`, `makeRequestContext`, `withCronContext`, `withWebhookContext`. Node-only, guardado com `server-only`. `crypto.randomUUID` importado de `node:crypto` para compatibilidade com Node 18.
+- `lib/logger/wrap.ts` — `withRouteContext(handler, staticContext?)` e `withServerActionContext` (alias) para Route Handlers e Server Actions. `tagUserId(userId)` para anexar usuário autenticado ao contexto ambiente. Requer Next.js runtime (`headers()`).
+- `tests/unit/lib/logger-redact.test.ts` — 42 testes.
+- `tests/unit/lib/logger-context.test.ts` — 11 testes.
+
+**Arquivos modificados (core)**
+
+- `lib/logger.ts` — refatorado: auto-enriquece do ALS ambiente, redige via `redact()` antes de `JSON.stringify`, reporta warn/error pro Sentry com escopo (requestId/traceId/userId/route), re-exporta helpers do context.
+- `middleware.ts` — honra `x-request-id` upstream (LB/CDN) se válido (`^[A-Za-z0-9_.:-]+$`, ≤128 chars), senão mint UUID. Propaga via request header `x-request-id` (pra downstream Node handlers) e response header `X-Request-ID` (pro cliente).
+- `vitest.config.ts` — thresholds ratcheted: branches 72→**75**, functions 85→**86**. statements/lines ficam em 72 (ganho marginal, não justifica bump).
+
+**Arquivos modificados (substituição `console.*` → `logger.*`)**
+
+24 arquivos, agrupados por domínio. Cada `console.*` virou `logger.*` com context enriquecido (`module`, `action`, `entityType`, `entityId`, `error`):
+
+- **Integrações externas:** `lib/zenvia.ts` (7), `lib/email/index.ts` (3), `lib/compliance.ts` (3).
+- **Auditoria / Crypto:** `lib/audit/index.ts` (1), `lib/crypto.ts` (1), `lib/circuit-breaker.ts` (1).
+- **Rate-limit / Monitoring:** `lib/rate-limit.ts` (1), `lib/monitoring.ts` (2) — fallback agora via logger unificado.
+- **Notificações:** `lib/notifications.ts` (2), `lib/push.ts` (2).
+- **Cron routes:** `app/api/cron/enforce-retention/route.ts` (1), `app/api/cron/revalidate-pharmacies/route.ts` (3), `app/api/cron/purge-revoked-tokens/route.ts` (1). Todos envoltos com `withCronContext('<job-name>', handler)`.
+- **Route handlers:** `app/api/registration/upload-docs/route.ts` (1), `app/api/products/interest/route.ts` (2), `app/api/export/route.ts` (1), `app/(auth)/auth/callback/route.ts` (2), `app/(private)/clinics/[id]/page.tsx` (1).
+
+**Mantidos em `console.*` (intencionalmente):**
+
+- `lib/logger.ts` — é o sink.
+- `scripts/migrate-pii-encryption.ts`, `scripts/setup-production.ts` — CLI scripts para humanos, querem output ANSI.
+- `tests/e2e/auth.setup.ts` — teste.
+- `lib/firebase/client.ts` — browser-side, logger é server-only.
+- `supabase/functions/send-auth-email/index.ts` — edge function Deno, sem acesso ao logger Node.
+
+**Docs atualizados**
+
+- `docs/execution-log.md` (este arquivo) — entrada Wave 1 + limpeza Slack.
+- `docs/runbooks/README.md` — P1 agora abre GitHub issue com label `incident` em vez de canal Slack.
+- `docs/disaster-recovery.md` — backup/restore notificam via GitHub Actions email default.
+- `docs/implementation-plan.md` — Wave 6 renomeado (`Slack/PagerDuty` → `email + PagerDuty`).
+- `docs/audit-fine-tooth-comb-2026-04.md` — `post-deploy.yml` não anuncia Slack.
+- `docs/slos.md` — Sentry Alert Rules usam e-mail/webhook.
+
+**Testes: +77 novos, 1044 passando total**
+
+- Redator: 42 testes (CPF, CNPJ, e-mail, telefone, JWT, Bearer/Basic, API keys Stripe/Asaas/Resend/Cloudflare/Supabase, cartão com mascaramento BIN+4, postgres URL, length cap, array cap, depth cap, cycles, Error/Date/URL serialization, cross-cutting sensitive-key-nested-in-allowed-branch).
+- Contexto ALS: 11 testes (inside/outside scope, await chain propagation, concurrent isolation, update mutation, no-op fora de scope, makeRequestContext defaults, withCronContext, withWebhookContext).
+- Logger (revamped): 24 testes — inclui auto-enriquecimento do ALS, override de contexto explícito, redação PII em mensagens/contexts/stack traces, persistLog com corpo redigido (sem `hunter2`, sem `x@y.com`, com `[redacted]`).
+
+**Coverage:** 72.82% stmts/lines (+0.56), **76.98% branches (+1.05)**, **86.12% functions (+0.34)**. Thresholds ratchet: branches 75, functions 86. Regressão futura vira erro no CI.
+
+**Métricas:**
+
+- `npm test`: 1044 passed, 0 failed, 10.34s.
+- `npx tsc --noEmit`: 0 erros.
+- `npm run lint`: 0 erros, 46 warnings pré-existentes (nenhum novo).
+
+**Impacto operacional**
+
+- Todo log estruturado emitido pela aplicação servidora agora:
+  1. É JSON uma-linha-por-entrada (parseable por Vercel Logs, grep, vector, logtail).
+  2. Inclui `requestId` automaticamente quando dentro de um request/cron/webhook (sem `logger.child` manual).
+  3. Tem PII redigida: CPF, CNPJ, e-mails (parcialmente mascarados `us***@dom`), telefones BR, JWT, Bearer tokens, service-role keys, senhas, cookies, cartões (BIN+last4), URLs postgres com credenciais, API keys de todos prefixos conhecidos.
+  4. Persiste warn/error em `public.server_logs` (com corpo já redigido) em produção.
+  5. Reporta warn/error pro Sentry com escopo carregando `request_id`, `trace_id`, `user.id`, `route` — correlação cross-tool.
+- Payloads de log gigantes são truncados (string ≥4096 chars, array ≥100 itens, object ≥8 níveis) para evitar OOM/CPU.
+- Falha no redator não derruba a request: sentinela `[redactor-failed]` entra em cena.
+
+**Pendências para Wave 2+ (capturadas aqui para não esquecer):**
+
+- Wave 6 vai adicionar `/api/alerts` e integração com PagerDuty — logger já está pronto pra consumir.
+- `@sentry/nextjs` poderia pegar trace_id/span_id automaticamente via `Sentry.getActiveSpan()` — integrar em Wave 7 (SLO burn rate + OTEL completo).
+- Nenhum Route Handler foi explicitamente envolto com `withRouteContext` (só cron). Adoção gradual em waves subsequentes quando cada rota for tocada.
+- Feature flag `observability.log_sampling` pode entrar em Wave 6 para sampling probabilístico em volume alto.
+
+**Commit único:** `feat(wave-1): structured logger with PII redaction and ALS correlation`.
 
 ---

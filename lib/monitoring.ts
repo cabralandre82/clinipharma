@@ -6,6 +6,7 @@
  * and ensures no errors are thrown when Sentry is not configured.
  */
 import * as Sentry from '@sentry/nextjs'
+import { logger } from '@/lib/logger'
 
 export interface ErrorContext {
   userId?: string
@@ -22,10 +23,10 @@ export interface ErrorContext {
  */
 export function captureError(error: unknown, context?: ErrorContext): void {
   if (!process.env.NEXT_PUBLIC_SENTRY_DSN) {
-    // Fallback: structured console logging for log aggregators (Vercel Logs)
-    console.error('[error]', {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
+    // Fallback: structured logging through our logger (PII-redacted, auto-enriched)
+    logger.error(error instanceof Error ? error.message : String(error), {
+      module: 'monitoring',
+      error,
       ...context,
     })
     return
@@ -51,7 +52,7 @@ export function captureError(error: unknown, context?: ErrorContext): void {
 export function recordMetric(message: string, data?: Record<string, unknown>): void {
   if (!process.env.NEXT_PUBLIC_SENTRY_DSN) {
     if (process.env.NODE_ENV !== 'production') {
-      console.info('[metric]', message, data ?? '')
+      logger.debug(message, { module: 'metric', ...data })
     }
     return
   }

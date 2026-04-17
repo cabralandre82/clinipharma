@@ -257,7 +257,7 @@ curl https://clinipharma.com.br/api/health
 5. Roda queries de integridade (counts em `auth.users`, `orders`, `payments`, `audit_logs`).
 6. Valida header do tarball de Storage (restore completo é exercitado em staging trimestralmente).
 7. Reporta duração do restore (RTO real) no `GITHUB_STEP_SUMMARY`.
-8. Notifica Slack (`SLACK_WEBHOOK_OPS`) em sucesso e **alerta em falha**.
+8. Em caso de falha, o GitHub Actions envia notificação por e-mail ao dono do repositório (default behaviour) e o run fica visível em Security → Dependabot → Workflow runs.
 
 ### Secrets necessários no repositório (uma vez)
 
@@ -272,7 +272,6 @@ curl https://clinipharma.com.br/api/health
 | `R2_ACCESS_KEY_ID`      | S3-compatível                                                       |
 | `R2_SECRET_ACCESS_KEY`  | S3-compatível                                                       |
 | `R2_BUCKET`             | `clinipharma-offsite`                                               |
-| `SLACK_WEBHOOK_OPS`     | Webhook para canal `#ops-alerts` (opcional)                         |
 
 ### Lifecycle no bucket R2
 

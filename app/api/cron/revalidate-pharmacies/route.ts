@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { validateCNPJ } from '@/lib/compliance'
 import { createNotificationForRole } from '@/lib/notifications'
+import { logger, withCronContext } from '@/lib/logger'
 
 /**
  * Weekly cron: re-validates CNPJ of all active pharmacies.
@@ -9,7 +10,7 @@ import { createNotificationForRole } from '@/lib/notifications'
  *
  * Vercel cron: every Monday at 06:00 UTC (configured in vercel.json).
  */
-export async function GET(req: NextRequest) {
+export const GET = withCronContext('revalidate-pharmacies', async (req: NextRequest) => {
   const secret = req.headers.get('x-cron-secret') ?? req.nextUrl.searchParams.get('secret')
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
     .or(`cnpj_validated_at.is.null,cnpj_validated_at.lt.${sevenDaysAgo}`)
 
   if (error) {
-    console.error('[cron/revalidate-pharmacies] fetch error:', error)
+    logger.error('fetch error', { action: 'revalidate-pharmacies', error })
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
@@ -64,9 +65,12 @@ export async function GET(req: NextRequest) {
           link: `/pharmacies/${pharmacy.id}`,
         })
 
-        console.warn(
-          `[cron/revalidate-pharmacies] Suspended pharmacy ${pharmacy.id} (${pharmacy.trade_name}): CNPJ situation = ${result.situation}`
-        )
+        logger.warn('Suspended pharmacy — CNPJ irregular', {
+          action: 'revalidate-pharmacies',
+          entityType: 'PHARMACY',
+          entityId: pharmacy.id,
+          situation: result.situation,
+        })
 
         results.suspended++
       }
@@ -74,10 +78,15 @@ export async function GET(req: NextRequest) {
       // Rate limit: 3 req/min to ReceitaWS — wait 25s between each call
       await new Promise((r) => setTimeout(r, 25_000))
     } catch (err) {
-      console.error(`[cron/revalidate-pharmacies] Error validating ${pharmacy.id}:`, err)
+      logger.error('Error validating pharmacy', {
+        action: 'revalidate-pharmacies',
+        entityType: 'PHARMACY',
+        entityId: pharmacy.id,
+        error: err,
+      })
       results.errors++
     }
   }
 
   return NextResponse.json({ ok: true, ...results })
-}
+})

@@ -38,14 +38,15 @@ export default defineConfig({
         '**/*.d.ts',
       ],
       thresholds: {
-        // Unit-test baseline aligned with today's real coverage (72.26% stmts/lines,
-        // 75.93% branches, 85.78% functions). Service success paths with multi-step
-        // DB chains require integration tests against a real Supabase project; those
-        // arrive in a later wave and will lift this ceiling. Do NOT lower further
-        // without a conscious decision — ratchet UP on every wave that adds tests.
+        // Ratchet plan: after every wave that adds ≥20 tests we lift these
+        // floors toward the real measurement, so regressions are caught
+        // the next PR. Current numbers after Wave 1 (logger + redactor +
+        // ALS context): 72.82% stmts/lines, 76.98% branches, 86.12% functions.
+        // Next ratchet targets in Wave 2 (webhook dedup / cron guard).
+        // Do NOT lower — if a PR regresses, add the missing test instead.
         statements: 72,
-        branches: 72,
-        functions: 85,
+        branches: 75,
+        functions: 86,
         lines: 72,
       },
     },

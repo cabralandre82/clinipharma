@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
 import { withCircuitBreaker, CircuitOpenError } from '@/lib/circuit-breaker'
+import { logger } from '@/lib/logger'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -16,7 +17,7 @@ interface SendEmailOptions {
 
 export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<void> {
   if (!process.env.RESEND_API_KEY) {
-    console.warn('[email] RESEND_API_KEY not set — skipping email:', subject)
+    logger.warn('RESEND_API_KEY not set — skipping email', { module: 'email', subject })
     return
   }
 
@@ -28,9 +29,9 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions): Promis
     })
   } catch (err) {
     if (err instanceof CircuitOpenError) {
-      console.warn('[email] Circuit OPEN — skipping email:', subject)
+      logger.warn('Circuit OPEN — skipping email', { module: 'email', subject })
     } else {
-      console.error('[email] Failed to send:', subject, err)
+      logger.error('Failed to send email', { module: 'email', subject, error: err })
     }
   }
 }

@@ -51,7 +51,7 @@
 Sentry Dashboard → Alerts → Create Alert Rule
 → Type: Error / Performance / Custom Metric
 → Trigger: quando condição exceder threshold
-→ Action: Notificar via e-mail / Slack / webhook
+→ Action: Notificar via e-mail / webhook
 ```
 
 ---

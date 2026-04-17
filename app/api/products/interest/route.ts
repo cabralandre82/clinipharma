@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/db/admin'
 import { createNotificationForRole } from '@/lib/notifications'
 import { Resend } from 'resend'
 import { productInterestSchema } from '@/lib/validators'
+import { logger } from '@/lib/logger'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     })
 
     if (error) {
-      console.error('[interest] insert error:', error.message)
+      logger.error('insert error', { action: 'product-interest', error: error.message })
       return NextResponse.json({ error: 'Erro ao registrar interesse' }, { status: 500 })
     }
 
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('[interest] unexpected error:', err)
+    logger.error('unexpected error', { action: 'product-interest', error: err })
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }

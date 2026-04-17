@@ -8,6 +8,7 @@ import { ButtonLink } from '@/components/ui/button-link'
 import { ClinicStatusActions } from '@/components/clinics/clinic-status-actions'
 import { AssignConsultantDialog } from '@/components/consultants/assign-consultant-dialog'
 import { BackButton } from '@/components/ui/back-button'
+import { logger } from '@/lib/logger'
 import type { Clinic, EntityStatus, SalesConsultant } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -29,7 +30,14 @@ export default async function ClinicDetailPage({ params }: PageProps) {
     .eq('id', id)
     .single()
 
-  if (clinicError) console.error('[clinics/[id]] query error:', clinicError)
+  if (clinicError) {
+    logger.error('query error', {
+      action: 'clinic-detail',
+      entityType: 'CLINIC',
+      entityId: id,
+      error: clinicError,
+    })
+  }
   if (!clinic) notFound()
 
   const typedClinic = clinic as unknown as Clinic

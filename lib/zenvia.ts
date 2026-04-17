@@ -14,6 +14,7 @@
  */
 
 import { withCircuitBreaker, CircuitOpenError } from '@/lib/circuit-breaker'
+import { logger } from '@/lib/logger'
 
 const BASE_URL = 'https://api.zenvia.com/v2/channels'
 
@@ -36,7 +37,10 @@ async function zenviaPost(
 ): Promise<void> {
   const token = getToken()
   if (!token) {
-    console.warn(`[zenvia/${channel}] ZENVIA_API_TOKEN not configured — message skipped`)
+    logger.warn('ZENVIA_API_TOKEN not configured — message skipped', {
+      module: 'zenvia',
+      channel,
+    })
     return
   }
 
@@ -66,9 +70,9 @@ async function zenviaPost(
     )
   } catch (err) {
     if (err instanceof CircuitOpenError) {
-      console.warn(`[zenvia/${channel}] Circuit OPEN — message skipped`)
+      logger.warn('Circuit OPEN — message skipped', { module: 'zenvia', channel })
     } else {
-      console.warn(`[zenvia/${channel}] Failed to send message:`, err)
+      logger.error('Failed to send message', { module: 'zenvia', channel, error: err })
     }
   }
 }
@@ -80,13 +84,18 @@ export async function sendSms(to: string, text: string): Promise<void> {
 
   const digits = to.replace(/\D/g, '')
   if (digits.length < 10) {
-    console.warn('[zenvia/sms] Invalid phone number, skipping:', to)
+    logger.warn('Invalid phone number, skipping', {
+      module: 'zenvia',
+      channel: 'sms',
+      // Don't log the raw number — the redactor would mask it, but being
+      // explicit documents the intent.
+    })
     return
   }
 
   const from = process.env.ZENVIA_SMS_FROM
   if (!from) {
-    console.warn('[zenvia/sms] ZENVIA_SMS_FROM not configured')
+    logger.warn('ZENVIA_SMS_FROM not configured', { module: 'zenvia', channel: 'sms' })
     return
   }
 
@@ -100,13 +109,13 @@ export async function sendWhatsApp(phone: string, text: string): Promise<void> {
 
   const digits = phone.replace(/\D/g, '')
   if (digits.length < 10) {
-    console.warn('[zenvia/whatsapp] Invalid phone number, skipping:', phone)
+    logger.warn('Invalid phone number, skipping', { module: 'zenvia', channel: 'whatsapp' })
     return
   }
 
   const from = process.env.ZENVIA_WHATSAPP_FROM
   if (!from) {
-    console.warn('[zenvia/whatsapp] ZENVIA_WHATSAPP_FROM not configured')
+    logger.warn('ZENVIA_WHATSAPP_FROM not configured', { module: 'zenvia', channel: 'whatsapp' })
     return
   }
 

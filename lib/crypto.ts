@@ -9,6 +9,7 @@
  */
 
 import * as nodeCrypto from 'crypto'
+import { logger } from '@/lib/logger'
 
 const ALGORITHM = 'aes-256-gcm'
 const IV_LENGTH = 12 // 96-bit IV recommended for GCM
@@ -65,10 +66,10 @@ export function decrypt(value: string | null | undefined): string | null {
 
     return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8')
   } catch (err) {
-    console.error(
-      '[crypto] decrypt failed — returning raw value (key rotation or data corruption):',
-      err
-    )
+    logger.error('decrypt failed — returning raw value (key rotation or data corruption)', {
+      module: 'crypto',
+      error: err,
+    })
     return value
   }
 }

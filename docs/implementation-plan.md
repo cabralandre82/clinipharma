@@ -59,7 +59,7 @@ Cada wave abaixo é independente, mas a ordem maximiza ganho cumulativo.
 | 3    | Audit append-only + hash chain + `verify_audit_chain` RPC + cron noturno                                                                                                      | W2      |
 | 4    | RBAC granular: `permissions`/`role_permissions`/`user_permission_grants` + `lib/rbac/permissions.ts`, migração gradual de `requireRole` → `requirePermission` feature-flagged | W3      |
 | 5    | CSRF double-submit + HMAC `timingSafeEqual` + open-redirect allowlist + E2E de ataque                                                                                         | W1      |
-| 6    | Health 3 camadas (`/live`, `/ready`, `/deep`) + `lib/metrics.ts` + `lib/alerts.ts` (Slack/PagerDuty)                                                                          | W1      |
+| 6    | Health 3 camadas (`/live`, `/ready`, `/deep`) + `lib/metrics.ts` + `lib/alerts.ts` (email + PagerDuty)                                                                        | W1      |
 | 7    | SLO burn rate multi-window + OTEL completo (`instrumentation.ts`, `fetchExternal`) + admin SLO dashboard                                                                      | W6      |
 
 ### Fase 2 — Correção transacional + schema
@@ -159,4 +159,4 @@ Migrations existentes vão até `043_server_logs.sql`. As novas continuam a part
 ---
 
 _Para detalhes técnicos de cada correção ver `docs/audit-fine-tooth-comb-2026-04.md`._
-_Última atualização: 2026-04-17 — Wave 0 em andamento._
+_Última atualização: 2026-04-17 — Wave 1 concluída (logger + PII redaction + ALS correlation)._

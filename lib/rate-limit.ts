@@ -20,6 +20,8 @@
  *   if (!result.ok) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
  */
 
+import { logger } from '@/lib/logger'
+
 export interface RateLimitResult {
   ok: boolean
   remaining: number
@@ -108,7 +110,9 @@ async function makeRedisLimiter(windowMs: number, max: number): Promise<RateLimi
     }
   } catch {
     // Package not installed or Redis unavailable — fall back to in-memory
-    console.warn('[rate-limit] Upstash packages not available, using in-memory fallback')
+    logger.warn('Upstash packages not available, using in-memory fallback', {
+      module: 'rate-limit',
+    })
     return makeInMemoryLimiter(windowMs, max)
   }
 }

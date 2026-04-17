@@ -2,6 +2,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/db/admin'
 import { sendPushToUser, sendPushToRole, type PushPayload } from '@/lib/push'
 import { type NotificationType, SILENCEABLE_TYPES, CRITICAL_TYPES } from '@/lib/notification-types'
+import { logger } from '@/lib/logger'
 
 export type { NotificationType }
 export { SILENCEABLE_TYPES, CRITICAL_TYPES }
@@ -75,7 +76,7 @@ export async function createNotification(input: CreateNotificationInput): Promis
       })
     }
   } catch (err) {
-    console.warn('[notifications] failed to create notification:', err)
+    logger.warn('failed to create notification', { module: 'notifications', error: err })
   }
 }
 
@@ -131,6 +132,6 @@ export async function createNotificationForRole(
       })
     }
   } catch (err) {
-    console.warn('[notifications] failed to create role notification:', err)
+    logger.warn('failed to create role notification', { module: 'notifications', error: err })
   }
 }

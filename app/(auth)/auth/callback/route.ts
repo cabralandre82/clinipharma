@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/db/server'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}${destination}`)
     }
 
-    console.error('[callback] verifyOtp error:', error.message)
+    logger.error('verifyOtp error', { action: 'auth-callback', type, error: error.message })
     return NextResponse.redirect(`${origin}/unauthorized`)
   }
 
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}${next}`)
     }
 
-    console.error('[callback] exchangeCodeForSession error:', error.message)
+    logger.error('exchangeCodeForSession error', { action: 'auth-callback', error: error.message })
   }
 
   return NextResponse.redirect(`${origin}/unauthorized`)
