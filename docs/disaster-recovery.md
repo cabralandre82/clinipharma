@@ -238,9 +238,14 @@ curl https://clinipharma.com.br/api/health
 | Variáveis de ambiente     | Documentado em go-live-checklist.md | Manual                      | —                          |
 | Uploads (documentos)      | Supabase Storage                    | Não há backup automático ⚠️ | —                          |
 
-**⚠️ Ações recomendadas:**
+**Ações recomendadas:**
 
-1. **Ativar PITR** no painel Supabase (`Settings → Backups → Enable Point-in-Time Recovery`) — reduz RPO de 24h para 5 min. Incluído no plano Pro sem custo adicional.
+1. **⏳ Ativar PITR — adiar até ter clientes reais ativos**
+   - Custo: $100/mês (7 dias) · $200/mês (14 dias) · $400/mês (28 dias)
+   - Recomendação: **7 dias** é suficiente, assim que houver pedidos e pagamentos reais em produção
+   - Como ativar: `Supabase Dashboard → Project clinipharma → Settings → Add-ons → Point in Time Recovery`
+   - Justificativa para adiar: volume de dados mínimo, nenhum cliente real onboardado ainda, backup diário suficiente para esta fase
+
 2. **Backup externo do Supabase Storage** (via `rclone` para S3) para documentos de pedidos e contratos.
 
 ---
