@@ -1,8 +1,9 @@
 /**
  * Structured logger for Clinipharma.
  *
- * Outputs JSON-formatted logs with consistent fields for observability.
- * Compatible with Vercel Log Drains (send to Logtail/Datadog/etc via drain URL).
+ * Outputs JSON-formatted logs to stdout (captured by Vercel).
+ * error and warn levels are also persisted to server_logs table in Supabase
+ * for long-term retention and admin visibility (90-day retention via cron).
  *
  * Fields per log entry:
  *   level, message, timestamp, requestId?, userId?, action?, durationMs?, error?, [context]
@@ -53,6 +54,45 @@ function output(entry: LogEntry): void {
       break
     default:
       console.log(line)
+  }
+
+  // Persist error/warn to Supabase for long-term retention (fire-and-forget)
+  if (
+    (entry.level === 'error' || entry.level === 'warn') &&
+    process.env.NODE_ENV === 'production'
+  ) {
+    persistLog(entry).catch(() => null)
+  }
+}
+
+async function persistLog(entry: LogEntry): Promise<void> {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!url || !key) return
+
+    const { requestId, path, ...context } = entry as LogEntry & {
+      requestId?: string
+      path?: string
+    }
+    await fetch(`${url}/rest/v1/server_logs`, {
+      method: 'POST',
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        level: entry.level,
+        message: entry.message,
+        route: path ?? null,
+        request_id: requestId ?? null,
+        context: Object.keys(context).length > 1 ? context : null,
+      }),
+    })
+  } catch {
+    // Never throw from logger — fail silently
   }
 }
 

@@ -165,6 +165,12 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN'],
   },
   {
+    href: '/server-logs',
+    label: 'Logs Servidor',
+    icon: ScrollText,
+    roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN'],
+  },
+  {
     href: '/audit',
     label: 'Auditoria',
     icon: ScrollText,

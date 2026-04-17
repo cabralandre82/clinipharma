@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { getCircuitStates } from '@/lib/circuit-breaker'
+import { withDbSpan } from '@/lib/tracing'
 
 /**
  * GET /api/health
@@ -24,7 +25,9 @@ export async function GET() {
   try {
     const t0 = Date.now()
     const admin = createAdminClient()
-    const { error } = await admin.from('sla_configs').select('id').limit(1)
+    const { error } = await withDbSpan('sla_configs', 'select', async () =>
+      admin.from('sla_configs').select('id').limit(1)
+    )
     checks.database = { ok: !error, latencyMs: Date.now() - t0 }
     if (error) checks.database.error = error.message
   } catch (err) {

@@ -137,12 +137,12 @@ Não bloqueiam o primeiro cliente, mas impactam operação, conversão e complia
 
 ### Observabilidade
 
-| #      | Pendência                                                                  | Onde documentado                                                                                                                                                     |
-| ------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
-| ~~17~~ | ~~**UptimeRobot**~~                                                        | ✅ **CONCLUÍDO (2026-04-16)** — monitor `/api/health` ativo. Status page: https://stats.uptimerobot.com/gPxExgRxI7                                                   | —   |
-| ~~18~~ | ~~**Sentry alertas**~~                                                     | ✅ **CONCLUÍDO (2026-04-16)** — 2 alertas configurados: "High error rate" (>10x/hora) e "New issue in production". Alerta de métrica p95 requer plano pago — adiado. | —   |
-| 19     | **Vercel Log Drain** — conectar Logtail ou Axiom para persistência de logs | `docs/roadmap-90pts.md` A13                                                                                                                                          |
-| 20     | **OpenTelemetry** — integrar `@vercel/otel` para spans em queries Supabase | `docs/roadmap-90pts.md` A13                                                                                                                                          |
+| #      | Pendência                | Onde documentado                                                                                                                                                                                                                            |
+| ------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| ~~17~~ | ~~**UptimeRobot**~~      | ✅ **CONCLUÍDO (2026-04-16)** — monitor `/api/health` ativo. Status page: https://stats.uptimerobot.com/gPxExgRxI7                                                                                                                          | —   |
+| ~~18~~ | ~~**Sentry alertas**~~   | ✅ **CONCLUÍDO (2026-04-16)** — 2 alertas configurados: "High error rate" (>10x/hora) e "New issue in production". Alerta de métrica p95 requer plano pago — adiado.                                                                        | —   |
+| ~~19~~ | ~~**Vercel Log Drain**~~ | ✅ **CONCLUÍDO (2026-04-14)** — Log Drain Vercel requer plano pago. Implementado alternativo: `lib/logger.ts` persiste `error`/`warn` em `server_logs` (Supabase, 90 dias); cron semanal purge; página admin `/server-logs`. Migration 043. |
+| ~~20~~ | ~~**OpenTelemetry**~~    | ✅ **CONCLUÍDO (2026-04-14)** — `@vercel/otel` + `instrumentation.ts`; auto-instrumenta todos `fetch()` (Supabase, OpenAI, Clicksign, Asaas); `lib/tracing.ts`; spans em `order.create`, `order.updateStatus`, `db.sla_configs.select`.     |
 
 ---
 
@@ -222,10 +222,10 @@ Itens do roadmap que dependem de CNPJ ativo para implementar:
 | Categoria                             | Qtd    | Responsável          |
 | ------------------------------------- | ------ | -------------------- |
 | 🔴 Bloqueantes (pré-primeiro-cliente) | 1      | Jurídico + Dev       |
-| 🟡 Importantes (30 dias)              | 6      | Dev + Fundador       |
+| 🟡 Importantes (30 dias)              | 4      | Dev + Fundador       |
 | 🟠 Recomendados (próximo sprint)      | 16     | Dev                  |
 | 🟢 Onboarding (após go-live)          | 7      | Comercial + Fundador |
-| **Total**                             | **30** |                      |
+| **Total**                             | **28** |                      |
 
 ### Funcionalidades entregues (v4.7.0 → v6.1.1)
 
