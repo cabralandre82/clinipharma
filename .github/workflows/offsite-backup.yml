@@ -73,16 +73,35 @@ jobs:
 
       - name: Database snapshot (pg_dump custom format)
         env:
-          PGPASSWORD_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
           OUT="${{ steps.meta.outputs.archive_dir }}/db-${{ steps.meta.outputs.stamp }}.dump"
-          pg_dump \
+
+          # Sanity check: secret must be populated and look like a postgres URI.
+          # Without this, pg_dump silently falls through to the local unix socket
+          # and fails with an unhelpful error.
+          if [ -z "${DB_URL:-}" ]; then
+            echo "::error::SUPABASE_DB_URL secret is empty"; exit 1
+          fi
+          case "$DB_URL" in
+            postgresql://*|postgres://*) ;;
+            *) echo "::error::SUPABASE_DB_URL does not start with postgresql://"; exit 1 ;;
+          esac
+          echo "DB URL host: $(echo "$DB_URL" | sed -E 's|^[^@]*@([^/?]*).*|\1|')"
+
+          # Prefer the explicit v16 binary — the default /usr/bin/pg_dump on
+          # ubuntu-latest may route through pg_wrapper to an older cluster.
+          PG_DUMP=/usr/lib/postgresql/16/bin/pg_dump
+          [ -x "$PG_DUMP" ] || PG_DUMP=$(command -v pg_dump)
+          "$PG_DUMP" --version
+
+          "$PG_DUMP" \
             --format=custom \
             --compress=9 \
             --no-owner --no-privileges \
-            --file="$OUT" \
-            "$PGPASSWORD_URL"
+            --dbname="$DB_URL" \
+            --file="$OUT"
           echo "Dumped $(stat --printf='%s bytes' "$OUT")"
 
       - name: Storage snapshot (contracts + prescriptions + order-documents)
