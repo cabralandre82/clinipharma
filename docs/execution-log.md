@@ -253,3 +253,107 @@ SUPABASE_PROJECT_REF    2026-04-17
 **Faltam:** `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, opcional `SLACK_WEBHOOK_OPS`.
 
 ---
+
+### Wave 0.9 — Offsite backup validado end-to-end — 2026-04-17 19:30 BRT
+
+**Status:** 🟢 concluído — **Wave 0 fechada**
+
+**Credenciais R2 recebidas do usuário:**
+
+- Bucket provisionado: `clinipharma-offsite` (account `78a3ba3eb08ea6faa4f0d53838862244`)
+- R2 API Token escopado (Object Read & Write apenas no bucket, sem TTL, sem IP filter)
+- Secrets 6-9/9 configurados: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
+- Secret 10 adicionado por necessidade: `SUPABASE_SERVICE_ROLE_KEY` (Storage REST API rejeita o PAT — sbp\_…9c9 só autentica Management API)
+
+**Validação prévia do token:** smoke test local via `rclone` — put → list → get → delete no bucket. `ListBuckets` foi 403 (correto: token é bucket-scoped), list/put/get/delete dentro de `clinipharma-offsite` funcionam.
+
+**Rodadas de `workflow_dispatch` em `offsite-backup.yml`:** 9 no total, cada uma expondo um problema real no caminho de produção:
+
+| #   | Falha                                                               | Causa                                                                 | Fix (commit)                                                                 |
+| --- | ------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | `apt-get install awscli` — "package not available"                  | Ubuntu 24.04 removeu `awscli` do apt; v2 vem pré-instalada no runner  | `44faf20`                                                                    |
+| 2   | `pg_dump: connection to socket failed`                              | URI sendo tratado como dbname posicional; URL não validada            | `7896ea1` — flag `--dbname=`, sanity-check pre-flight, binário v17 explícito |
+| 3   | `pg_dump: aborting because of server version mismatch (17.6 vs 16)` | Supabase upgraded a PG 17                                             | `ab0cc67` — `postgresql-client-17` (também no restore-drill)                 |
+| 4   | `curl: Could not resolve host: ***.supabase.co` na Storage API      | PAT (`sbp_…`) é rejeitado pela Storage REST — só serve Management API | `947eee7` — usar `SUPABASE_SERVICE_ROLE_KEY`                                 |
+| 5   | `curl: returned 400` em `/object/list/{bucket}`                     | Body sem `prefix` e `sortBy` (Supabase exige)                         | `8a9b40a` — body completo com jq                                             |
+| 6   | `curl: returned 400` ao baixar um objeto                            | Resposta mistura folders (id=null) e arquivos; tentou baixar folder   | `67ea902` — BFS por prefixos + filter `.id != null`                          |
+| 7   | `age: malformed recipient at line 1`                                | Secret `AGE_PUBLIC_KEY` com conteúdo errado                           | Re-set com `printf` da chave pública real                                    |
+| 8   | `aws: Invalid endpoint`                                             | Secrets R2 tinham trailing newline (`echo` vs `printf`)               | Re-set dos 4 secrets R2 com `printf`                                         |
+| 9   | ✅ passou em 36s                                                    | —                                                                     | —                                                                            |
+
+**Artefatos no R2 após run #9 (`20260417T222526Z`):**
+
+```
+537204 bytes  db-20260417T222526Z.dump.age
+   386 bytes  manifest-sha256.txt.age
+   475 bytes  manifest.json.age
+250831 bytes  storage-20260417T222526Z.tgz.age
+-------- 4 objects, 770 KiB total --------
+```
+
+**Validação de recuperação (round-trip completo):**
+
+- Baixei os 4 artefatos cifrados localmente
+- Decriptei com a chave privada `~/.config/clinipharma/age-offsite.key`
+- `sha256sum -c manifest-sha256.txt`: ambos os arquivos passaram (`db-*.dump: SUCESSO`, `storage-*.tgz: SUCESSO`)
+- `tar -tzf storage-*.tgz`: 3 PDFs reais de `order-documents/` + `.manifest` sentinel
+- `manifest.json` decriptado: stamp, label, commit hash e lista de arquivos corretos
+- Local cleanup: `rm -rf /tmp/r2-recover` (não deixar plaintext em disco)
+
+**Follow-up menor aplicado (commit pendente junto deste log):** o loop de encriptação escrevia `recipient.age` no archive dir, e o glob `*.age` do upload mandava esse arquivo pro R2 também. Sem risco de segurança (é chave pública), mas faz o `restore-drill` quebrar ao tentar decriptar um arquivo plaintext. Fix: escrever o recipient em `$RUNNER_TEMP` fora do archive dir. Arquivo espúrio da run #9 já foi removido do bucket manualmente.
+
+**Bugs encontrados no restore-drill que os 9 dispatches cobriram por tabela:** PG client v17 (já ajustado). A sintaxe `age -d -i KEY -o OUT IN` já estava certa lá — falso alarme do meu teste local.
+
+**Lifecycle rules:** usuário configurou `weekly/` → 84 dias, `monthly/` → 180 dias. Próximo backup real será do cron no domingo 04:00 BRT (07:00 UTC), prefixo `weekly/`.
+
+**Commits Wave 0.9:**
+
+- `147bf49` fix(workflows): rely on pre-installed awscli v2
+- `7896ea1` fix(offsite-backup): harden pg_dump invocation
+- `ab0cc67` fix(workflows): bump pg client to 17
+- `947eee7` fix(offsite-backup): use service_role JWT for Storage REST API
+- `8a9b40a` fix(offsite-backup): send full list body (prefix/sortBy)
+- `67ea902` fix(offsite-backup): recurse through storage folders
+- (deste log) fix(offsite-backup): keep recipient.age out of the upload set
+
+**Secrets no repositório (10/10 obrigatórios + 0 opcionais):**
+
+```
+AGE_PRIVATE_KEY              2026-04-17
+AGE_PUBLIC_KEY               2026-04-17
+R2_ACCESS_KEY_ID             2026-04-17
+R2_ACCOUNT_ID                2026-04-17
+R2_BUCKET                    2026-04-17
+R2_SECRET_ACCESS_KEY         2026-04-17
+SUPABASE_ACCESS_TOKEN        2026-04-17
+SUPABASE_DB_URL              2026-04-17
+SUPABASE_PROJECT_REF         2026-04-17
+SUPABASE_SERVICE_ROLE_KEY    2026-04-17
+```
+
+`SLACK_WEBHOOK_OPS` segue opcional — o workflow tem guard `if: env.SLACK_WEBHOOK != ''` e pula silenciosamente.
+
+---
+
+## Wave 0 — Checklist final
+
+- [x] 0.0 Planejamento + docs + runbooks index + audit report consolidado
+- [x] 0.1 Feature flags (migration 044 aplicada prod + staging, module + 27 testes)
+- [x] 0.2 CI security scan (CodeQL, Gitleaks, npm audit, Trivy pinned SHA, license check, SBOM)
+- [x] 0.3 Governance (CODEOWNERS, Dependabot, branch protection policy doc)
+- [x] 0.4 Offsite backup + restore drill workflows
+- [x] 0.5 Branch protection aplicado em `main`
+- [x] 0.6 Dependabot ativo + 10 alertas iniciais triados (protobufjs, hono fechados via `npm audit fix`; trivy-action via pinned-SHA; ...)
+- [x] 0.7 Secrets GitHub (10/10 configurados)
+- [x] 0.8 Staging discovery + pooler correto + CF token rotation plan
+- [x] 0.9 Offsite backup end-to-end validado (9 dispatches, round-trip completo)
+
+**Pré-requisitos humanos remanescentes antes de Wave 1 (nenhum bloqueador):**
+
+1. **Rotacionar PAT Supabase `sbp_…9c9`**: exposto nesta conversa. Gerar novo em https://supabase.com/dashboard/account/tokens e rodar `printf NEW | gh secret set SUPABASE_ACCESS_TOKEN`.
+2. **Guardar `~/.config/clinipharma/age-offsite.key` offline**: o usuário confirmou que já copiou. Reforçar que sem essa chave **não há recuperação** dos backups R2.
+3. (Opcional) Criar webhook Slack `#ops` e configurar `SLACK_WEBHOOK_OPS`.
+
+**Wave 0 está fechada. Apto a iniciar Wave 1 quando o usuário autorizar.**
+
+---

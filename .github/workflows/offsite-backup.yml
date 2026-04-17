@@ -230,12 +230,18 @@ jobs:
         run: |
           set -euo pipefail
           cd "${{ steps.meta.outputs.archive_dir }}"
-          echo "${{ secrets.AGE_PUBLIC_KEY }}" > recipient.age
+          # Write recipient to a tmpfile under $RUNNER_TEMP so it never lands
+          # in the archive directory — otherwise the upload step's *.age glob
+          # picks it up and ships a plaintext public-key file (harmless but
+          # noisy, and it makes restore-drill choke trying to "decrypt" it).
+          RECIPIENT="$RUNNER_TEMP/recipient.age"
+          echo "${{ secrets.AGE_PUBLIC_KEY }}" > "$RECIPIENT"
           for f in *.dump *.tgz manifest.json manifest-sha256.txt; do
             [ -f "$f" ] || continue
-            age -R recipient.age -o "$f.age" "$f"
+            age -R "$RECIPIENT" -o "$f.age" "$f"
             rm -f "$f"
           done
+          rm -f "$RECIPIENT"
           ls -lh *.age
 
       - name: Upload to R2
