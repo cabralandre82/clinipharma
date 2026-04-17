@@ -217,3 +217,39 @@ Ações executadas diretamente pelo agente via `gh`, `psql` e binários locais:
 Assim que os 6 secrets do bloco R2/Supabase/Slack estiverem configurados, dar `workflow_dispatch` em `offsite-backup.yml` para validar end-to-end antes de confiar no cron semanal.
 
 ---
+
+### Wave 0.8 — Tokens recebidos do usuário, rodada extra — 2026-04-17 18:35 BRT
+
+**Status:** 🟢 Supabase configurado e validado | 🔴 Cloudflare rejeitado
+
+**Supabase Access Token (sbp\_…9c9):** válido. Listagem de projetos via Management API revelou:
+
+| ref                  | region    | status         | name                |
+| -------------------- | --------- | -------------- | ------------------- |
+| jomdntqlgrupvhrqoyai | us-east-1 | ACTIVE_HEALTHY | clinipharma (prod)  |
+| ghjexiyrqdtqhkolsyaw | sa-east-1 | ACTIVE_HEALTHY | clinipharma-staging |
+| naxcwttpwtjmrhnorbhf | us-west-2 | ACTIVE_HEALTHY | Omni Runner         |
+| dzvepxgxalpgipvadxmo | us-east-1 | INACTIVE       | NoCapp              |
+
+**Consequências imediatas:**
+
+1. **Descoberta de staging não documentada**: `clinipharma-staging` em `sa-east-1` existia mas não estava referenciado em `.env.local` nem em nenhum runbook.
+2. **Migration 044 aplicada em staging também** via Supabase SQL API (`POST /v1/projects/{ref}/database/query`). Validação: 7 flags seedadas, 7 rows no `feature_flag_audit`.
+3. **Pooler correto identificado**: `aws-1-us-east-1.pooler.supabase.com:5432` (sessão) ou `:6543` (transação). Meu chute inicial `aws-0-` estava errado — Supavisor migrou para numeração por cluster. O secret `SUPABASE_DB_URL` foi **atualizado** para a URL pooler correta, que funciona via IPv4 (resolve o problema que achei mais cedo sobre GitHub Actions não ter IPv6).
+4. Secret `SUPABASE_ACCESS_TOKEN` **configurado** — desbloqueia o job de Storage snapshot em `offsite-backup.yml`.
+
+**Cloudflare (`cfk_…28043acf`, "Global API Key" novo formato 2026):** rejeitado pela API em todos os esquemas de auth testados (Bearer, X-Auth-Key com 4 e-mails candidatos, CF-Access-Client-Secret). Possível causa: revogação prévia, ou e-mail da conta diferente dos testados. Por segurança recomendei ao usuário **NÃO** usar Global API Key de forma alguma e sim criar um **R2 API Token** escopado apenas ao bucket — minimizando blast radius.
+
+**Secrets no repositório (5 de 9):**
+
+```
+AGE_PRIVATE_KEY         2026-04-17
+AGE_PUBLIC_KEY          2026-04-17
+SUPABASE_ACCESS_TOKEN   2026-04-17   ← novo
+SUPABASE_DB_URL         2026-04-17   ← atualizado (pooler correto)
+SUPABASE_PROJECT_REF    2026-04-17
+```
+
+**Faltam:** `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, opcional `SLACK_WEBHOOK_OPS`.
+
+---
