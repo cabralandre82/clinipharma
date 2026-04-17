@@ -1,0 +1,23 @@
+# Gitleaks configuration — B2B Med Platform
+#
+# We extend the default ruleset and narrowly allowlist deterministic synthetic
+# fixtures used to exercise the PII redactor in `lib/logger/redact.ts`.
+#
+# Guardrails:
+#   - Only one file is allowlisted: the redactor's own unit tests.
+#   - All other rules remain active for that file; only the specific rule IDs
+#     that trip on the synthetic fixtures are allowlisted.
+#   - Real credentials have never been committed and must never be.
+#
+# Reference: https://github.com/gitleaks/gitleaks (v8.18+ schema)
+
+title = "clinipharma-gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic PII redactor fixtures and docs references"
+paths = [
+  '''tests/unit/lib/logger-redact\.test\.ts''',
+]
