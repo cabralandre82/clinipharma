@@ -51,13 +51,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install PostgreSQL client 16 and age
-        # awscli is pre-installed on ubuntu-latest (v2) — only add what's missing.
+      - name: Install PostgreSQL client 17 and age
+        # Supabase is on PostgreSQL 17 as of 2026-04. Client major must be >=
+        # server major or pg_dump refuses with a version-mismatch error.
+        # awscli is pre-installed on ubuntu-latest (v2).
         run: |
           sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
           sudo apt-get update -qq
-          sudo apt-get install -y postgresql-client-16 age
+          sudo apt-get install -y postgresql-client-17 age
           aws --version
 
       - name: Compute snapshot metadata
@@ -92,7 +94,7 @@ jobs:
 
           # Prefer the explicit v16 binary — the default /usr/bin/pg_dump on
           # ubuntu-latest may route through pg_wrapper to an older cluster.
-          PG_DUMP=/usr/lib/postgresql/16/bin/pg_dump
+          PG_DUMP=/usr/lib/postgresql/17/bin/pg_dump
           [ -x "$PG_DUMP" ] || PG_DUMP=$(command -v pg_dump)
           "$PG_DUMP" --version
 
