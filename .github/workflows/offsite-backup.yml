@@ -142,37 +142,64 @@ jobs:
 
             mkdir -p "$OUT_DIR/$BUCKET"
             echo "Listing $BUCKET…"
-            # Supabase Storage list endpoint requires a body with `prefix`
-            # (empty string to list root), `limit`, `offset` and `sortBy`.
-            # Omitting `prefix` or `sortBy` returns 400 Bad Request.
-            PAGE=0
-            while :; do
-              BODY=$(jq -cn \
-                --arg prefix "" \
-                --argjson limit 1000 \
-                --argjson offset $((PAGE * 1000)) \
-                '{prefix: $prefix, limit: $limit, offset: $offset, sortBy: {column: "name", order: "asc"}}')
-              RESP=$(curl -fsS \
-                -H "Authorization: Bearer $SERVICE_KEY" \
-                -H "apikey: $SERVICE_KEY" \
-                -H 'Content-Type: application/json' \
-                -d "$BODY" \
-                "$BASE/object/list/$BUCKET")
-              COUNT=$(echo "$RESP" | jq 'length')
-              echo "  page=$PAGE count=$COUNT"
-              [ "$COUNT" = "0" ] && break
-              echo "$RESP" | jq -r '.[] | select(.name != null) | .name' | while read -r KEY; do
-                [ -z "$KEY" ] && continue
-                SAFE=$(echo "$KEY" | tr '/' '_')
-                curl -fsS \
+            # Supabase Storage list endpoint returns folders (id=null,
+            # metadata=null) and files (both populated) mixed. Downloading
+            # a folder path via /object/{bucket}/{prefix} returns 400, so we
+            # recurse with a queue of prefixes and only download entries
+            # that have a non-null id (= real objects).
+            PREFIX_QUEUE=("")
+            TOTAL_FILES=0
+            while [ ${#PREFIX_QUEUE[@]} -gt 0 ]; do
+              PREFIX="${PREFIX_QUEUE[0]}"
+              PREFIX_QUEUE=("${PREFIX_QUEUE[@]:1}")
+              PAGE=0
+              while :; do
+                BODY=$(jq -cn \
+                  --arg prefix "$PREFIX" \
+                  --argjson limit 1000 \
+                  --argjson offset $((PAGE * 1000)) \
+                  '{prefix: $prefix, limit: $limit, offset: $offset, sortBy: {column: "name", order: "asc"}}')
+                RESP=$(curl -fsS \
                   -H "Authorization: Bearer $SERVICE_KEY" \
                   -H "apikey: $SERVICE_KEY" \
-                  "$BASE/object/$BUCKET/$KEY" \
-                  -o "$OUT_DIR/$BUCKET/$SAFE"
+                  -H 'Content-Type: application/json' \
+                  -d "$BODY" \
+                  "$BASE/object/list/$BUCKET")
+                COUNT=$(echo "$RESP" | jq 'length')
+                echo "  prefix='$PREFIX' page=$PAGE count=$COUNT"
+                [ "$COUNT" = "0" ] && break
+
+                # Enqueue folders for recursion. A folder has id == null.
+                while IFS= read -r FOLDER; do
+                  [ -z "$FOLDER" ] && continue
+                  NEXT_PREFIX="${PREFIX:+$PREFIX/}$FOLDER"
+                  PREFIX_QUEUE+=("$NEXT_PREFIX")
+                done < <(echo "$RESP" | jq -r '.[] | select(.id == null) | .name')
+
+                # Download files (id != null).
+                while IFS= read -r FILE; do
+                  [ -z "$FILE" ] && continue
+                  FULL_KEY="${PREFIX:+$PREFIX/}$FILE"
+                  SAFE=$(echo "$FULL_KEY" | tr '/' '_')
+                  # URL-encode spaces (+ is fine for ASCII keys we care about;
+                  # full encoding would need a helper — UUID prefixes are safe).
+                  ENCODED_KEY=$(echo "$FULL_KEY" | sed 's| |%20|g')
+                  if curl -fsS \
+                      -H "Authorization: Bearer $SERVICE_KEY" \
+                      -H "apikey: $SERVICE_KEY" \
+                      "$BASE/object/$BUCKET/$ENCODED_KEY" \
+                      -o "$OUT_DIR/$BUCKET/$SAFE"; then
+                    TOTAL_FILES=$((TOTAL_FILES + 1))
+                  else
+                    echo "::warning::failed to download $BUCKET/$FULL_KEY"
+                  fi
+                done < <(echo "$RESP" | jq -r '.[] | select(.id != null) | .name')
+
+                PAGE=$((PAGE + 1))
+                [ "$COUNT" -lt 1000 ] && break
               done
-              PAGE=$((PAGE + 1))
-              [ "$COUNT" -lt 1000 ] && break
             done
+            echo "  total files archived from $BUCKET: $TOTAL_FILES"
           done
 
           # Ensure at least one file lands in the storage archive so that
