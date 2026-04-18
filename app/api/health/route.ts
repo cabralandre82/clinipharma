@@ -2,26 +2,28 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { getCircuitStates } from '@/lib/circuit-breaker'
 import { withDbSpan } from '@/lib/tracing'
+import { incCounter, observeHistogram, Metrics } from '@/lib/metrics'
 
 /**
- * GET /api/health
+ * GET /api/health — legacy alias of `/api/health/ready`.
  *
- * Used by:
- *   - Vercel uptime checks
- *   - External monitoring (UptimeRobot, Better Uptime, etc.)
- *   - Upstash Redis health monitoring
- *   - CI/CD smoke tests post-deploy
+ * Preserved for backward compatibility with UptimeRobot / Vercel
+ * dashboards that were configured before the W6 split. New probes
+ * should use `/api/health/live`, `/api/health/ready`, or
+ * `/api/health/deep` directly.
  *
- * Returns 200 if all critical services are reachable, 503 otherwise.
- * Never returns auth errors — this endpoint is intentionally public.
+ * Implementation intentionally duplicates `ready/route.ts` rather than
+ * re-exporting so that a regression in one file cannot cascade into
+ * the other (and because Next.js handler re-exports have historically
+ * been finicky across runtimes).
  */
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET() {
   const start = Date.now()
   const checks: Record<string, { ok: boolean; latencyMs?: number; error?: string }> = {}
 
-  // ── Supabase connectivity check ──────────────────────────────────────────
-  // Uses a lightweight query: count(1) on a small system table.
-  // Does NOT expose any user data.
   try {
     const t0 = Date.now()
     const admin = createAdminClient()
@@ -34,7 +36,6 @@ export async function GET() {
     checks.database = { ok: false, error: String(err) }
   }
 
-  // ── Environment variables check ──────────────────────────────────────────
   const requiredEnvs = [
     'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
@@ -44,21 +45,20 @@ export async function GET() {
   checks.env = { ok: missingEnvs.length === 0 }
   if (missingEnvs.length > 0) checks.env.error = `Missing: ${missingEnvs.join(', ')}`
 
-  // ── Circuit breaker states ───────────────────────────────────────────────
   const circuits = getCircuitStates()
   const openCircuits = Object.entries(circuits).filter(([, v]) => v.state !== 'CLOSED')
-  if (openCircuits.length > 0) {
-    checks.circuits = {
-      ok: false,
-      error: `Open circuits: ${openCircuits.map(([k]) => k).join(', ')}`,
-    }
-  } else {
-    checks.circuits = { ok: true }
-  }
+  checks.circuits =
+    openCircuits.length === 0
+      ? { ok: true }
+      : {
+          ok: false,
+          error: `Open circuits: ${openCircuits.map(([k]) => k).join(', ')}`,
+        }
 
-  // ── Result ───────────────────────────────────────────────────────────────
   const allOk = Object.values(checks).every((c) => c.ok)
   const totalMs = Date.now() - start
+  observeHistogram(Metrics.HEALTH_CHECK_DURATION_MS, totalMs, { endpoint: 'legacy' })
+  incCounter('health_check_total', { endpoint: 'legacy', status: allOk ? 'ok' : 'degraded' })
 
   return NextResponse.json(
     {
@@ -66,15 +66,12 @@ export async function GET() {
       version: process.env.npm_package_version ?? '2.4.0',
       timestamp: new Date().toISOString(),
       totalLatencyMs: totalMs,
-      // Only expose detailed check breakdown to monitoring services (via CRON_SECRET)
       checks,
-      // Never expose circuit internal state publicly — only summary
       circuitStatus: openCircuits.length === 0 ? 'ok' : `${openCircuits.length} open`,
     },
     {
       status: allOk ? 200 : 503,
       headers: {
-        // Never cache health responses
         'Cache-Control': 'no-store, no-cache, must-revalidate',
       },
     }

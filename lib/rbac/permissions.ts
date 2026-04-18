@@ -36,6 +36,7 @@ import { hasAnyRole } from '@/lib/rbac'
 import { isFeatureEnabled } from '@/lib/features'
 import { logger } from '@/lib/logger'
 import { getRequestContext } from '@/lib/logger/context'
+import { incCounter, detectSurge, Metrics } from '@/lib/metrics'
 import type { ProfileWithRoles, UserRole } from '@/types'
 
 // ─────────────────────────────────────────────────────────────────
@@ -167,6 +168,39 @@ function perRequestCache(): Map<string, boolean> | null {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Surge-triggered alerting. When the RPC misbehaves at a rate high
+// enough to exceed the threshold in a 5-minute window, fire a P2
+// alert once (the surge detector self-resets so we don't spam).
+// ─────────────────────────────────────────────────────────────────
+
+const RBAC_RPC_SURGE_WINDOW_MS = 5 * 60 * 1000
+const RBAC_RPC_SURGE_THRESHOLD = 3
+
+function maybeAlertOnRbacRpcSurge(reason: string): void {
+  if (!detectSurge('rbac_rpc_errors', RBAC_RPC_SURGE_WINDOW_MS, RBAC_RPC_SURGE_THRESHOLD)) {
+    return
+  }
+  // Dynamic import to keep lib/alerts out of the RBAC hot-path cold start.
+  void (async () => {
+    try {
+      const { triggerAlert } = await import('@/lib/alerts')
+      await triggerAlert({
+        severity: 'error',
+        title: 'RBAC has_permission RPC surge',
+        message: `More than ${RBAC_RPC_SURGE_THRESHOLD} has_permission errors in ${Math.round(
+          RBAC_RPC_SURGE_WINDOW_MS / 60000
+        )}min. Authorisation is failing closed; see runbook rbac-permission-denied.md.`,
+        dedupKey: 'rbac:has_permission:rpc_surge',
+        component: 'lib/rbac/permissions',
+        customDetails: { reason },
+      })
+    } catch {
+      /* best effort */
+    }
+  })()
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Core evaluator.
 // ─────────────────────────────────────────────────────────────────
 
@@ -205,6 +239,8 @@ async function evaluate(user: ProfileWithRoles, permission: Permission): Promise
           errorMessage: error.message,
           errorCode: error.code ?? null,
         })
+        incCounter(Metrics.RBAC_RPC_ERRORS_TOTAL, { reason: error.code ?? 'unknown' })
+        maybeAlertOnRbacRpcSurge('rpc-error')
         decision = false
       } else {
         decision = data === true
@@ -215,6 +251,8 @@ async function evaluate(user: ProfileWithRoles, permission: Permission): Promise
         permission,
         errorMessage: err instanceof Error ? err.message : String(err),
       })
+      incCounter(Metrics.RBAC_RPC_ERRORS_TOTAL, { reason: 'throw' })
+      maybeAlertOnRbacRpcSurge('rpc-throw')
       decision = false
     }
   }
@@ -277,6 +315,7 @@ export async function requirePermission(
     roles: user.roles,
     required: perms,
   })
+  for (const p of perms) incCounter(Metrics.RBAC_DENIED_TOTAL, { permission: p })
   throw new Error('FORBIDDEN')
 }
 
@@ -299,6 +338,7 @@ export async function requirePermissionPage(
     roles: user.roles,
     required: perms,
   })
+  for (const p of perms) incCounter(Metrics.RBAC_DENIED_TOTAL, { permission: p, page: 'true' })
   redirect('/unauthorized')
 }
 

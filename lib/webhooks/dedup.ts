@@ -46,6 +46,7 @@ import { createHash } from 'node:crypto'
 import { createAdminClient } from '@/lib/db/admin'
 import { logger } from '@/lib/logger'
 import { getRequestContext } from '@/lib/logger/context'
+import { incCounter, Metrics } from '@/lib/metrics'
 
 export type WebhookSource = 'asaas' | 'clicksign' | 'inngest' | (string & {})
 
@@ -153,6 +154,7 @@ export async function claimWebhookEvent(args: ClaimArgs): Promise<ClaimResult> {
       .single()
 
     if (!insert.error && insert.data?.id) {
+      incCounter(Metrics.WEBHOOK_CLAIM_TOTAL, { source: args.source, outcome: 'claimed' })
       return { status: 'claimed', eventId: insert.data.id as number }
     }
 
@@ -192,6 +194,8 @@ export async function claimWebhookEvent(args: ClaimArgs): Promise<ClaimResult> {
       .update({ attempts: (existing.data.attempts ?? 1) + 1, status: 'duplicate' })
       .eq('id', existing.data.id)
 
+    incCounter(Metrics.WEBHOOK_DUPLICATE_TOTAL, { source: args.source })
+    incCounter(Metrics.WEBHOOK_CLAIM_TOTAL, { source: args.source, outcome: 'duplicate' })
     return {
       status: 'duplicate',
       eventId: existing.data.id as number,
@@ -205,6 +209,7 @@ export async function claimWebhookEvent(args: ClaimArgs): Promise<ClaimResult> {
       idempotencyKey: args.idempotencyKey,
       error: err,
     })
+    incCounter(Metrics.WEBHOOK_CLAIM_TOTAL, { source: args.source, outcome: 'degraded' })
     return { status: 'degraded', reason: err instanceof Error ? err.message : String(err) }
   }
 }

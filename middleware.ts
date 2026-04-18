@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { checkCsrf, ensureCsrfCookie } from '@/lib/security/csrf'
+import { incCounter, Metrics } from '@/lib/metrics'
 
 const PUBLIC_ROUTES = [
   '/login',
@@ -89,6 +90,10 @@ export async function middleware(request: NextRequest) {
   if (!csrf.ok) {
     const isUnsafeApi = request.method !== 'GET' && request.nextUrl.pathname.startsWith('/api/')
     if (isUnsafeApi) {
+      // Wave 6 — count blocks so the deep health endpoint + alerts
+      // rule can spot a surge. `reason` keeps the label cardinality
+      // bounded (there are ~5 possible values).
+      incCounter(Metrics.CSRF_BLOCKED_TOTAL, { reason: csrf.reason ?? 'csrf_blocked' })
       // Only block API calls — a redirect-to-login response on a JSON
       // endpoint would look like a success from an HTTP client.
       return NextResponse.json(

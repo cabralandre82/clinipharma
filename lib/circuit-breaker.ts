@@ -1,5 +1,6 @@
 import { captureError } from '@/lib/monitoring'
 import { logger } from '@/lib/logger'
+import { setGauge, Metrics } from '@/lib/metrics'
 
 /**
  * Circuit Breaker — prevents cascade failures when external services are down.
@@ -69,6 +70,7 @@ export async function withCircuitBreaker<T>(
   if (circuit.state === 'OPEN') {
     if (circuit.openedAt !== null && now - circuit.openedAt >= recoveryTimeMs) {
       circuit.state = 'HALF_OPEN'
+      setGauge(Metrics.CIRCUIT_BREAKER_STATE, 1, { name })
     } else {
       throw new CircuitOpenError(name)
     }
@@ -79,10 +81,26 @@ export async function withCircuitBreaker<T>(
 
     // Success: reset circuit
     if (circuit.state === 'HALF_OPEN') {
+      const wasHalfOpen = true
       circuit.state = 'CLOSED'
       circuit.failures = 0
       circuit.openedAt = null
       circuit.lastFailureAt = null
+      setGauge(Metrics.CIRCUIT_BREAKER_STATE, 0, { name })
+      if (wasHalfOpen) {
+        void (async () => {
+          try {
+            const { resolveAlert } = await import('@/lib/alerts')
+            await resolveAlert({
+              dedupKey: `circuit-breaker:${name}:open`,
+              component: 'lib/circuit-breaker',
+              message: 'Circuit breaker recovered (CLOSED).',
+            })
+          } catch {
+            /* best effort */
+          }
+        })()
+      }
     } else if (circuit.state === 'CLOSED') {
       circuit.failures = 0
     }
@@ -99,6 +117,7 @@ export async function withCircuitBreaker<T>(
       const wasAlreadyOpen = (circuit.state as string) === 'OPEN'
       circuit.state = 'OPEN'
       circuit.openedAt = now
+      setGauge(Metrics.CIRCUIT_BREAKER_STATE, 2, { name })
 
       if (!wasAlreadyOpen) {
         // Alert on circuit open — this means the external service is down
@@ -111,6 +130,29 @@ export async function withCircuitBreaker<T>(
           circuit: name,
           failures: circuit.failures,
         })
+        // Fire a P1 alert. Imported lazily to avoid a cycle: lib/alerts →
+        // lib/email → lib/circuit-breaker. This dynamic import keeps the
+        // module graph a DAG even while the breaker stays the sink for
+        // "something is on fire" signals.
+        void (async () => {
+          try {
+            const { triggerAlert } = await import('@/lib/alerts')
+            await triggerAlert({
+              severity: 'critical',
+              title: `Circuit breaker OPEN: ${name}`,
+              message: `The ${name} downstream circuit has opened after ${circuit.failures} consecutive failures. Calls to ${name} will fail fast until it recovers.`,
+              dedupKey: `circuit-breaker:${name}:open`,
+              component: 'lib/circuit-breaker',
+              customDetails: {
+                service: name,
+                failures: circuit.failures,
+                openedAt: new Date(now).toISOString(),
+              },
+            })
+          } catch {
+            // Alert dispatch is best-effort — never let it surface.
+          }
+        })()
       }
     }
 

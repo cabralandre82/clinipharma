@@ -33,6 +33,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { logger, withCronContext } from '@/lib/logger'
 import { getRequestContext } from '@/lib/logger/context'
+import { incCounter, observeHistogram, Metrics } from '@/lib/metrics'
 
 export interface GuardedOptions {
   /** Lease TTL in seconds. Default 900 (15 min) — matches Vercel Pro cron maxDuration. */
@@ -124,6 +125,7 @@ export async function runCronGuarded<T>(
       jobName,
       runId,
     })
+    incCounter(Metrics.CRON_RUN_TOTAL, { job: jobName, status: 'skipped_locked' })
     return { status: 'skipped_locked', runId, reason: 'lock-busy' }
   }
 
@@ -148,6 +150,8 @@ export async function runCronGuarded<T>(
     }
 
     await releaseLock(jobName, lockedBy)
+    incCounter(Metrics.CRON_RUN_TOTAL, { job: jobName, status: 'success' })
+    observeHistogram(Metrics.CRON_DURATION_MS, durationMs, { job: jobName })
     return { status: 'success', runId: runId ?? -1, durationMs, result }
   } catch (err) {
     const durationMs = Date.now() - startedAt
@@ -168,6 +172,8 @@ export async function runCronGuarded<T>(
     }
 
     await releaseLock(jobName, lockedBy)
+    incCounter(Metrics.CRON_RUN_TOTAL, { job: jobName, status: 'failed' })
+    observeHistogram(Metrics.CRON_DURATION_MS, durationMs, { job: jobName })
     return { status: 'failed', runId: runId ?? -1, durationMs, error: message }
   }
 }

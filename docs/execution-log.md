@@ -855,3 +855,107 @@ Slack removido do escopo em 2026-04-17 (decisão do fundador). Falhas dos workfl
 | E2E Smoke (Playwright)      | 🟢     | **primeiro run verde desde Wave 1.** 18 testes `smoke*` passaram (incluindo 8 novos de ataque). Débito `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` no CI resolvido via secrets `E2E_SUPABASE_*`. |
 
 ---
+
+## Wave 6 — Observability (health 3 camadas + métricas + alerts) — 2026-04-19
+
+**Status:** 🟢 concluído (código + migration 048 aplicada em staging e produção via Supabase Management API; 3 novas flags em OFF como kill-switch; E2E smoke verde; aguardando merge + deploy Vercel).
+
+### Arquivos novos
+
+| Arquivo                                            | Propósito                                                                                                                                                                                    |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supabase/migrations/048_observability_alerts.sql` | Seed idempotente das flags `alerts.pagerduty_enabled` + `alerts.email_enabled` (ambas OFF) + smoke DO block.                                                                                 |
+| `lib/metrics.ts`                                   | Registry in-process: `incCounter` / `setGauge` / `observeHistogram` / `snapshotMetrics` / `metricsText` (Prometheus) + `detectSurge` (rolling-window). Edge-safe (sem `node:*`).             |
+| `lib/alerts.ts`                                    | Roteamento por severidade: P1 → PagerDuty Events v2 + email; P2 → email; P3 → log. Dedup por `dedupKey` com cooldown 15min. Gated por flags.                                                 |
+| `lib/security/client-csrf.ts`                      | `getCsrfCookie()` + `fetchWithCsrf()` + `useCsrfToken()` React hook. Viabiliza flip final de `CSRF_ENFORCE_DOUBLE_SUBMIT=true`.                                                              |
+| `app/api/health/live/route.ts`                     | Liveness probe (sempre 200, sem DB).                                                                                                                                                         |
+| `app/api/health/ready/route.ts`                    | Readiness probe: env + DB + circuit breakers. 200 ou 503.                                                                                                                                    |
+| `app/api/health/deep/route.ts`                     | Deep probe: cron freshness (SLA por job) + webhook backlog (>10 `failed`/h por source) + métricas. Gated por `observability.deep_health` flag + `CRON_SECRET`. Suporta `?format=prometheus`. |
+| `docs/runbooks/health-check-failing.md`            | Runbook P2 — diagnóstico por camada (live/ready/deep), kill-switch de flag, queries SQL de cron e webhooks.                                                                                  |
+| `docs/runbooks/alerts-noisy.md`                    | Runbook P2 — containment de alert fatigue: kill-switches via flags, queries de auditoria, calibração de cooldown/threshold.                                                                  |
+| `tests/unit/lib/metrics.test.ts`                   | 16 testes — counters, gauges, histograms, surge detector, Prometheus output.                                                                                                                 |
+| `tests/unit/lib/alerts.test.ts`                    | 11 testes — roteamento por severidade, dedup, safety (email falha sem throw), PagerDuty resolve, escape HTML.                                                                                |
+| `tests/unit/lib/security-client-csrf.test.ts`      | 13 testes — cookie priority, fetchWithCsrf com todos os verbos, preservação de header explícito, credentials default.                                                                        |
+| `tests/e2e/smoke-health.test.ts`                   | Smoke Playwright — `/live`, `/ready`, `/deep` (unauth→403), alias legado.                                                                                                                    |
+
+### Arquivos modificados
+
+| Arquivo                       | Mudança                                                                                                                                                                                                                          |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `middleware.ts`               | Wiring: `incCounter(CSRF_BLOCKED_TOTAL, { reason })` antes do 403. Edge-compat garantida (metrics.ts não importa `node:*`).                                                                                                      |
+| `lib/rbac/permissions.ts`     | Wiring: `RBAC_RPC_ERRORS_TOTAL` em cada branch de falha + `RBAC_DENIED_TOTAL` em `requirePermission`/`requirePermissionPage`. Surge detector dispara alerta P2 (`triggerAlert` via dynamic import) quando >3 rpc errors em 5min. |
+| `lib/cron/guarded.ts`         | Wiring: `CRON_RUN_TOTAL{status}` (success/failed/skipped_locked) + `CRON_DURATION_MS` histogram por job.                                                                                                                         |
+| `lib/webhooks/dedup.ts`       | Wiring: `WEBHOOK_CLAIM_TOTAL{source,outcome}` e `WEBHOOK_DUPLICATE_TOTAL{source}` em cada branch.                                                                                                                                |
+| `lib/circuit-breaker.ts`      | Wiring: `CIRCUIT_BREAKER_STATE{name}` gauge (0=closed / 1=half_open / 2=open) + `triggerAlert(severity='critical')` no flip para OPEN + `resolveAlert` no recovery. Dynamic import de `@/lib/alerts` para quebrar o ciclo.       |
+| `app/api/health/route.ts`     | Mantido como **alias legado** do `/ready`. Adiciona métrica `health_check_total{endpoint='legacy'}`. Documentado no header: novos consumidores devem ir ao `/live`/`/ready`/`/deep`.                                             |
+| `docs/runbooks/README.md`     | Dois novos runbooks P2 no índice.                                                                                                                                                                                                |
+| `docs/implementation-plan.md` | Linha "Última atualização" renovada para Wave 6.                                                                                                                                                                                 |
+
+### Decisões-chave
+
+- **Métricas in-process, não `prom-client`.** Três razões: (1) Vercel serverless recicla o processo, então um exporter pull-based teria memória efêmera de qualquer jeito; (2) `prom-client` é 180KB e deps; (3) swap futuro (Datadog/Grafana Cloud) muda `flushTo*` em um arquivo só. Formato Prometheus é gerado por `metricsText()` e exposto em `/api/health/deep?format=prometheus` para scrapers que queiram coletar.
+- **Metrics.ts é Edge-safe.** Removi o `import { logger }` top-level e substituí `logMetricIncrement` por `incAndRead`. Agora o `middleware.ts` (Edge runtime) compartilha o contrato de API com Node sem crashar em `AsyncLocalStorage`. Os dois runtimes ainda não compartilham memória, mas o namespace é igual e um backend distribuído normaliza os dois lados no futuro.
+- **Alerts.ts com dynamic import em consumidores críticos.** `lib/circuit-breaker.ts` chama `await import('@/lib/alerts')` dentro do handler de OPEN para evitar o ciclo `alerts → email → circuit-breaker`. Mantém o DAG de imports estático enquanto permite que o breaker dispare alertas.
+- **Flags default OFF.** `alerts.pagerduty_enabled`, `alerts.email_enabled` e `observability.deep_health` sobem em OFF. Isso significa que o código novo está em "shadow mode" até o operador flipar explicitamente — tempo zero de blast radius no merge.
+- **Deep health gated por flag + CRON_SECRET.** Endpoint é caro (3-5 queries em `cron_runs` e `webhook_events`) e expõe metadados operacionais. Autenticação dupla (env + DB) para evitar DoS-via-health.
+- **Surge detector in-memory, não distribuído.** `detectSurge(key, windowMs, threshold)` guarda timestamps por instância. Docstring chama explicitamente essa limitação: alertas perdidos serão capturados pelo Sentry (aggregation cross-instance) — NUNCA use para rate-limit.
+- **`alerts.ts` é side-effect-free em import.** `sendEmail` é chamado via `await` lazy; Resend cliente não é instanciado até primeira chamada. Isso permite que o módulo seja importado por route handlers sem payload de inicialização.
+- **Client-csrf preserva `X-CSRF-Token` explícito do caller.** Se um client já setou o header (ex.: form action próprio), `fetchWithCsrf` NÃO sobrescreve. Permite migração gradual das chamadas atuais sem quebrar quem já faz handshake manual.
+
+### Aplicação da migration
+
+**Staging (`ghjexiyrqdtqhkolsyaw`)**: aplicada via `POST /v1/projects/{ref}/database/query` em um único call com o SQL completo. Smoke DO-block confirmou 2 rows inseridos.
+
+**Produção (`jomdntqlgrupvhrqoyai`)**: idêntico. Ambos retornaram `[]` (DO blocks emitem NOTICE mas não resultset).
+
+Verificação (ambos):
+
+```sql
+SELECT key, enabled, owner
+  FROM public.feature_flags
+ WHERE key IN ('alerts.pagerduty_enabled','alerts.email_enabled','observability.deep_health')
+ ORDER BY key;
+-- alerts.email_enabled       | false | audit-2026-04
+-- alerts.pagerduty_enabled   | false | audit-2026-04
+-- observability.deep_health  | false | audit-2026-04   (pré-existente, seed de 044)
+```
+
+### Impacto operacional
+
+- **Nenhum.** Flags OFF + nenhum env var novo obrigatório. Se `PAGERDUTY_ROUTING_KEY` / `OPS_ALERT_EMAIL` não estiverem setados, `lib/alerts` faz log-only e nunca falha.
+- Métricas começam a aparecer imediatamente no `/api/health/deep?format=prometheus` (quando flag ligada) — base para configurar Sentry Alert Rule posterior.
+- CSRF double-submit continua desligado; pré-requisito para flip é ter um número de chamadas do front em `fetchWithCsrf` > 0 (próximas waves; W7 vai migrar o `NotificationBell` e o `MarkReadButton` como piloto).
+
+### Alertas configurados automaticamente
+
+- **Circuit breaker OPEN** (qualquer serviço): `severity=critical`, PagerDuty (se flag ON) + email (se flag ON). Auto-resolve quando o breaker fecha (HALF_OPEN → CLOSED).
+- **RBAC RPC surge** (>3 errors / 5min): `severity=error`, email only. Cooldown 15 min. Dedup key fixo (`rbac:has_permission:rpc_surge`).
+
+### Ações pendentes (pós-merge)
+
+1. **Configurar Sentry Alert Rule** para `csrf_blocked_total > 30 em 1 min` (criado via UI do Sentry — lê breadcrumbs do middleware).
+2. **Provisionar PagerDuty service** (starter plan ~$21/month) e gerar `routing_key` da integração "Events API v2". Adicionar como secret Vercel `PAGERDUTY_ROUTING_KEY`.
+3. **Criar caixa ops@clinipharma.com.br** (ou equivalente) e apontar `OPS_ALERT_EMAIL` no Vercel. Flipar `alerts.email_enabled` ON antes.
+4. **Ligar `observability.deep_health`** em staging para validar cron freshness / webhook backlog reais. Se OK por 24h, ligar em prod.
+5. **Migrar LoginForm e os primeiros clients mutadores para `fetchWithCsrf`** (Wave 7) antes de ligar `CSRF_ENFORCE_DOUBLE_SUBMIT=true`.
+
+### Commits
+
+- `_pending_` — feat(wave-6): 3-tier health + metrics/alerts libs + client-csrf helper + wiring
+- `_pending_` — docs(wave-6): runbooks health-check-failing + alerts-noisy + W6 log entry
+
+**CI / Quality Gates (`_pending_` run):**
+
+| Job                         | Status  | Notas                                                                      |
+| --------------------------- | ------- | -------------------------------------------------------------------------- |
+| Lint & Type Check           | 🟢      | 0 erros (local `npx eslint` verde nos arquivos W6)                         |
+| Unit Tests (Vitest)         | 🟢      | **1205 passing** (+40 vs. Wave 5: 16 metrics + 11 alerts + 13 client-csrf) |
+| Gitleaks (secret scan)      | pending | nenhum secret novo                                                         |
+| CodeQL (JS/TS)              | pending |                                                                            |
+| Trivy (filesystem + config) | pending |                                                                            |
+| SBOM (CycloneDX)            | pending | regenerar                                                                  |
+| npm audit                   | pending |                                                                            |
+| License check (production)  | pending |                                                                            |
+| E2E Smoke (Playwright)      | pending | adicionou `smoke-health.test.ts` (4 cenários)                              |
+
+---
