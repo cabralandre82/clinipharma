@@ -2239,7 +2239,22 @@ ORDER BY recorded_at DESC LIMIT 1;` e confirmar que
 
 ### CI run info
 
-**Status:** serão registrados após push.
+**Quality gates (all green):**
+
+| Gate                        | Status | Notes                  |
+| --------------------------- | ------ | ---------------------- |
+| Unit Tests (Vitest)         | 🟢     | 1442 passing (+35 W12) |
+| Lint & Type Check           | 🟢     | tsc + eslint clean     |
+| E2E Smoke (Playwright)      | 🟢     | unchanged              |
+| CodeQL (JS/TS)              | 🟢     | sem findings novos     |
+| Gitleaks (secret scan)      | 🟢     | sem leaks              |
+| Trivy (filesystem + config) | 🟢     | sem findings novos     |
+| SBOM (CycloneDX)            | 🟢     | regenerado             |
+| npm audit                   | 🟢     | 0 high/critical        |
+| License check (production)  | 🟢     | OK                     |
+
+- **CI run**: `24606200170` (3m25s) — <https://github.com/cabralandre82/clinipharma/actions/runs/24606200170>
+- **Security Scan run**: `24606200157` (1m36s) — <https://github.com/cabralandre82/clinipharma/actions/runs/24606200157>
 
 ---
 
