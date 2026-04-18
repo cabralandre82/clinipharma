@@ -635,3 +635,22 @@ Slack removido do escopo em 2026-04-17 (decisão do fundador). Falhas dos workfl
 - `docs/execution-log.md` — esta entrada.
 - `docs/runbooks/audit-chain-tampered.md` — novo runbook P1.
 - `docs/implementation-plan.md` — linha "Última atualização" bumpada.
+  **Commits:**
+
+- `e546ffd` — feat(wave-3): audit append-only + hash chain + nightly verify cron (migration 046)
+
+**CI / Quality Gates (run `24595929562` + `24595929566` @ `e546ffd`):**
+
+| Job                         | Status | Notas                                                                                                                                                                                                                                    |
+| --------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lint & Type Check           | 🟢     | 0 erros, 44 warnings (mesma baseline de Wave 2)                                                                                                                                                                                          |
+| Unit Tests (Vitest)         | 🟢     | 1089 passing, thresholds Wave 1 (75% branches, 86% funcs) mantidos                                                                                                                                                                       |
+| Gitleaks (secret scan)      | 🟢     | allowlist inalterada                                                                                                                                                                                                                     |
+| CodeQL (JS/TS)              | 🟢     | sem findings novos                                                                                                                                                                                                                       |
+| Trivy (filesystem + config) | 🟢     | sem findings novos                                                                                                                                                                                                                       |
+| SBOM (CycloneDX)            | 🟢     | regenerado                                                                                                                                                                                                                               |
+| npm audit                   | 🟢     | 0 high/critical (mesmo conjunto de advisories moderate/low de Wave 2, tracked em Wave 5)                                                                                                                                                 |
+| License check (production)  | 🟢     | OK                                                                                                                                                                                                                                       |
+| E2E Smoke (Playwright)      | 🔴     | **mesmo bug pré-existente Waves 1 e 2** — `webServer` não sobe por falta de `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` no ambiente CI. Mensagem idêntica (`Your project's URL and Key are required to create a Supabase client!`). Débito W5. |
+
+---
