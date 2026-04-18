@@ -27,6 +27,28 @@ vi.mock('@/lib/crypto', () => ({ decrypt: vi.fn((v: string | null) => v) }))
 vi.mock('@/lib/rbac', () => ({
   requireRole: vi.fn().mockResolvedValue({ id: 'admin-1', roles: ['SUPER_ADMIN'] }),
 }))
+vi.mock('@/lib/rate-limit', () => ({
+  guard: vi.fn().mockResolvedValue(null),
+  extractClientIp: vi.fn().mockReturnValue('127.0.0.1'),
+  lgpdFormLimiter: {
+    windowMs: 3_600_000,
+    limit: 3,
+    check: vi.fn().mockResolvedValue({ ok: true }),
+  },
+  lgpdExportLimiter: {
+    windowMs: 3_600_000,
+    limit: 5,
+    check: vi.fn().mockResolvedValue({ ok: true }),
+  },
+  Bucket: {
+    LGPD_DELETION: 'lgpd.deletion_request',
+    LGPD_EXPORT: 'lgpd.export',
+  },
+}))
+vi.mock('@/lib/turnstile', () => ({
+  verifyTurnstile: vi.fn().mockResolvedValue({ ok: true, bypass: 'flag-off' }),
+  extractTurnstileToken: vi.fn().mockResolvedValue(null),
+}))
 
 function makeRequest(method = 'GET', body?: unknown, headers?: Record<string, string>) {
   return new NextRequest('http://localhost:3000/api/lgpd/export', {

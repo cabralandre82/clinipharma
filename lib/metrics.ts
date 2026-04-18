@@ -253,6 +253,12 @@ export const Metrics = {
   DSAR_SLA_BREACH_TOTAL: 'dsar_sla_breach_total',
   DSAR_SLA_WARNING_TOTAL: 'dsar_sla_warning_total',
   DSAR_EXPIRED_TOTAL: 'dsar_expired_total',
+  RATE_LIMIT_HITS_TOTAL: 'rate_limit_hits_total',
+  RATE_LIMIT_DENIED_TOTAL: 'rate_limit_denied_total',
+  RATE_LIMIT_CHECK_DURATION_MS: 'rate_limit_check_duration_ms',
+  RATE_LIMIT_SUSPICIOUS_IPS_TOTAL: 'rate_limit_suspicious_ips_total',
+  TURNSTILE_VERIFY_TOTAL: 'turnstile_verify_total',
+  TURNSTILE_VERIFY_DURATION_MS: 'turnstile_verify_duration_ms',
 } as const
 
 // ── Surge detector ───────────────────────────────────────────────────────────

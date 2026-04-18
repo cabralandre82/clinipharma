@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/db/admin'
 import { decrypt } from '@/lib/crypto'
 import { createDsarRequest, transitionDsarRequest, signCanonicalBundle } from '@/lib/dsar'
 import { logPiiView } from '@/lib/audit'
+import { guard, lgpdExportLimiter, Bucket } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
 
 /**
@@ -41,6 +42,17 @@ export async function GET(req: NextRequest) {
       { status: 401, headers: { 'X-Request-ID': requestId } }
     )
   }
+
+  // Rate limit: 5 exports per hour per user. Exports are heavy
+  // (full PII bundle + HMAC sign) and a subject should never
+  // legitimately need more than ~1 per week. Scope by user id,
+  // not IP, for the same reasons as the deletion endpoint.
+  const denied = await guard(req, lgpdExportLimiter, {
+    bucket: Bucket.LGPD_EXPORT,
+    identifier: `${Bucket.LGPD_EXPORT}:user:${user.id}`,
+    userId: user.id,
+  })
+  if (denied) return denied
 
   const admin = createAdminClient()
 

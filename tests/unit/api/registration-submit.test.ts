@@ -7,8 +7,19 @@ import * as adminModule from '@/lib/db/admin'
 vi.mock('@/lib/db/admin', () => ({ createAdminClient: vi.fn() }))
 vi.mock('@/lib/rate-limit', () => ({
   registrationLimiter: {
-    check: vi.fn().mockResolvedValue({ ok: true, resetAt: 0 }),
+    check: vi.fn().mockResolvedValue({ ok: true, resetAt: 0, windowMs: 60000, limit: 3 }),
+    windowMs: 60000,
+    limit: 3,
   },
+  guard: vi.fn().mockResolvedValue(null),
+  extractClientIp: vi.fn().mockReturnValue('127.0.0.1'),
+  Bucket: {
+    REGISTER_SUBMIT: 'register.submit',
+  },
+}))
+vi.mock('@/lib/turnstile', () => ({
+  verifyTurnstile: vi.fn().mockResolvedValue({ ok: true, bypass: 'flag-off' }),
+  extractTurnstileToken: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('resend', () => {
   function MockResend() {

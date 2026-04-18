@@ -1,28 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { Resend } from 'resend'
-import { authLimiter } from '@/lib/rate-limit'
+import { authLimiter, guard, Bucket, extractClientIp } from '@/lib/rate-limit'
+import { verifyTurnstile } from '@/lib/turnstile'
 import { logger } from '@/lib/logger'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(req: NextRequest) {
   try {
-    // Rate limit: 5 requests per minute per IP
-    const ip =
-      req.headers.get('x-forwarded-for')?.split(',')[0] ?? req.headers.get('x-real-ip') ?? 'unknown'
-    const rl = await authLimiter.check(`forgot-password:${ip}`)
-    if (!rl.ok) {
-      return NextResponse.json(
-        { error: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' },
-        {
-          status: 429,
-          headers: { 'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
-        }
-      )
+    // Rate limit: 5 requests per minute per IP. Forgot-password
+    // is unauthenticated so we must key by IP; the ledger row
+    // will show SHA-256(ip || salt) for later forensics.
+    const denied = await guard(req, authLimiter, Bucket.AUTH_FORGOT)
+    if (denied) return denied
+
+    const { email, turnstileToken } = (await req.json()) as {
+      email?: unknown
+      turnstileToken?: unknown
     }
 
-    const { email } = await req.json()
+    // Turnstile on a public, unauthenticated form is the right
+    // place to put it. While the flag is OFF it's a no-op.
+    const tsResult = await verifyTurnstile({
+      token: typeof turnstileToken === 'string' ? turnstileToken : null,
+      remoteIp: extractClientIp(req),
+      bucket: Bucket.AUTH_FORGOT,
+    })
+    if (!tsResult.ok) {
+      return NextResponse.json(
+        {
+          error: tsResult.softFailure
+            ? 'Verificação expirada. Atualize a página e tente novamente.'
+            : 'Não foi possível validar a verificação de segurança.',
+        },
+        { status: 403 }
+      )
+    }
 
     if (!email || typeof email !== 'string') {
       return NextResponse.json({ error: 'Email inválido.' }, { status: 400 })

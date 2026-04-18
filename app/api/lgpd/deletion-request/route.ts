@@ -4,6 +4,8 @@ import { createAdminClient } from '@/lib/db/admin'
 import { createNotificationForRole } from '@/lib/notifications'
 import { createAuditLog, AuditAction, AuditEntity } from '@/lib/audit'
 import { createDsarRequest } from '@/lib/dsar'
+import { guard, lgpdFormLimiter, Bucket, extractClientIp } from '@/lib/rate-limit'
+import { verifyTurnstile, extractTurnstileToken } from '@/lib/turnstile'
 import { logger } from '@/lib/logger'
 
 /**
@@ -35,8 +37,43 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // Rate limit: 3 deletion requests per hour per user. We scope
+  // by user id (not IP) because the form is authenticated — an
+  // attacker on a shared NAT shouldn't grief another tenant,
+  // and a legitimate user behind a corporate proxy shouldn't be
+  // collectively throttled with their coworkers.
+  const denied = await guard(req, lgpdFormLimiter, {
+    bucket: Bucket.LGPD_DELETION,
+    identifier: `${Bucket.LGPD_DELETION}:user:${user.id}`,
+    userId: user.id,
+  })
+  if (denied) return denied
+
   const body = await req.json().catch(() => ({}))
   const reason = (body.reason as string | undefined)?.slice(0, 500) ?? 'Sem motivo informado'
+  const turnstileToken = (body.turnstileToken as string | undefined) ?? null
+
+  // Turnstile is a second layer on top of the per-user rate
+  // limit. It's a no-op while `security.turnstile_enforce` is
+  // OFF (the default during rollout) but logs every token seen
+  // so we can tune the false-positive rate before flipping.
+  const tsResult = await verifyTurnstile({
+    token: turnstileToken,
+    remoteIp: extractClientIp(req),
+    bucket: Bucket.LGPD_DELETION,
+  })
+  if (!tsResult.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'turnstile_required',
+        message: tsResult.softFailure
+          ? 'Verificação expirada. Por favor, tente novamente.'
+          : 'Não foi possível validar a verificação de segurança. Atualize a página e tente novamente.',
+      },
+      { status: 403, headers: { 'X-Request-ID': requestId } }
+    )
+  }
 
   const admin = createAdminClient()
 

@@ -60,6 +60,10 @@
     {
       "path": "/api/cron/dsar-sla-check",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/rate-limit-report",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

@@ -1541,3 +1541,295 @@ failed` — tolerável por 48h.
 | License check (production)  | 🟢     | OK                                                                          |
 
 ---
+
+## Wave 10 — Rate-limit + anti-abuse (2026-04-17 → 2026-04-17)
+
+### Escopo
+
+- **W10 entregável**: hardening de superfície pública contra
+  abuse (form-spam, credential stuffing, scraper loops).
+- **Pré-requisitos satisfeitos**: W5 (CSRF double-submit) ativo,
+  W9 (DSAR queue estabilizada 7+ dias em prod).
+- **Saída do diretivo**: "Redis-backed sliding-window + device
+  fingerprint + CAPTCHA adaptativo via Cloudflare Turnstile."
+
+### Deliverables
+
+#### Migration 052 — rate_limit_violations
+
+- `supabase/migrations/052_rate_limit_violations.sql` aplicado em:
+  - **Staging** (`ghjexiyrqdtqhkolsyaw`): HTTP 201, smoke interno
+    passou (table=1, view=1, fns=2, flag OFF, upsert dedup works,
+    ip_hash 64-char-validation works, empty-bucket rejection works).
+  - **Produção** (`jomdntqlgrupvhrqoyai`): HTTP 201 idem.
+- Artefatos DDL:
+  - `public.rate_limit_violations` — 1 row per (bucket, ip_hash,
+    bucket_minute) com `hits` incrementado via
+    `ON CONFLICT DO UPDATE`. LGPD-safe por design
+    (`ip_hash = sha256(ip || RATE_LIMIT_IP_SALT)`).
+  - `public.rate_limit_report_view` — rollup da última hora por
+    `ip_hash`, com fallback para `max(uuid)` via subquery
+    (PostgreSQL não define `max(uuid)`, erro descoberto na 1ª
+    aplicação em staging, corrigido com `ORDER BY last_seen_at
+DESC LIMIT 1`).
+  - `public.rate_limit_record(p_bucket text, p_ip_hash text,
+p_user_id uuid, p_metadata jsonb) → uuid` — SECURITY DEFINER,
+    valida `length(ip_hash) = 64`, upsert via unique index.
+  - `public.rate_limit_purge_old(p_retention_days int) → int` —
+    chamada pelo cron, hard-coded retention default 30 dias.
+  - Feature flag `security.turnstile_enforce` (default OFF).
+  - RLS habilitado em `rate_limit_violations` (deny-by-default;
+    apenas `service_role` tem acesso implícito).
+
+#### Rate-limit library upgrade — lib/rate-limit.ts
+
+- Extendido mantendo API retro-compatível:
+  - `rateLimit({ windowMs, max })` continua retornando
+    `RateLimiter` com cache por chave `${windowMs}:${max}`.
+  - Trocado `eval("import(...)")` anti-pattern por
+    `import(/* webpackIgnore: true */ '...')` + `.catch(() =>
+null)` para melhor tree-shaking.
+  - Novo tipo `RateLimitResult` expõe `windowMs` e `limit` para
+    headers HTTP consistentes.
+  - Novo helper `guard(req, limiter, bucketOrOptions)`:
+    - Retorna `NextResponse` 429 com `Retry-After` +
+      `X-RateLimit-Limit` + `X-RateLimit-Remaining` +
+      `X-RateLimit-Reset` + RFC 7807 problem+json body, ou `null`
+      se permitido.
+    - Emite `rate_limit_hits_total{bucket,outcome}` (allowed|
+      denied|error) e `rate_limit_check_duration_ms{bucket}`.
+    - Persiste violação via `recordViolation()` (void,
+      fire-and-forget — ledger é observability, não path crítico).
+    - Fail-open em erro do backend (Redis down → permite, não
+      mascara 500s como 429s).
+  - Novos helpers `extractClientIp(req)` (XFF leftmost → x-real-ip
+    → 'unknown') e `hashIp(ip)` (SHA-256 com salt de env ou
+    sentinel + warn-once global flag para evitar spam de warns).
+  - 6 limiters pré-configurados:
+    - `authLimiter` — 5/min (login, forgot).
+    - `registrationLimiter` — 3/10min.
+    - `apiLimiter` — 60/min (API autenticada geral).
+    - `exportLimiter` — 10/min (queries pesadas).
+    - `lgpdFormLimiter` — **novo**, 3/h (DSAR forms).
+    - `lgpdExportLimiter` — **novo**, 5/h (export pesado + HMAC).
+  - `Bucket` constants: `AUTH_FORGOT`, `AUTH_LOGIN`, `AUTH_SIGNUP`,
+    `REGISTER_SUBMIT`, `REGISTER_DRAFT`, `LGPD_DELETION`,
+    `LGPD_EXPORT`, `LGPD_RECTIFICATION`, `COUPON_ACTIVATE`,
+    `ORDER_PRESCRIPTION`, `DOCUMENT_UPLOAD`, `EXPORT_GENERIC`.
+
+#### Cloudflare Turnstile — lib/turnstile.ts
+
+- Novo módulo server-only:
+  - `verifyTurnstile({ token, remoteIp, bucket, required })`:
+    - Bypass quando `security.turnstile_enforce` é OFF (padrão
+      durante rollout) — retorna `{ ok: true, bypass: 'flag-off' }`
+      sem hitar a rede.
+    - Fail-closed quando flag ON mas `TURNSTILE_SECRET_KEY` está
+      missing (logger.error + retorna `ok:false`).
+    - POST para `https://challenges.cloudflare.com/turnstile/v0/siteverify`
+      com `AbortController` 5s timeout.
+    - `timeout-or-duplicate` mapeado como `softFailure=true` (não
+      é security failure, é usuário clicando 2× após expirar).
+    - Counters: `turnstile_verify_total{bucket,outcome}` com
+      outcomes `ok`, `bypass_flag`, `no_secret`, `missing_token`,
+      `soft_fail`, `hard_fail`, `http_error`, `exception`.
+    - Histogram: `turnstile_verify_duration_ms{bucket}`.
+  - `extractTurnstileToken(req)` — lê token de:
+    1. Header `x-turnstile-token`
+    2. JSON body `turnstileToken` ou `cf-turnstile-response`
+    3. FormData `cf-turnstile-response`
+  - Constante `TURNSTILE_DUMMY_SECRET_PASS` = Cloudflare public
+    testing secret (para dev/CI sem keys reais).
+  - Parâmetro `required: true` força enforce mesmo com flag OFF
+    (para webhook-like routes que nunca devem auto-bypass).
+
+#### Cron — /api/cron/rate-limit-report
+
+- Schedule: `*/15 * * * *` (a cada 15 min).
+- Wrap em `withCronGuard('rate-limit-report', ...)` (auth via
+  `CRON_SECRET`, lock via `cron_try_lock`, ALS context, row em
+  `cron_runs`).
+- Query única: `SELECT * FROM public.rate_limit_report_view` (já
+  agregada last-hour pela view).
+- Função pura exportada `classifyReport(rows)`:
+  - **P3 info** — `distinct_ips < 10` e `max_hits < 100` — alerta
+    não disparado.
+  - **P2 warning** — `distinct_ips >= 10` OR `max_hits > 100`.
+  - **P1 critical** — `distinct_ips >= 50` OR `max_hits > 500` OR
+    `distinct_buckets_per_ip > 5` (signature de credential
+    stuffing: um único attacker tentando login + forgot +
+    signup + LGPD).
+  - Top-offenders ordenados deterministicamente
+    (`total_hits DESC, distinct_buckets DESC, ip_hash ASC`) e
+    cap em 10 para manter payloads do PagerDuty pequenos.
+- Dedup keys estáveis: `rate-limit:spike:crit` / `rate-limit:spike:warn`.
+- Retention: chama `rate_limit_purge_old(30)` em cada run
+  (best-effort — falha não afeta resposta do cron).
+- Counter emitido: `rate_limit_suspicious_ips_total{severity}`
+  com o value sendo o número de IPs distintos no report.
+
+#### Integração nas rotas
+
+- `app/api/lgpd/deletion-request/route.ts`:
+  - `guard(req, lgpdFormLimiter, { bucket: LGPD_DELETION,
+identifier: 'lgpd.deletion_request:user:<uid>', userId })`
+    — scope por usuário (não IP) porque autenticado; evita
+    NAT/corporate-proxy co-throttling.
+  - `verifyTurnstile({ token, bucket: LGPD_DELETION })` — flag
+    OFF durante rollout; logs toda presença/ausência de token.
+  - 403 em failure do Turnstile, 429 em rate-limit denied.
+- `app/api/lgpd/export/route.ts`:
+  - Mesmo padrão com `lgpdExportLimiter`, user-scoped. Turnstile
+    não ativado (endpoint já é logged via `logPiiView` e tem
+    HMAC-signed response — dupla proteção seria overkill).
+- `app/api/auth/forgot-password/route.ts`:
+  - Substituída lógica manual de `authLimiter.check()` por
+    `guard()` idiomático. Turnstile ativado (route
+    unauthenticated).
+- `app/api/registration/submit/route.ts`:
+  - Substituída lógica manual de `registrationLimiter.check()`
+    por `guard()`. Turnstile ativado (form público, alvo de
+    scraping de relacionamentos consultor→clínica).
+
+#### Vercel cron schedule
+
+- `vercel.json` — adicionado entry para
+  `/api/cron/rate-limit-report` (schedule `*/15 * * * *`).
+
+### Métricas & flags novas
+
+- Metrics (`lib/metrics::Metrics`):
+  - `RATE_LIMIT_HITS_TOTAL = 'rate_limit_hits_total'`
+  - `RATE_LIMIT_DENIED_TOTAL = 'rate_limit_denied_total'`
+  - `RATE_LIMIT_CHECK_DURATION_MS = 'rate_limit_check_duration_ms'`
+  - `RATE_LIMIT_SUSPICIOUS_IPS_TOTAL = 'rate_limit_suspicious_ips_total'`
+  - `TURNSTILE_VERIFY_TOTAL = 'turnstile_verify_total'`
+  - `TURNSTILE_VERIFY_DURATION_MS = 'turnstile_verify_duration_ms'`
+- Feature flags (`lib/features::FeatureFlagKey`):
+  - `security.turnstile_enforce` — default OFF, default
+    durante rollout. Flip para ON após 7 dias de métricas
+    mostrando < 0.1% de rejeições falso-positivas.
+
+### Testes
+
+Adicionados 46 unit tests novos:
+
+- `tests/unit/lib/rate-limit-guard.test.ts` (16 tests):
+  - `extractClientIp`: XFF leftmost, x-real-ip fallback,
+    whitespace trimming, "unknown" default.
+  - `hashIp`: 64-char lowercase hex, determinismo, sensibilidade
+    ao salt, warn-once em salt missing.
+  - `guard`: allow path + emits `allowed` counter; deny path
+    retorna 429 com `Retry-After` + X-RateLimit-\*; body é
+    RFC 7807; persiste via `recordViolation`; metadata inclui
+    `ua` + `path`; `identifier` override permite scoping
+    user-scoped; fail-open em limiter throw; silent swallow de
+    RPC errors; shorthand bucket-string aceita.
+  - `Bucket`: valida constants estáveis.
+- `tests/unit/lib/turnstile.test.ts` (16 tests):
+  - Bypass path (flag OFF): retorna `ok:true bypass:flag-off`
+    sem fetch; emite `bypass_flag` metric.
+  - Flag ON sem secret: retorna `missing-input-secret`.
+  - Token curto/missing → `missing-input-response`.
+  - Happy path com success=true: verifica request body tem
+    `secret`, `response`, `remoteip`.
+  - Failure com error-codes propagado; `softFailure` flag em
+    `timeout-or-duplicate`; `internal-error` em non-2xx + em
+    fetch throw.
+  - `required:true` força enforce mesmo com flag OFF.
+  - `extractTurnstileToken`: header, JSON
+    `turnstileToken`/`cf-turnstile-response`, form-data.
+- `tests/unit/api/rate-limit-report.test.ts` (14 tests):
+  - `classifyReport` (7 tests): info baseline, warning por
+    distinct_ips, warning por max_hits, critical por 50+ IPs,
+    critical por 500+ hits, critical por distinct_buckets > 5
+    (credential-stuffing signal), determinismo da ordenação,
+    cap em 10 top-offenders.
+  - GET route (7 tests): 401 sem secret, info run sem alert,
+    warning dispara P2 com `rate-limit:spike:warn` dedup,
+    critical dispara P1 com `rate-limit:spike:crit` dedup, 500
+    em query error, purge best-effort em RPC failure.
+
+**Total: 1382 passing** (+46 vs. Wave 9: 16 rate-limit-guard + 16
+turnstile + 14 rate-limit-report).
+
+Também atualizados para novos imports:
+
+- `tests/unit/api/registration-submit.test.ts` — mock extended
+  para `@/lib/rate-limit` (`guard`, `extractClientIp`, `Bucket`)
+  e `@/lib/turnstile` (stubbed).
+- `tests/unit/api/lgpd.test.ts` — mocks análogos.
+
+### Runbook
+
+- `docs/runbooks/rate-limit-abuse.md` (novo):
+  - Severity ladder (P2 ≥10 IPs/h ou >100 hits; P1 ≥50 IPs,
+    > 500 hits, ou >5 buckets/IP).
+  - Tabela de padrões: single-IP single-bucket (retry loop),
+    single-IP multi-bucket (credential stuffing), many-IP
+    single-bucket (form spam), many-IP auth.\* (credential
+    spraying botnet), burst-then-silence (scanner).
+  - Queries SQL de triage e diagnóstico (top offenders,
+    credential-stuffing detector, time distribution).
+  - Ground-truth false-positive checks (deploy artifact,
+    synthetic monitor, sale/campaign, internal network).
+  - 3 mitigações: (a) Cloudflare WAF block (preferido — economiza
+    CPU da app), (b) Turnstile enforce via flag flip, (c) bucket
+    budget lowering via PR.
+  - Escalation path: P1 + credential-stuffing signature → Security
+    em ≤ 30 min.
+  - Post-incident: snapshot do ledger, retrospective, rule review.
+
+### Operational impact
+
+- **Novo SECRET**: `RATE_LIMIT_IP_SALT` (≥ 32 chars
+  recomendado). Se missing, limiter ainda funciona mas gera warn
+  único no startup e usa salt sentinel. **Deve ser setado em
+  staging e prod antes de flag flip de Turnstile**.
+- **Novo SECRET**: `TURNSTILE_SECRET_KEY` (apenas necessário
+  quando flag ON). Ref: Cloudflare Turnstile docs.
+- **Novo ENV var opcional**: `UPSTASH_REDIS_REST_URL` +
+  `UPSTASH_REDIS_REST_TOKEN`. Sem elas o limiter usa in-memory
+  (single-instance — OK para staging, não para prod multi-region).
+  **TODO**: criar Upstash Redis instance e setar vars antes de
+  flag flip.
+- **Retention automático**: cron chama `rate_limit_purge_old(30)`
+  a cada 15 min. Sem intervenção manual necessária.
+- **Rollback**: flip flag `security.turnstile_enforce=false`
+  desabilita Turnstile em 10s (cache TTL). `guard()` não tem
+  flag — seu comportamento é idempotente e sempre ativo, mas
+  falha-aberto em qualquer erro.
+
+### Decisões-chave
+
+1. **IP hash não é um endereço PII** — mas é LGPD-safe-enough
+   para retenção 30 dias. Não é indexado por subject, não
+   suporta pesquisa reversível sem o salt.
+2. **Persistência best-effort** — se o RPC `rate_limit_record`
+   falhar, o 429 ainda é retornado. Logs mostram a falha mas o
+   request não é bloqueado.
+3. **user-scoped vs IP-scoped** — escolha por endpoint:
+   authenticated (LGPD) → user, unauthenticated (forgot,
+   registration) → IP. Evita corporate-proxy co-throttling.
+4. **Turnstile default OFF** — durante rollout, token é
+   validado quando presente mas missing token não 403s. Flip
+   após 7 dias de métricas.
+5. **Cloudflare WAF > app-layer block** — runbook recomenda
+   mitigação em edge para poupar CPU da app e custos de Vercel.
+
+### Post-merge follow-ups
+
+- [ ] Criar Upstash Redis instance (tier livre → 10k req/day,
+      upgrade para 100k req/day em prod). Setar `UPSTASH_REDIS_REST_URL`
+      e `UPSTASH_REDIS_REST_TOKEN` em prod.
+- [ ] Gerar `RATE_LIMIT_IP_SALT` (32+ chars random) e setar em
+      staging + prod via Vercel env vars.
+- [ ] Ativar Turnstile no painel Cloudflare (site key + secret
+      key), setar `TURNSTILE_SECRET_KEY` em staging, observar
+      7 dias de métricas via Grafana dashboard.
+- [ ] Adicionar widget Turnstile ao form de registration e
+      forgot-password (front-end — trabalho de W10.1 separado,
+      não escopo desta wave).
+- [ ] Monitorar `rate_limit_hits_total{outcome=denied}` por
+      bucket — se > 1% em qualquer bucket, investigar via
+      runbook seção 3.

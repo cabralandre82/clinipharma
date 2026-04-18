@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
 import { Resend } from 'resend'
-import { registrationLimiter } from '@/lib/rate-limit'
+import { registrationLimiter, guard, Bucket, extractClientIp } from '@/lib/rate-limit'
+import { verifyTurnstile } from '@/lib/turnstile'
 import { encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
 
@@ -10,23 +11,38 @@ const APP_URL = 'https://clinipharma.com.br'
 
 export async function POST(req: NextRequest) {
   try {
-    const ip =
-      req.headers.get('x-forwarded-for')?.split(',')[0] ?? req.headers.get('x-real-ip') ?? 'unknown'
-    const rl = await registrationLimiter.check(`registration:${ip}`)
-    if (!rl.ok) {
-      return NextResponse.json(
-        { error: 'Muitas tentativas de cadastro. Aguarde antes de tentar novamente.' },
-        {
-          status: 429,
-          headers: { 'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
-        }
-      )
-    }
+    // 3 registrations per 10 min per IP. Submit is the form
+    // that stores PII + uploaded documents, so it's both the
+    // most valuable target for scrapers and the slowest route
+    // to process. Keying by IP here is correct because the
+    // caller is not yet authenticated.
+    const denied = await guard(req, registrationLimiter, Bucket.REGISTER_SUBMIT)
+    if (denied) return denied
 
     const fd = await req.formData()
     const type = fd.get('type') as 'CLINIC' | 'DOCTOR'
     const formDataRaw = fd.get('form_data') as string
     const draftId = fd.get('draft_id') as string | null
+    const turnstileToken = (fd.get('cf-turnstile-response') as string | null) ?? null
+
+    // Turnstile on the public signup form protects against
+    // automated scraping of our consultancy relationships. While
+    // the flag is OFF the token is just logged.
+    const tsResult = await verifyTurnstile({
+      token: turnstileToken,
+      remoteIp: extractClientIp(req),
+      bucket: Bucket.REGISTER_SUBMIT,
+    })
+    if (!tsResult.ok) {
+      return NextResponse.json(
+        {
+          error: tsResult.softFailure
+            ? 'Verificação expirada. Atualize a página e tente novamente.'
+            : 'Não foi possível validar a verificação de segurança. Atualize a página e tente novamente.',
+        },
+        { status: 403 }
+      )
+    }
 
     if (!type || !formDataRaw) {
       return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
