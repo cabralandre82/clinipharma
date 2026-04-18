@@ -3034,5 +3034,17 @@ rotatedBy: 'on-call:alice@x' })` para o ledger refletir a
 | Unit Tests (Vitest)    | 🟢     | 1538 passing (+48 W15)                                         |
 | Migration smoke (prod) | 🟢     | 056 aplicada, smoke 19 secrets / 0 overdue / 0 chain breaks    |
 | Manifest drift         | 🟢     | `manifest.ts` ⇄ `056.sql` aligned (14 invariant tests passing) |
+| Lint                   | 🟢     | 0 errors / 44 pre-existing warnings unchanged                  |
+| `tsc --noEmit`         | 🟢     | clean                                                          |
+| `next build`           | 🟢     | clean — `/api/cron/rotate-secrets` registered as fn            |
+
+**Commits:** `fb1fb60` — `feat(wave-15): rotação automática de secrets — 3-tier model + hash-chain ledger`
+
+**CI runs (commit `fb1fb60`, branch `main`):**
+
+| Workflow      | Run ID                                                                               | Conclusion |
+| ------------- | ------------------------------------------------------------------------------------ | ---------- |
+| CI            | [24612972839](https://github.com/cabralandre82/clinipharma/actions/runs/24612972839) | 🟢 success |
+| Security Scan | [24612972850](https://github.com/cabralandre82/clinipharma/actions/runs/24612972850) | 🟢 success |
 
 ---
