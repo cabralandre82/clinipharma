@@ -32,6 +32,13 @@ export interface GuardStubOptions {
   from: FromFn
   lockGranted?: boolean
   cronRunId?: number
+  /**
+   * Extra RPC handlers, keyed by RPC name. If provided, they take precedence
+   * over the cron-lock defaults. Each handler receives the `args` object the
+   * caller passed to `admin.rpc()` and must return the Supabase result
+   * envelope (`{ data, error }`).
+   */
+  rpcHandlers?: Record<string, (args: unknown) => Promise<{ data: unknown; error: unknown }>>
 }
 
 export interface GuardStubHandle {
@@ -48,7 +55,9 @@ export function attachCronGuard(opts: GuardStubOptions): GuardStubHandle {
   const cronRunsInsert = vi.fn()
   const cronRunsUpdateEq = vi.fn().mockResolvedValue({ error: null })
 
-  const rpc = vi.fn().mockImplementation((name: string) => {
+  const extra = opts.rpcHandlers ?? {}
+  const rpc = vi.fn().mockImplementation((name: string, args?: unknown) => {
+    if (extra[name]) return extra[name](args)
     if (name === 'cron_try_lock') {
       return Promise.resolve({ data: lockGranted, error: null })
     }

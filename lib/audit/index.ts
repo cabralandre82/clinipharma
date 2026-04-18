@@ -15,6 +15,17 @@ interface AuditLogParams {
   userAgent?: string
 }
 
+/**
+ * Appends a row to `public.audit_logs`.
+ *
+ * Hash-chain columns (`seq`, `prev_hash`, `row_hash`) are filled by the
+ * `audit_logs_chain_before_insert` trigger (migration 046). Do not pass
+ * them from the application side — the trigger ignores caller-supplied
+ * values and overwrites them. UPDATE / DELETE on `audit_logs` are
+ * blocked by triggers; the only sanctioned delete path is the
+ * `audit_purge_retention` SECURITY DEFINER RPC called from
+ * `lib/retention-policy.ts`.
+ */
 export async function createAuditLog(params: AuditLogParams): Promise<void> {
   try {
     const supabase = createAdminClient()

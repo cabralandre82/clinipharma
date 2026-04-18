@@ -564,3 +564,74 @@ Slack removido do escopo em 2026-04-17 (decisão do fundador). Falhas dos workfl
 | E2E Smoke (Playwright)      | 🔴     | **mesmo bug pré-existente Wave 1** — `webServer` não sobe por falta de `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` no ambiente CI. Não bloqueia Wave 2. Débito W5. |
 
 ---
+
+### Wave 3 — Audit append-only + hash chain + `verify_audit_chain` RPC + cron noturno — 2026-04-18
+
+**Status:** 🟢 concluído (código + migration 046 aplicada em staging e produção via Supabase Management API com backfill de 37 rows em prod; cron `verify-audit-chain` agendado no `vercel.json`; aguardando merge + deploy Vercel).
+
+**Escopo do plano (`implementation-plan.md` W3):** Audit append-only + hash chain + `verify_audit_chain` RPC + cron noturno. Pré-req W2 satisfeito (withCronGuard existe).
+
+**Escopo executado:**
+
+- **Tamper-evident chain** em `audit_logs` via SHA-256 encadeado. Cada linha carrega `seq bigint` (monotônico, via `audit_logs_seq_seq`), `prev_hash bytea` (row_hash da linha anterior pela ordem de `seq`), `row_hash bytea = sha256(prev_hash || canonical_bytes(linha))`. Mutar qualquer linha invalida todo o hash adiante.
+- **Append-only enforcement** no nível de trigger. UPDATE é sempre bloqueado (`audit_logs_prevent_update_trg` lança exceção). DELETE só passa quando a transação corrente tem a GUC `clinipharma.audit_allow_delete='on'` — ativada exclusivamente pelo `SECURITY DEFINER` `audit_purge_retention(cutoff, exclude_entity_types[])` via `SET LOCAL`. `service_role`, com RLS bypass, continua incapaz de burlar a cadeia sem passar pelo RPC.
+- **Canonicalização determinística** em `audit_canonical_payload(row)`: `jsonb_build_object` (chaves alfabéticas pela implementação do PostgreSQL) → `::text` → `convert_to(..., 'UTF8')`. Estável entre versões.
+- **Serialização de inserts.** Trigger `audit_logs_chain_before_insert()` adquire `pg_advisory_xact_lock(hashtext('clinipharma.audit_logs_chain'))` antes de ler o `prev_hash`; evita duas sessões concorrentes escreverem com o mesmo `prev_hash` e produzirem forks da cadeia.
+- **Forensic checkpoint trail** (`audit_chain_checkpoints`). Retenção insere um checkpoint com `reason='retention_purge'`, `last_hash_before`, `new_genesis_seq`, `new_genesis_hash` para que auditorias forense futuras possam explicar "buracos" legítimos. Backfill do 046 registrou um checkpoint `reason='migration_backfill'` cobrindo os 37 rows pré-existentes em prod.
+- **`verify_audit_chain(start, end, max_rows)`** SECURITY DEFINER. Seed do `expected_prev_hash` = `row_hash` da linha imediatamente anterior à janela. Itera ordenado por `seq`, recomputa `row_hash` via `extensions.digest` e compara. Janela default = `(now() - 48h, now())`, override por env no cron. Reconhece checkpoints (`new_genesis_seq = first_seq`) como início legítimo. Retorna `(scanned, inconsistent, first_broken_seq, first_broken_id, verified_from, verified_to)`.
+
+**Arquivos novos**
+
+- `supabase/migrations/046_audit_hash_chain.sql` — extensão pgcrypto no schema `extensions` (Supabase layout), colunas `seq/prev_hash/row_hash`, sequence `audit_logs_seq_seq`, tabela `audit_chain_checkpoints`, função canonical, trigger de chain, triggers de prevent-mutation, RPC `verify_audit_chain`, RPC `audit_purge_retention`, grants mínimos (REVOKE ALL + GRANT EXECUTE service_role), smoke check final (`DO $smoke$` que invoca verify e levanta exceção se inconsistente — aborta o migration caso backfill produza cadeia quebrada). Idempotente (`IF NOT EXISTS`/`OR REPLACE` em todas as mudanças). Rollback documentado no header.
+- `app/api/cron/verify-audit-chain/route.ts` — handler wrapped em `withCronGuard('verify-audit-chain')`. Lê `AUDIT_CHAIN_VERIFY_LOOKBACK_HOURS` (default 48) e `AUDIT_CHAIN_VERIFY_MAX_ROWS` (default 500000). Invoca RPC, loga `audit chain tampered` + throws quando `inconsistent > 0` (força `cron_runs.status='failed'` → Sentry + runbook P1). Quando ok, retorna `{scanned, inconsistent:0, verifiedFrom, verifiedTo, lookbackHours}` para `cron_runs.result`.
+- `docs/runbooks/audit-chain-tampered.md` — runbook P1 completo. Seções: sintomas → impacto (regulatório, não funcional) → containment em 5 min (snapshot + issue + NÃO tocar nada) → diagnóstico (queries SQL para isolar `stored_hash vs recomputed` + `stored_prev vs expected_prev`, checar `pg_trigger` para triggers dropadas, checar `audit_chain_checkpoints` para falsos-positivos) → mitigação (rotação de `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ACCESS_TOKEN`, roles com `BYPASSRLS`) → correção definitiva (migration forense OU novo checkpoint manual) → falso-positivo (checkpoint não reconhecido) → post-incident (notificação Compliance Officer, prazo LGPD Art. 48).
+- `tests/unit/api/verify-audit-chain.test.ts` — 6 testes: 401 sem CRON_SECRET, 200 `scanned=0` em janela vazia, 200 quando tudo bate, **500 `failed` quando `inconsistent > 0`** (propaga `firstBrokenSeq` na mensagem de erro), 500 quando RPC em si falha (`verify_audit_chain RPC failed`), honra override de `AUDIT_CHAIN_VERIFY_LOOKBACK_HOURS` (captura `p_start`/`p_end` e valida delta).
+
+**Arquivos modificados**
+
+- `lib/retention-policy.ts` — audit_logs purge migrado de `admin.from('audit_logs').delete().lt(...).not(...)` para `admin.rpc('audit_purge_retention', {p_cutoff, p_exclude_entity_types})`. Contador lido do envelope `{purged_count, checkpoint_id}`. Triggers de prevent-delete agora bloqueariam a forma antiga. Erros continuam agregados em `errors[]` sem throw.
+- `lib/audit/index.ts` — doc comment explicando o comportamento do trigger (colunas `seq/prev_hash/row_hash` preenchidas server-side; caller não deve passar; UPDATE/DELETE bloqueados exceto via `audit_purge_retention`).
+- `types/index.ts` — `AuditLog` ganha `seq?`, `prev_hash?`, `row_hash?` (todos opcionais pois são server-filled). Novo tipo `AuditChainCheckpoint` espelhando a nova tabela.
+- `tests/helpers/cron-guard-mock.ts` — `GuardStubOptions` ganha campo opcional `rpcHandlers: Record<string, (args) => Promise<{data, error}>>` para que testes de cron wrapped possam mockar RPCs de domínio específicos (ex: `verify_audit_chain`) sem sobrescrever os de lock.
+- `tests/unit/lib/retention-policy.test.ts` — três testes adaptados (mock agora expõe `.rpc`) + 2 testes novos especificamente para audit_purge_retention: `counts purged audit logs via audit_purge_retention RPC` valida os argumentos passados à RPC; `records audit_logs errors without throwing when RPC fails` garante resiliência.
+- `vercel.json` — nova cron entry: `/api/cron/verify-audit-chain` em `45 3 * * *` (UTC). Escolhido 03:45 para ficar 45 min depois da maioria dos crons noturnos e deixar espaço livre para qualquer lock herdado.
+- `docs/runbooks/README.md` — nenhuma mudança (entrada `audit-chain-tampered.md` já existia na tabela P1 desde Wave 1).
+- `docs/implementation-plan.md` — "Última atualização" bumpada para 2026-04-18 mencionando Wave 3.
+
+**Operações executadas**
+
+- **Staging (`ghjexiyrqdtqhkolsyaw`)**: migration aplicada via Supabase Management API (`POST /v1/projects/{ref}/database/query`, envelope JSON com o SQL completo) em dois passos:
+  1. **Primeira aplicação** falhou em runtime no trigger (`function digest(bytea, unknown) does not exist`) porque a migration inicial usava `CREATE EXTENSION IF NOT EXISTS pgcrypto` sem qualificar schema; Supabase mantém pgcrypto em `extensions`, não em `public`, e nosso trigger roda com `search_path = public, pg_temp` (para resistir a search-path injection). **Correção:** `CREATE EXTENSION ... SCHEMA extensions` + referências qualificadas `extensions.digest(...)` em três lugares (DO backfill, trigger de chain, função verify).
+  2. **Segunda aplicação** (migration fix-forward, reaplicada devido à idempotência) OK. Smoke com 3 rows sintéticos `SMOKE/CREATE|UPDATE|DELETE`: chain seq=2→3→4 (sequence rearmada no backfill 0-row da 1ª tentativa, irrelevante). `verify_audit_chain()` → `scanned=3, inconsistent=0`. `UPDATE` bloqueado com `audit_logs is append-only: UPDATE is forbidden`. `DELETE` direto bloqueado. `audit_purge_retention(now()+1d, ARRAY[]::text[])` purgou os 3, criou `audit_chain_checkpoints.id=1` com `reason='retention_purge'`. `verify_audit_chain()` pós-purge com 0 rows no window: consistente.
+- **Produção (`jomdntqlgrupvhrqoyai`)**: pré-state 37 rows entre `2026-04-11 12:12` e `2026-04-15 16:00`. Migration aplicada de primeira (já com as correções). Pós-state: `seq 1..37`, `genesis_count=1` (só a linha seq=1 com prev_hash=NULL), `verify_audit_chain('-infinity','infinity')` → `scanned=37, inconsistent=0`. Checkpoint `id=1, reason='migration_backfill', notes='Wave 3 migration 046 backfilled 37 rows'`.
+- Secrets: nenhuma alteração. `SUPABASE_SERVICE_ROLE_KEY` continua preenchido; o cron de verify usa o mesmo client admin.
+- Vercel cron `/api/cron/verify-audit-chain` aparecerá no próximo deploy (`vercel.json` é lido no build).
+
+**Testes: 1089 total (+7 vs. fim de Wave 2)**
+
+- 6 novos em `verify-audit-chain.test.ts` + 1 novo em `retention-policy.test.ts` (audit_purge_retention RPC specific).
+- `npm test`: 1089 passed, 0 failed, 11.34s (75 files).
+- `npx tsc --noEmit`: 0 erros.
+- `npm run lint`: sem mudança vs. Wave 2.
+
+**Impacto operacional**
+
+1. **Tampering detectável em ≤24h.** Cron noturno 03:45 UTC varre 48h com overlap para tolerar 1 falha. Qualquer mutação de `audit_logs` executada via bypass de trigger (ex: operação manual DDL como `DROP TRIGGER ... ALTER TABLE ... ALTER ROW ... re-create TRIGGER`) produz divergência `row_hash` ≠ recomputed; cron falha, Sentry alerta, runbook P1 ativa.
+2. **Caminho de retenção legítimo preserva forense.** Antes: DELETE direto apagava rows sem deixar rastro agregado. Agora: RPC registra `audit_chain_checkpoints` com contagem, hash do último purgado, hash do novo genesis. Compliance consegue explicar "por que existe gap no dia X" em auditoria externa sem precisar do git log.
+3. **Defense-in-depth vs. service_role comprometido.** Mesmo quem tem `SUPABASE_SERVICE_ROLE_KEY` não pode mais mutar/apagar linhas individuais. Atacante precisa (a) dropar triggers, (b) mutar, (c) recompute e reescrever todos os `row_hash` subsequentes dentro da mesma transação, OU (d) ter credenciais de Postgres owner/superuser. Qualquer um desses caminhos deixa evidência paralela (`pg_trigger.tgenabled`, `pg_stat_activity`, logs Supabase).
+4. **Backward compatible no lado do app.** `lib/audit/createAuditLog` e `audit_logs` SELECTs (página `/audit`, `/api/lgpd/export`) funcionam inalterados; novas colunas são NULL-compat ou opcionais.
+
+**Pendências capturadas**
+
+- **RPC para full-chain verify offline.** `verify_audit_chain('-infinity','infinity')` funciona, mas scanning de milhões de rows leva minutos. Quando `audit_logs` cruzar 1M (previsão: W15 → partitioning), adicionar RPC `verify_audit_chain_partition(partition_date)` que rode em paralelo por partição.
+- **Janela de 48h é heurística.** Se o cron falhar 2x seguidas (ex: degradação de 36h do Supabase), tampering entre `now()-48h` e `now()-96h` passa despercebido. W6 (health) deve alarmar quando 2 runs consecutivos de `verify-audit-chain` falham, não apenas 1.
+- **`audit_chain_checkpoints` retention.** Não há política de purge — tabela cresce linearmente com cada retenção mensal (~12/ano). Aceitável por décadas, mas incluir em W15 (partitioning) se necessário.
+- **Alerta dedicado Sentry para `audit chain tampered`.** Atualmente captura via `logger.error`. W6 (alerts) deve criar issue-alert Sentry específica `message:"audit chain tampered"` com PagerDuty P1.
+- **UI admin pra `audit_chain_checkpoints`.** Página `/audit/integrity` exibindo últimos N checkpoints + botão "Run verify now" — backlog W4 (RBAC granular ajuda a restringir).
+- **Falsos-positivos conhecidos.** Backfill registra checkpoint em prod; a primeira execução do cron **vai ver** `new_genesis_seq=1` e tratar como legítimo (pelo predicado `EXISTS ... new_genesis_seq = r.seq`). Caso nunca detectado, ok; caso a primeira semana tenha anomalia, revisar.
+
+**Docs atualizados**
+
+- `docs/execution-log.md` — esta entrada.
+- `docs/runbooks/audit-chain-tampered.md` — novo runbook P1.
+- `docs/implementation-plan.md` — linha "Última atualização" bumpada.

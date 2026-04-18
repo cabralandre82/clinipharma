@@ -444,6 +444,23 @@ export interface AuditLog {
   ip?: string | null
   user_agent?: string | null
   created_at: string
+  // Wave 3 — hash chain (migration 046). Filled server-side by the
+  // audit_logs_chain_before_insert trigger; callers must leave these unset.
+  seq?: number
+  prev_hash?: string | null
+  row_hash?: string
+}
+
+export interface AuditChainCheckpoint {
+  id: number
+  reason: 'retention_purge' | 'migration_backfill' | 'manual'
+  cutoff_before?: string | null
+  purged_count?: number | null
+  last_hash_before?: string | null
+  new_genesis_seq?: number | null
+  new_genesis_hash?: string | null
+  notes?: string | null
+  created_at: string
 }
 
 export interface AppSetting {

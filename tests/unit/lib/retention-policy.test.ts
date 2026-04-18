@@ -30,6 +30,17 @@ describe('getRetentionDates', () => {
 })
 
 describe('enforceRetentionPolicy', () => {
+  // Wave 3: retention now delegates audit_logs purge to the
+  // audit_purge_retention RPC (append-only via migration 046).
+  function mockRpc(
+    result: { data?: unknown; error?: unknown } = {
+      data: [{ purged_count: 0, checkpoint_id: null }],
+      error: null,
+    }
+  ) {
+    return vi.fn().mockResolvedValue({ data: result.data ?? null, error: result.error ?? null })
+  }
+
   it('anonymizes stale inactive profiles', async () => {
     const staleProfile = { id: 'user-1', full_name: 'Old User', email: 'old@test.com' }
 
@@ -46,7 +57,7 @@ describe('enforceRetentionPolicy', () => {
             }),
           }
         }
-        // notifications and audit_logs
+        // notifications
         return {
           delete: vi.fn().mockReturnThis(),
           lt: vi.fn().mockReturnThis(),
@@ -54,6 +65,7 @@ describe('enforceRetentionPolicy', () => {
           select: vi.fn().mockResolvedValue({ data: [], error: null }),
         }
       }),
+      rpc: mockRpc(),
     } as unknown as ReturnType<typeof adminModule.createAdminClient>)
 
     const { enforceRetentionPolicy } = await import('@/lib/retention-policy')
@@ -81,14 +93,9 @@ describe('enforceRetentionPolicy', () => {
             select: vi.fn().mockResolvedValue({ data: [{ id: 'n1' }, { id: 'n2' }], error: null }),
           }
         }
-        // audit_logs
-        return {
-          delete: vi.fn().mockReturnThis(),
-          lt: vi.fn().mockReturnThis(),
-          not: vi.fn().mockReturnThis(),
-          select: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }
+        return {}
       }),
+      rpc: mockRpc(),
     } as unknown as ReturnType<typeof adminModule.createAdminClient>)
 
     const { enforceRetentionPolicy } = await import('@/lib/retention-policy')
@@ -97,20 +104,56 @@ describe('enforceRetentionPolicy', () => {
     expect(result.notificationsPurged).toBe(2)
   })
 
-  it('records errors without throwing', async () => {
+  it('counts purged audit logs via audit_purge_retention RPC', async () => {
+    const rpcMock = mockRpc({ data: [{ purged_count: 7, checkpoint_id: 42 }], error: null })
+
     vi.mocked(adminModule.createAdminClient).mockReturnValue({
-      from: vi.fn().mockImplementation(() => ({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        lt: vi.fn().mockReturnThis(),
-        not: vi.fn().mockResolvedValue({ data: null, error: { message: 'DB error' } }),
-        delete: vi.fn().mockReturnThis(),
-      })),
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            lt: vi.fn().mockReturnThis(),
+            not: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }
+        }
+        // notifications
+        return {
+          delete: vi.fn().mockReturnThis(),
+          lt: vi.fn().mockReturnThis(),
+          select: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }
+      }),
+      rpc: rpcMock,
     } as unknown as ReturnType<typeof adminModule.createAdminClient>)
 
     const { enforceRetentionPolicy } = await import('@/lib/retention-policy')
     const result = await enforceRetentionPolicy()
 
-    expect(result.errors.length).toBeGreaterThan(0)
+    expect(result.auditLogsPurged).toBe(7)
+    expect(rpcMock).toHaveBeenCalledWith(
+      'audit_purge_retention',
+      expect.objectContaining({
+        p_exclude_entity_types: ['PAYMENT', 'COMMISSION', 'TRANSFER', 'CONSULTANT_TRANSFER'],
+      })
+    )
+  })
+
+  it('records audit_logs errors without throwing when RPC fails', async () => {
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        lt: vi.fn().mockReturnThis(),
+        not: vi.fn().mockResolvedValue({ data: [], error: null }),
+        delete: vi.fn().mockReturnThis(),
+      })),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: { message: 'DELETE forbidden' } }),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const { enforceRetentionPolicy } = await import('@/lib/retention-policy')
+    const result = await enforceRetentionPolicy()
+
+    expect(result.errors.some((e) => e.includes('audit_logs'))).toBe(true)
   })
 })

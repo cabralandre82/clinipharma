@@ -87,18 +87,25 @@ export async function enforceRetentionPolicy(): Promise<RetentionSummary> {
     errors.push(`notifications: ${err instanceof Error ? err.message : String(err)}`)
   }
 
-  // 3. Purge non-financial audit logs beyond 5 years
-  // Financial audit logs (entity_type IN ('PAYMENT','COMMISSION','TRANSFER')) are preserved 10 years
+  // 3. Purge non-financial audit logs beyond 5 years via append-only-safe RPC.
+  // Wave 3 (migration 046) made audit_logs tamper-evident: direct DELETE is
+  // blocked by the `audit_logs_prevent_delete_trg` trigger. The
+  // `audit_purge_retention` SECURITY DEFINER function sets the one-shot
+  // `clinipharma.audit_allow_delete=on` GUC inside its own transaction and
+  // appends a row to `audit_chain_checkpoints` so the forensic trail is
+  // preserved. Financial entities are never purged (passed as exclusion list).
   try {
-    const { data: purged, error: auditErr } = await admin
-      .from('audit_logs')
-      .delete()
-      .lt('created_at', fiveYearsAgo)
-      .not('entity_type', 'in', '("PAYMENT","COMMISSION","TRANSFER","CONSULTANT_TRANSFER")')
-      .select('id')
+    const { data: purged, error: auditErr } = await admin.rpc('audit_purge_retention', {
+      p_cutoff: fiveYearsAgo,
+      p_exclude_entity_types: ['PAYMENT', 'COMMISSION', 'TRANSFER', 'CONSULTANT_TRANSFER'],
+    })
 
-    if (auditErr) errors.push(`audit_logs: ${auditErr.message}`)
-    else auditLogsPurged = purged?.length ?? 0
+    if (auditErr) {
+      errors.push(`audit_logs: ${auditErr.message}`)
+    } else {
+      const row = Array.isArray(purged) ? purged[0] : purged
+      auditLogsPurged = Number((row as { purged_count?: number } | null)?.purged_count ?? 0)
+    }
   } catch (err) {
     errors.push(`audit_logs: ${err instanceof Error ? err.message : String(err)}`)
   }
