@@ -1082,3 +1082,215 @@ P2 com mapa de decisão completo: identificar o fluxo afetado por labels do coun
 | License check (production)  | 🟢     | OK (6s)                                                                    |
 
 ---
+
+## Wave 8 — money em integer cents (dual-read gated)
+
+**Intenção.** Erradicar o risco de drift financeiro decorrente do uso
+de `number` (IEEE 754) em JS para somar/ratearer valores monetários
+armazenados como `numeric(x,2)` no Postgres. A mesma conta feita no
+Postgres e no JS pode divergir em até ±0,01 por linha-item e mais em
+percentuais (comissão do consultor, comissão da plataforma); a
+ausência de paridade acumula silenciosamente em relatórios. Wave 8
+introduz colunas `*_cents BIGINT` espelhando cada campo monetário do
+caminho P&L quente, sincronização bidirecional via trigger BEFORE
+INSERT/UPDATE, reconciliação contínua via cron e um flag
+`money.cents_read` para alternar a autoridade no momento certo.
+
+**Migration aplicada.** `supabase/migrations/050_money_cents.sql`
+rodada em staging (`ghjexiyrqdtqhkolsyaw`) e produção
+(`jomdntqlgrupvhrqoyai`) com sucesso em 2026-04-19. Dispôs:
+
+- **14 colunas shadow `*_cents BIGINT`** em 7 tabelas do caminho P&L:
+  `orders.total_price`, `order_items.{unit_price, total_price,
+pharmacy_cost_per_unit, platform_commission_per_unit}`,
+  `payments.gross_amount`, `commissions.{commission_fixed_amount,
+commission_total_amount}`, `transfers.{gross_amount,
+commission_amount, net_amount}`, `consultant_commissions.{order_total,
+commission_amount}`, `consultant_transfers.gross_amount`. Tabelas
+  de display (products, coupons, NFS-e) não entram na Wave 8 porque
+  não participam da agregação P&L — ficam para Wave 11.
+- **Backfill idempotente** via `UPDATE … SET cents = _money_to_cents(numeric)
+WHERE cents IS NULL` em cada tabela. Re-rodar a migration é no-op.
+- **Função auxiliar `public._money_to_cents(numeric) → bigint`**
+  (IMMUTABLE, PARALLEL SAFE) que implementa `round(v * 100)::bigint`
+  com arredondamento half-away-from-zero (mesmo modo do PG `round()`
+  e do `Math.round` em JS após `+ Number.EPSILON * sign`). Reusada
+  pelos triggers, view de drift e pelo backfill.
+- **7 funções trigger `_money_sync_<table>()` + 7 triggers BEFORE
+  INSERT OR UPDATE** que garantem o invariant `cents == round(numeric
+  - 100)` em todo caminho de escrita:
+  * numeric-only (writer legado) → cents derivado automaticamente;
+  * cents-only (writer novo) → numeric derivado automaticamente;
+  * ambos concordando (|drift| ≤ 1 cent) → aceitos como dados;
+  * ambos discordando > 1 cent → `RAISE EXCEPTION P0001` com
+    mensagem identificando o campo e a tabela.
+
+  Os 4 casos foram validados em staging via bloco DO $smoke$
+  (`insert-only-numeric`, `insert-only-cents`, `insert-both-agree`,
+  `insert-both-disagree` com `exception caught`). A migration
+  propriamente traz smoke block no final que falha se: (a) qualquer
+  linha ficar com `*_cents IS NULL` após backfill, (b)
+  `money_drift_view` tiver ≥1 linha logo após o backfill, (c) o
+  flag ficar faltando ou com `enabled = true`.
+
+- **View `public.money_drift_view`** une os 7 pares (table, field) e
+  lista apenas linhas onde `|cents - round(numeric * 100)| > 1`. Em
+  steady state a view é vazia; é o que o cron observa.
+- **Flag `money.cents_read`** inserido em `public.feature_flags` com
+  `enabled = false`, owner `audit-2026-04`. Só deve ir pra ON após a
+  reconciliação provar 0 drift por 7 dias corridos.
+
+**Módulo `lib/money.ts`.** Toda a aritmética monetária nova passa a
+viver em um único arquivo server+edge-compatible:
+
+- `toCents(value)` — parse + round half-away-from-zero com a
+  correção `Number.EPSILON * Math.sign(n)` para absorver o pitfall
+  `2.36 * 100 === 235.99999999999997`. Aceita number, string, null e
+  undefined; rejeita NaN/Infinity com TypeError explícito.
+- `fromCents(cents)` — divide por 100. Inverso exato de `toCents`
+  para qualquer valor `numeric(x,2)`. Aceita bigint.
+- `sumCents(values)` — soma inteira exata. Rejeita não-inteiros.
+- `mulCentsByQty(cents, quantity)` — quantidade é
+  não-negativa-inteira. Usa no cálculo de linha-item.
+- `percentBpsCents(baseCents, rateBps)` — percentual em bps (100 bps
+  = 1%). Arredonda half-away-from-zero no resto da divisão por
+  10.000. Preferido para novas integrações.
+- `percentDecimalCents(baseCents, ratePercent)` — wrapper para a
+  forma legada `sales_consultants.commission_rate = 5.0 → 5%`.
+  Converte para bps internamente com rounding.
+- `driftCents(numericValue, centsValue)` — delta absoluto em cents,
+  usado pelo cron.
+- `formatCents(cents, currency='BRL')` — formata via Intl sem float
+  intermediário (`fromCents` antes do `NumberFormat`).
+- `readMoneyField(row, field)` — adapter que prefere
+  `row[field_cents]` quando presente e numérico, cai para
+  `toCents(row[field])` caso contrário. Core da dual-read.
+
+**Módulo `lib/money-format.ts` (server-only).** Adapter gated no
+flag `money.cents_read`:
+
+- `formatMoney(row, field, ctx, currency)` — decide em runtime por
+  qual coluna formatar.
+- `readMoneyCents(row, field, ctx)` — devolve o valor canônico em
+  cents para agregação server-side.
+- `readMoneyDecimal(row, field, ctx)` — devolve number (R$ 10,50)
+  para callers legados. Em todos os três casos, falha no lookup do
+  flag é tratada como OFF (fail-closed).
+
+**Cron `/api/cron/money-reconcile`.** Rodando a cada 30 minutos via
+`vercel.json` (nova entry). Seleciona até 21 amostras de
+`money_drift_view` (env `MONEY_RECONCILE_MAX_SAMPLES=20`, +1 para
+detectar truncamento), emite os counters/gauges/histograms
+`money_drift_total{table,field}`, `money_reconcile_duration_ms` e
+`money_reconcile_last_run_ts`, e:
+
+- quando `driftCount = 0`: retorna 200 OK, cron_runs fica `success`.
+- quando `driftCount > 0`: incrementa counter por linha, dispara
+  `triggerAlert` com severity=warning, dedupKey
+  `money:reconcile:drift` e runbook inline no campo `message`, e
+  depois `throw` para `withCronGuard` marcar a run como `failed`
+  (paging via cron-failure path). Falha no alert não mascara o
+  erro — o throw acontece mesmo se `triggerAlert` rejeitar.
+
+**Nenhuma mudança nos RPCs atômicos (W7).** Como os triggers
+BEFORE sincronizam cents ↔ numeric em todo caminho de escrita
+(incluindo os INSERTs dentro de `create_order_atomic`,
+`confirm_payment_atomic`, etc.), as RPCs de W7 continuam escrevendo
+apenas `numeric` e os cents são derivados automaticamente pelo
+trigger. Isso preserva a atomicidade + o `lock_version` + o
+comportamento observável dos RPCs e ainda assim fecha o ciclo em
+cents. Validado em staging: INSERTs-via-RPC deixam `money_drift_view`
+vazia.
+
+**Métricas novas em `lib/metrics.ts`:**
+
+- `money_drift_total{table,field}` (counter) — cada linha vista pela
+  reconciliação.
+- `money_reconcile_duration_ms` (histogram) — latência do cron.
+- `money_reconcile_last_run_ts` (gauge) — freshness check usado
+  pelo `/api/health/deep` (futuro).
+
+**Runbook novo:** `docs/runbooks/money-drift.md` (P2). Cobre
+árvore de decisão por padrão de drift (1 linha vs. N vs. N tabelas
+vs. drift astronômico indicando swap de unidade), queries de
+diagnóstico (triggers, helper, migrations recentes), 3 mitigações
+(kill-switch via flag, re-install de trigger, patch de linha via
+`UPDATE … = _money_to_cents(...)`), métricas a observar e passos
+pós-incidente. Indexado no `docs/runbooks/README.md`.
+
+**Testes novos:**
+
+- `tests/unit/lib/money.test.ts` (42 testes): `toCents`/`fromCents`
+  cobrindo os dois pitfalls clássicos (`0.1 + 0.2`, `2.36 * 100`),
+  round-trip exato, NaN/Infinity, negativos. `sumCents` com rejeição
+  explícita de não-inteiros. `percentBpsCents`/`percentDecimalCents`
+  validados com fixtures de comissão da plataforma e do consultor
+  (5%, 2.5%, 0.01%). `readMoneyField` cobrindo as três rotas
+  (cents-presente, cents-NULL com fallback, cents-NaN com fallback).
+  Inclui 3 integrações curtas reproduzindo um pedido típico e a
+  comissão do consultor (5% × R$ 1234,56 = R$ 61,73 após rounding
+  half-up em 6.173 cents).
+- `tests/unit/lib/money-format.test.ts` (13 testes): cobre ambos os
+  branches do flag, fail-closed em exception do `isFeatureEnabled`,
+  propagação correta do `FeatureFlagContext`, override de currency
+  (USD), null-row.
+- `tests/unit/api/money-reconcile.test.ts` (5 testes,
+  `@vitest-environment node`): 401 sem `CRON_SECRET`, 200 com view
+  vazia (nenhum alert), 500 com drift disparando counter por linha e
+  alert único com dedupKey estável, 500 com query error sem alert,
+  resiliência a falha no dispatch do alert. Usa o helper compartilhado
+  `attachCronGuard` + `loggerMock`.
+
+Total novos: **60 unit tests**. Regressão integral:
+`npx vitest run` reporta **1292 passing** (1232 Wave 7 + 60 W8).
+
+**Impacto operacional (observável com flag OFF):**
+
+- Cada INSERT/UPDATE nas 7 tabelas do P&L incorre em 1 invocação do
+  trigger BEFORE e 1 a 4 `round()`s. Medido em staging com o workload
+  sintético: p50 +0,2 ms, p95 +0,4 ms por linha. Desprezível.
+- O cron roda a cada 30 min e varre a view via 7 queries UNION em
+  colunas indexadas. Em staging: 28 ms p50, 94 ms p95. Orçamento
+  anual: 17.520 invocações × ~50 ms = ~14 min de CPU/ano. Irrelevante.
+- Nenhum efeito visível para usuários finais enquanto o flag estiver
+  OFF — a autoridade continua sendo `numeric`.
+
+**Decisões-chave registradas:**
+
+1. **Shadow column, não migração destrutiva.** A alternativa
+   seria alterar `total_price` para `bigint` e mover todo o código
+   de uma vez. Rejeitada porque: (a) requer reindexar todas as
+   tabelas do P&L simultaneamente, (b) qualquer bug no conversor
+   corromperia dados em vez de acender o alerta de drift, (c) faz
+   flip atômico do flag impossível.
+2. **Triggers BEFORE, não GENERATED ALWAYS.** A alternativa seria
+   `GENERATED ALWAYS AS ((total_price * 100)::bigint) STORED`.
+   Rejeitada porque: (a) impede escritas cents-first, (b) requer
+   rewrite completo de todas as linhas existentes no ALTER TABLE,
+   (c) `GENERATED` + `numeric` tem semântica de rounding que não é
+   garantida half-away-from-zero entre versões do PG.
+3. **Percent em bps, não decimal.** O helper primário para novas
+   integrações é `percentBpsCents` porque bps mantém a multiplicação
+   inteira. `percentDecimalCents` existe só pra compatibilidade com
+   `sales_consultants.commission_rate numeric(5,2)`.
+4. **Tolerância de 1 cent na view de drift.** Evita falsos-positivos
+   quando um writer legado escreve `round(x, 2)` no numeric e o
+   trigger aplica `round(x * 100)` — os dois rounds empatam quase
+   sempre mas podem divergir em 0,005-boundary. 1 cent absorve isso
+   sem esconder drift real.
+5. **Cron a cada 30 min.** Compromise entre custo e latência de
+   detecção. Se uma migration quebra os triggers às 03:00, o alerta
+   chega até 03:30 em vez de 24 h (o cron de verify-audit-chain roda
+   diário). Custo é 48 invocações/dia, todas < 100 ms.
+
+**Pendências pós-merge:**
+
+- Monitorar `money_drift_total` por 7 dias consecutivos com
+  `driftCount = 0`. Somente então flipar `money.cents_read = true`
+  via admin UI.
+- Migrar progressivamente os formatters de componentes top-10 (por
+  tráfego) para `formatMoney()` em uma wave futura, usando o
+  `data-testid` E2E para provar visualmente que o valor é o mesmo.
+- Consider um `CHECK (cents IS NOT NULL OR numeric IS NULL)` quando
+  `money.cents_read` estiver ON por ≥ 14 dias e zero drift — hoje a
+  migration não adiciona CHECK para evitar bloquear inserts legados.

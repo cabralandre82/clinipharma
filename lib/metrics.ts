@@ -242,6 +242,9 @@ export const Metrics = {
   ATOMIC_RPC_TOTAL: 'atomic_rpc_total',
   ATOMIC_RPC_DURATION_MS: 'atomic_rpc_duration_ms',
   ATOMIC_RPC_FALLBACK_TOTAL: 'atomic_rpc_fallback_total',
+  MONEY_DRIFT_TOTAL: 'money_drift_total',
+  MONEY_RECONCILE_DURATION_MS: 'money_reconcile_duration_ms',
+  MONEY_RECONCILE_LAST_RUN_TS: 'money_reconcile_last_run_ts',
 } as const
 
 // ── Surge detector ───────────────────────────────────────────────────────────
