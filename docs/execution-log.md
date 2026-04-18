@@ -545,10 +545,22 @@ Slack removido do escopo em 2026-04-17 (decisão do fundador). Falhas dos workfl
 - `docs/runbooks/README.md` — tabela P2 atualizada com as duas novas entradas.
 - `docs/implementation-plan.md` — linha "Última atualização" bumpada.
 
-**Commits a consolidar em 1 PR:** (hashes atribuídos no push)
+**Commits:**
 
-- `feat(wave-2): webhook dedup + cron single-flight guard (migration 045)`
+- `a816709` — feat(wave-2): webhook dedup + cron single-flight guard (migration 045)
 
-**CI / Quality Gates:** aguardando push.
+**CI / Quality Gates (run `24595491379` @ `a816709`):**
+
+| Job                         | Status | Notas                                                                                                                                                        |
+| --------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Lint & Type Check           | 🟢     | 0 erros, 44 warnings (2 a menos que Wave 1)                                                                                                                  |
+| Unit Tests (Vitest)         | 🟢     | 1082 passing, thresholds Wave 1 (75% branches, 86% funcs) mantidos                                                                                           |
+| Gitleaks (secret scan)      | 🟢     | allowlist Wave 1 inalterada                                                                                                                                  |
+| CodeQL (JS/TS)              | 🟢     | sem findings novos                                                                                                                                           |
+| Trivy (filesystem + config) | 🟢     | sem findings novos                                                                                                                                           |
+| SBOM (CycloneDX)            | 🟢     | regenerado                                                                                                                                                   |
+| npm audit                   | 🟢     | 0 high/critical (3 advisories dependabot: 2 moderate + 1 low — fora do escopo, tracked em Wave 5)                                                            |
+| License check (production)  | 🟢     | OK                                                                                                                                                           |
+| E2E Smoke (Playwright)      | 🔴     | **mesmo bug pré-existente Wave 1** — `webServer` não sobe por falta de `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` no ambiente CI. Não bloqueia Wave 2. Débito W5. |
 
 ---
