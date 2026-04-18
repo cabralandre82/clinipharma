@@ -42,9 +42,10 @@
 
 ### 🟡 P3 — Degradação silenciosa (backlog)
 
-| Runbook                | Sintoma disparador                    |
-| ---------------------- | ------------------------------------- |
-| `ticket-sla-breach.md` | Tickets de suporte sem resposta > SLA |
+| Runbook                | Sintoma disparador                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| `ticket-sla-breach.md` | Tickets de suporte sem resposta > SLA                                                                |
+| `vercel-cron-quota.md` | Deploys silenciosamente rejeitados por `cron_jobs_limits_reached` (Hobby plan ↔ sub-daily schedules) |
 
 ---
 
