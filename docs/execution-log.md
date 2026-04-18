@@ -1065,3 +1065,20 @@ P2 com mapa de decisão completo: identificar o fluxo afetado por labels do coun
 ### Commits
 
 - `_pending_` — feat(wave-7): atomic RPCs for orders/coupons/payments + dual-path wrapper + migration 049 + runbook + tests
+- `c835bb6` — feat(wave-7): atomic RPCs for orders/coupons/payments + dual-path wrapper (inclui migration 049 + runbook + 27 tests novos)
+
+**CI / Quality Gates (run `24603728310` CI + `24603728300` Security Scan @ `c835bb6`):**
+
+| Job                         | Status | Notas                                                                      |
+| --------------------------- | ------ | -------------------------------------------------------------------------- |
+| Lint & Type Check           | 🟢     | 0 erros, 44 warnings de baseline inalterados (2m54s)                       |
+| Unit Tests (Vitest)         | 🟢     | **1232 passing** (+27 vs. Wave 6: 23 wrapper + 4 race simulations) (2m56s) |
+| E2E Smoke (Playwright)      | 🟢     | 22 testes `smoke*` verdes — nenhuma mudança na sequência (1m41s)           |
+| Gitleaks (secret scan)      | 🟢     | nenhum secret novo (6s, hit cache)                                         |
+| CodeQL (JS/TS)              | 🟢     | sem findings novos (6s, hit cache)                                         |
+| Trivy (filesystem + config) | 🟢     | sem findings novos (6s, hit cache)                                         |
+| SBOM (CycloneDX)            | 🟢     | regenerado (6s)                                                            |
+| npm audit                   | 🟢     | 0 high/critical (mesmas advisories moderate/low Waves anteriores) (6s)     |
+| License check (production)  | 🟢     | OK (6s)                                                                    |
+
+---
