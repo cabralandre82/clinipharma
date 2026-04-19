@@ -19,7 +19,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </div>
           <p className="text-sm text-blue-100">Plataforma B2B de intermediação médica</p>
         </div>
-        <div className="rounded-2xl bg-white p-8 shadow-2xl">{children}</div>
+        <main id="main" className="rounded-2xl bg-white p-8 shadow-2xl">
+          {children}
+        </main>
         <p className="mt-6 text-center text-xs text-blue-200/70">
           Ao acessar, você concorda com nossos{' '}
           <Link href="/terms" className="underline hover:text-white">

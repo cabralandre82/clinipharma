@@ -14,7 +14,9 @@ export function Shell({ user, title, children }: ShellProps) {
       <Sidebar userRoles={user.roles} />
       <div className="ml-64 flex min-h-screen flex-1 flex-col">
         <Header user={user} title={title} />
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        <main id="main" className="flex-1 overflow-auto p-6">
+          {children}
+        </main>
       </div>
     </div>
   )

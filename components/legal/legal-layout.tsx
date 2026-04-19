@@ -32,7 +32,7 @@ export function LegalLayout({
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 py-10">
+      <main id="main" className="mx-auto max-w-4xl px-6 py-10">
         {/* Document header */}
         <div className="mb-8 rounded-xl border bg-white p-6">
           <h1 className="text-2xl font-bold text-slate-900">{title}</h1>

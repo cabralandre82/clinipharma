@@ -41,6 +41,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="pt-BR" suppressHydrationWarning data-csp-nonce={nonce || undefined}>
       <body>
+        {/*
+         * Wave Hardening III — keyboard-only "skip to main content" link.
+         * Visually hidden until focused so it doesn't disturb the design,
+         * but the first <Tab> from the top of any page surfaces it. Pages
+         * are expected to mark their primary region with id="main"; if
+         * they do not, the link is a no-op rather than a broken anchor.
+         */}
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[1000] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[hsl(196,91%,33%)]"
+        >
+          Pular para o conteúdo principal
+        </a>
         {children}
         <Toaster richColors position="top-right" />
       </body>

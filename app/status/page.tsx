@@ -26,7 +26,7 @@ export default function StatusPage() {
           <span className="text-sm text-slate-500">Status</span>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-6 py-10">
+      <main id="main" className="mx-auto max-w-5xl px-6 py-10">
         <StatusBoard />
       </main>
     </div>
