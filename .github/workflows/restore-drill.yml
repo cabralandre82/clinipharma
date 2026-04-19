@@ -241,8 +241,14 @@ jobs:
           # Tolerable: extensions only available inside Supabase, plus
           # ALTER OWNER / GRANT to platform-owned roles that we can't
           # impersonate. These cannot be exercised in a vanilla PG drill.
+          # Tolerable patterns:
+          #  1. Supabase-managed extensions not available in vanilla PG
+          #  2. Supabase-managed role names (rare here since we pre-create them)
+          #  3. Schema already exists / cannot drop schema — direct
+          #     consequence of bootstrapping the same schemas the dump
+          #     also tries to recreate via --clean --if-exists.
           TOLERABLE=$(grep -E '^pg_restore: error:' "$ERR_LOG" | grep -cE \
-            'extension "(pg_graphql|supabase_vault|pgsodium|pg_net|pgaudit|pg_cron|pg_jsonschema|wrappers|hypopg|index_advisor|pgmq|http|plpgsql_check|plv8)"|role "(supabase_admin|supabase_auth_admin|supabase_storage_admin|supabase_realtime_admin|supabase_functions_admin|supabase_replication_admin|pgsodium_|authenticator)"' \
+            'extension "(pg_graphql|supabase_vault|pgsodium|pg_net|pgaudit|pg_cron|pg_jsonschema|wrappers|hypopg|index_advisor|pgmq|http|plpgsql_check|plv8)"|role "(supabase_admin|supabase_auth_admin|supabase_storage_admin|supabase_realtime_admin|supabase_functions_admin|supabase_replication_admin|pgsodium_|authenticator)"|schema "(vault|extensions|auth|storage|realtime|graphql|graphql_public|_realtime|supabase_functions)" already exists|cannot drop schema (vault|extensions|auth|storage|realtime|graphql|graphql_public|_realtime|supabase_functions)' \
             || true)
           REAL=$((TOTAL - TOLERABLE))
           echo "pg_restore errors: total=$TOTAL tolerable=$TOLERABLE real=$REAL"
@@ -293,11 +299,14 @@ jobs:
           probe "auth.users"            "SELECT count(*) FROM auth.users;"
           probe "public.orders"         "SELECT count(*) FROM public.orders;"
           probe "public.payments"       "SELECT count(*) FROM public.payments;"
-          probe "public.audit_log"      "SELECT count(*) FROM public.audit_log;"
-          probe "public.audit_log max"  "SELECT max(created_at) FROM public.audit_log;"
+          probe "public.audit_logs"     "SELECT count(*) FROM public.audit_logs;"
+          probe "public.audit_logs max" "SELECT max(created_at) FROM public.audit_logs;"
+          probe "public.audit_chain_checkpoints" "SELECT count(*) FROM public.audit_chain_checkpoints;"
           probe "public.feature_flags"  "SELECT count(*) FROM public.feature_flags;"
           probe "public.products"       "SELECT count(*) FROM public.products;"
-          probe "public.organizations"  "SELECT count(*) FROM public.organizations;"
+          probe "public.pharmacies"     "SELECT count(*) FROM public.pharmacies;"
+          probe "public.clinics"        "SELECT count(*) FROM public.clinics;"
+          probe "public.prescriptions"  "SELECT count(*) FROM public.prescriptions;"
 
       - name: Upload pg_restore stderr (for forensics)
         if: always()
