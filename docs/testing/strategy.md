@@ -1,10 +1,10 @@
 # Testing Strategy
 
-| Field           | Value                                                |
-| --------------- | ---------------------------------------------------- |
-| Owner           | Engineering                                          |
-| Last reviewed   | 2026-04-18                                           |
-| Source-of-truth | this doc, `vitest.config.ts`, `playwright.config.ts` |
+| Field           | Value                                                                      |
+| --------------- | -------------------------------------------------------------------------- |
+| Owner           | Engineering                                                                |
+| Last reviewed   | 2026-04-19                                                                 |
+| Source-of-truth | this doc, `vitest.config.ts`, `playwright.config.ts`, `stryker.config.mjs` |
 
 ## 1. Test pyramid
 
@@ -131,20 +131,35 @@ WCAG violation drops the build immediately.
 - **`.only` or `.skip` checked into main.** CI rejects via
   `forbidOnly: true` in playwright.config.
 
+### Mutation (`stryker.config.mjs`)
+
+Stryker JS, scoped to `lib/crypto.ts` + `lib/security/**`. Validates
+that the unit tests for our security-critical primitives actually
+**catch** regressions instead of merely executing the lines. Current
+overall mutation score: **86.50 %** (break floor 84 %). Per-file
+breakdown, equivalent-mutant catalogue, and ratchet plan live in
+[`docs/testing/mutation-testing.md`](./mutation-testing.md). Wall
+clock per run: ~3–4 min; runs on PRs touching the mutate set, plus
+weekly cron, plus manual dispatch.
+
 ## 5. Promotion path
 
 Items intentionally out of scope for now, with the trigger to revisit:
 
-- **Mutation testing (Stryker).** Trigger: coverage above 90 % becomes
-  the new floor; mutation score then becomes the next quality lever.
 - **Visual regression (Playwright + Percy/Chromatic).** Trigger: a
   visual incident slips through three sprints in a row.
 - **Contract tests against external APIs (Pactflow).** Trigger: we
   introduce a second consumer of the Asaas webhook, or a third-party
   consumer of our public API.
+- **Mutation testing — wider scope.** Trigger: a regression in
+  business logic (orders / payments / RBAC) escapes the unit suite.
+  Today only the security primitives are mutated; widening to
+  business logic costs ~10× wall clock and brings diminishing
+  returns until the security baseline is fully stable.
 
 ## 6. Change log
 
-| Date       | Change                                                          |
-| ---------- | --------------------------------------------------------------- |
-| 2026-04-18 | Initial publication. Pyramid, ratchet plan, four new E2E flows. |
+| Date       | Change                                                                               |
+| ---------- | ------------------------------------------------------------------------------------ |
+| 2026-04-18 | Initial publication. Pyramid, ratchet plan, four new E2E flows.                      |
+| 2026-04-19 | Added mutation-testing tier (Stryker on security surface, 86.5 % score, 84 % floor). |

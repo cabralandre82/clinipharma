@@ -1,0 +1,134 @@
+name: Mutation Tests
+
+# ────────────────────────────────────────────────────────────────────────────
+# Stryker mutation testing scoped to the security-critical surface.
+#
+# Why a dedicated workflow (not part of the main `ci.yml`)?
+#   - Each Stryker run takes ~3–4 minutes wall-clock. Running on every
+#     PR would more than double total CI time.
+#   - Mutation regressions are interesting at PR review time, not at
+#     PR-merge time — by the time a PR lands, you can't undo the
+#     missing test. So we run on PRs touching the mutated paths
+#     (synchronous gate) and on a weekly cadence (drift detection).
+#
+# Triggers:
+#   - PRs that touch any file under the mutate set (lib/crypto.ts,
+#     lib/security/**) — gate fails if score drops below the break
+#     threshold defined in stryker.config.mjs.
+#   - Weekly cron — catches drift in equivalent-mutant classification
+#     (e.g. Stryker version bumps that surface previously-hidden mutants).
+#   - Manual dispatch — for ad-hoc verification.
+#
+# Outputs:
+#   - HTML report uploaded as a GitHub artifact for forensics.
+#   - JSON report uploaded for the dashboard reporter (off by default).
+# ────────────────────────────────────────────────────────────────────────────
+
+on:
+  pull_request:
+    paths:
+      - 'lib/crypto.ts'
+      - 'lib/security/**'
+      - 'tests/unit/lib/crypto.test.ts'
+      - 'tests/unit/lib/security-*.test.ts'
+      - 'tests/unit/api/csp-report.test.ts'
+      - 'stryker.config.mjs'
+      - 'vitest.stryker.config.ts'
+      - '.github/workflows/mutation-test.yml'
+  schedule:
+    # Every Monday at 06:00 UTC (03:00 BRT) — before the work week
+    # starts so any failure is on the on-call's plate before the day.
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stryker:
+    name: Stryker (security surface)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Stryker
+        env:
+          # Stryker dashboard publishing is opt-in. Leaving these unset
+          # disables the dashboard reporter without failing the run.
+          STRYKER_DASHBOARD_PROJECT: ''
+          STRYKER_DASHBOARD_VERSION: ${{ github.ref_name }}
+          # Surface the mutation score in the runner log even when the
+          # default reporter trims it.
+          FORCE_COLOR: '1'
+        run: npm run test:mutation
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: stryker-html-report
+          path: reports/mutation/
+          retention-days: 30
+
+      - name: Summarise mutation score in step summary
+        if: always()
+        run: |
+          set -euo pipefail
+          REPORT=reports/mutation/mutation.json
+          if [ ! -f "$REPORT" ]; then
+            echo "No mutation report found." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          node -e '
+            const r = require("./reports/mutation/mutation.json");
+            const totals = { killed: 0, survived: 0, timeout: 0, noCov: 0, total: 0 };
+            const perFile = [];
+            for (const [file, info] of Object.entries(r.files)) {
+              const c = { killed:0, survived:0, timeout:0, noCov:0, total: info.mutants.length };
+              for (const m of info.mutants) {
+                if (m.status === "Killed") c.killed++;
+                else if (m.status === "Survived") c.survived++;
+                else if (m.status === "Timeout") c.timeout++;
+                else if (m.status === "NoCoverage") c.noCov++;
+              }
+              const score = c.total ? ((c.killed + c.timeout) / c.total * 100).toFixed(2) : "n/a";
+              perFile.push({ file, score, ...c });
+              totals.killed += c.killed;
+              totals.survived += c.survived;
+              totals.timeout += c.timeout;
+              totals.noCov += c.noCov;
+              totals.total += c.total;
+            }
+            const overall = ((totals.killed + totals.timeout) / totals.total * 100).toFixed(2);
+            let md = `## Mutation Testing — Security Surface\n\n`;
+            md += `**Overall mutation score: ${overall} %** ` +
+                  `(killed=${totals.killed}, survived=${totals.survived}, ` +
+                  `timeout=${totals.timeout}, no-cov=${totals.noCov}, ` +
+                  `total=${totals.total})\n\n`;
+            md += `| File | Score | Killed | Survived | Timeout | No-cov |\n`;
+            md += `|------|------:|-------:|---------:|--------:|-------:|\n`;
+            for (const p of perFile.sort((a,b)=>a.file.localeCompare(b.file))) {
+              md += `| \`${p.file}\` | ${p.score} % | ${p.killed} | ${p.survived} | ${p.timeout} | ${p.noCov} |\n`;
+            }
+            md += `\n_Break threshold: 84 %. Low: 85 %. High: 90 %._\n`;
+            md += `\nFull HTML report attached as workflow artifact ` +
+                  `\`stryker-html-report\` (30-day retention).\n`;
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
+          '

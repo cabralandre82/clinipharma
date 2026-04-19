@@ -51,6 +51,8 @@ const eslintConfig = [
       "next-env.d.ts",
       "tests/load/**",
       "public/**",
+      "reports/mutation/**",
+      ".stryker-tmp/**",
     ],
   },
 ];

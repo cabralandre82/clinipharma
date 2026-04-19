@@ -38,6 +38,11 @@ yarn-error.log*
 # Vercel
 .vercel
 
+# Stryker mutation testing
+.stryker-tmp/
+reports/mutation/
+stryker.log
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
