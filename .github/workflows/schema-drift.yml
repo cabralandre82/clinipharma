@@ -93,13 +93,24 @@ jobs:
 
           -- Supabase installs every extension into the `extensions`
           -- schema (see their `_supabase` setup). Migration 055 calls
-          -- `extensions.digest(...)`, which is pgcrypto. We mirror the
-          -- placement so the qualified call resolves.
+          -- `extensions.digest(...)` (qualified) and migration 014 calls
+          -- `gen_random_bytes(32)` (unqualified), so we both:
+          --   1. Place extensions in `extensions` schema, and
+          --   2. Add `extensions` to search_path for the database/role.
           CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA extensions;
           CREATE EXTENSION IF NOT EXISTS pgcrypto SCHEMA extensions;
           CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA extensions;
           CREATE EXTENSION IF NOT EXISTS btree_gin SCHEMA extensions;
           CREATE EXTENSION IF NOT EXISTS btree_gist SCHEMA extensions;
+
+          -- Mirror Supabase's runtime search_path so unqualified calls to
+          -- pgcrypto/uuid-ossp/etc. functions resolve. ALTER DATABASE
+          -- requires a reconnect, but ALTER ROLE applies on next session;
+          -- we set both for belt-and-braces and reset our own session
+          -- search_path explicitly below.
+          ALTER DATABASE drift_check SET search_path = "$user", public, extensions;
+          ALTER ROLE postgres SET search_path = "$user", public, extensions;
+          SET search_path = "$user", public, extensions;
 
           -- Stub the auth helper functions our policies reference. We
           -- never INVOKE them in this job (no rows are inserted), but
