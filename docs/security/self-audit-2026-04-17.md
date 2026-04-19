@@ -45,6 +45,8 @@
 
 **Ação tomada:** documentado e aceito o risco residual. As 8 lows são da cadeia transitiva do `firebase-admin` cujo upgrade-fix indicado pelo `npm audit` (`firebase-admin@10.3.0`) é, na verdade, **regressão** (versão mais antiga que a atual `>=11`); o aviso parece ser um falso positivo de heurística do registry. Os 3 moderates só afetam o dev server e não chegam à imagem de produção (Vercel).
 
+**Re-avaliação (2026-04-18):** o alert #7 do Dependabot (`@tootallnate/once` < 3.0.1, CVE-2026-3449) foi formalmente avaliado e dismissado como `tolerable_risk`. Análise completa de exploitability, mitigações compensatórias e gatilhos de re-revisão em [`known-acceptable-vulns.md`](./known-acceptable-vulns.md#vuln-001--tootallnateonce--301-cve-2026-3449). Próxima revisão: **2026-07-17**.
+
 **Próxima ação:** monitorar releases do `firebase-admin` para upgrade quando o GHSA-vpq2-c234-7xj6 for corrigido upstream sem regressão.
 
 ---
