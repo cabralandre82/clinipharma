@@ -18,9 +18,9 @@ export default function TermsPage() {
   return (
     <LegalLayout
       title="Termos de Uso"
-      version="1.0"
+      version="1.1"
       effectiveDate="08 de abril de 2026"
-      updatedDate="08 de abril de 2026"
+      updatedDate="17 de abril de 2026"
     >
       <Highlight>
         Leia este documento com atenção. Ao acessar ou utilizar a Clinipharma, você declara ter
@@ -301,16 +301,22 @@ export default function TermsPage() {
         </Sub>
 
         <Sub title="11.3 Rescisão pela Clinipharma">
-          <P>Podemos suspender ou encerrar seu acesso, com ou sem aviso prévio, em caso de:</P>
+          <P>
+            Podemos suspender ou encerrar seu acesso, observado contraditório prévio quando cabível,
+            nas seguintes hipóteses:
+          </P>
           <UL
             items={[
-              'Violação destes Termos ou da Política de Privacidade',
-              'Inadimplemento financeiro não regularizado em 15 dias',
-              'Cassação, suspensão ou expiração de licenças regulatórias (AFE, CRM, CNES, CRF)',
-              'Determinação de autoridade competente (ANVISA, Vigilância Sanitária, Poder Judiciário)',
-              'Conduta que coloque em risco a segurança da plataforma ou de outros usuários',
+              'Suspensão imediata, sem prévio aviso, em caso de: (i) cassação ou suspensão de licença regulatória por autoridade competente (AFE, CRM, CNES, CRF); (ii) determinação direta de autoridade competente (ANVISA, Vigilância Sanitária, Poder Judiciário, ANPD); (iii) conduta que coloque em risco iminente a segurança da plataforma, de outros usuários ou de pacientes; (iv) indícios concretos de fraude, falsificação documental ou crime contra a saúde pública',
+              'Suspensão precedida de notificação com prazo de 10 (dez) dias úteis para regularização em caso de: (i) violação destes Termos ou da Política de Privacidade que admita correção; (ii) inadimplemento financeiro; (iii) expiração administrativa de licença regulatória sem cassação (período de renovação)',
+              'Encerramento definitivo (rescisão) após reincidência ou descumprimento do prazo de regularização',
             ]}
           />
+          <P>
+            Em todas as hipóteses, será assegurado ao Usuário acesso aos seus próprios dados pelo
+            prazo necessário ao cumprimento de obrigações legais regulatórias e ao exercício do
+            contraditório, observada a Política de Privacidade.
+          </P>
         </Sub>
 
         <Sub title="11.4 Efeitos da rescisão">
@@ -367,20 +373,34 @@ export default function TermsPage() {
 
         <Sub title="14.2 Foro">
           <P>
-            As partes elegem o <strong>Foro da Comarca de São Paulo/SP</strong>, com renúncia
-            expressa a qualquer outro, por mais privilegiado que seja, para dirimir quaisquer
-            controvérsias oriundas destes Termos.
+            As partes elegem o{' '}
+            <strong>Foro da Circunscrição Especial Judiciária de Brasília-DF</strong> para dirimir
+            quaisquer controvérsias oriundas destes Termos, com renúncia expressa a qualquer outro,
+            por mais privilegiado que seja, <strong>ressalvada</strong> (i) a competência da ANPD
+            para apuração de infrações à LGPD; e (ii) o direito do Usuário hipossuficiente, quando
+            aplicável o Código de Defesa do Consumidor, de propor a ação no foro de seu próprio
+            domicílio (CDC, Art. 101, I; CPC, Art. 63, §3º).
           </P>
         </Sub>
 
-        <Sub title="14.3 Independência das cláusulas">
+        <Sub title="14.3 Assinatura eletrônica e validade jurídica">
+          <P>
+            Estes Termos vinculam o Usuário a partir do aceite eletrônico realizado no momento do
+            cadastro ou do login (Lei nº 14.063/2020, Art. 4º — assinatura eletrônica simples) e,
+            para os contratos específicos celebrados via Clicksign (DPAs, Contrato de Adesão,
+            Contrato de Consultoria), por meio de assinatura eletrônica avançada nos termos do{' '}
+            <strong>Art. 5º da Lei nº 14.063/2020</strong> e do Art. 10, §2º, da MP 2.200-2/2001.
+          </P>
+        </Sub>
+
+        <Sub title="14.4 Independência das cláusulas">
           <P>
             Se qualquer disposição destes Termos for considerada inválida ou inaplicável, as demais
             disposições permanecerão em pleno vigor e efeito.
           </P>
         </Sub>
 
-        <Sub title="14.4 Acordo integral">
+        <Sub title="14.5 Acordo integral">
           <P>
             Estes Termos, em conjunto com a Política de Privacidade e quaisquer adendos específicos
             celebrados entre as partes, constituem o acordo integral entre a Clinipharma e o
@@ -388,10 +408,20 @@ export default function TermsPage() {
           </P>
         </Sub>
 
-        <Sub title="14.5 Renúncia">
+        <Sub title="14.6 Renúncia">
           <P>
             A falha da Clinipharma em exigir o cumprimento de qualquer disposição destes Termos não
             constitui renúncia a esse direito para o futuro.
+          </P>
+        </Sub>
+
+        <Sub title="14.7 Equilíbrio econômico-regulatório (hardship)">
+          <P>
+            Na hipótese de mudança regulatória superveniente (LGPD, ANPD, ANVISA, Receita Federal,
+            CFM, CFF) que torne a execução destes Termos excessivamente onerosa para qualquer das
+            partes, será assegurada a renegociação de boa-fé pelo prazo de até 60 (sessenta) dias.
+            Não havendo consenso, poderá qualquer das partes resolver o vínculo sem ônus, observados
+            os arts. 478 a 480 do Código Civil e o princípio da boa-fé objetiva (CC Art. 422).
           </P>
         </Sub>
       </Section>
@@ -409,10 +439,26 @@ export default function TermsPage() {
       </Section>
 
       <div className="mt-8 border-t pt-6 text-xs text-slate-400">
-        Clinipharma — Termos de Uso v1.0 · Vigência: 08/04/2026 · Referências: Código Civil (Lei nº
-        10.406/2002), CDC (Lei nº 8.078/1990), LGPD (Lei nº 13.709/2018), Lei nº 9.610/1998
-        (Direitos Autorais), Lei nº 9.279/1996 (Propriedade Industrial), RDC ANVISA nº 67/2007, RDC
-        ANVISA nº 204/2017, Lei nº 5.991/1973, Portaria SVS/MS nº 344/1998.
+        <p>
+          Clinipharma — Termos de Uso v1.1 · Vigência original: 08/04/2026 · Última atualização:
+          17/04/2026.
+        </p>
+        <p className="mt-2">
+          <strong>Referências normativas:</strong> Código Civil (Lei nº 10.406/2002, em especial
+          arts. 422-424, 478-480 e 402-403), Código de Processo Civil (Lei nº 13.105/2015, art. 63),
+          CDC (Lei nº 8.078/1990, em hipóteses subsidiárias), LGPD (Lei nº 13.709/2018), Lei nº
+          14.063/2020 (assinaturas eletrônicas), MP 2.200-2/2001 (ICP-Brasil), Marco Civil da
+          Internet (Lei nº 12.965/2014), Lei nº 9.610/1998 (Direitos Autorais), Lei nº 9.279/1996
+          (Propriedade Industrial), RDC ANVISA nº 67/2007, RDC ANVISA nº 20/2011, RDC ANVISA nº
+          204/2017, Lei nº 5.991/1973, Portaria SVS/MS nº 344/1998, Resolução CFM nº 1.931/2009.
+        </p>
+        <p className="mt-2">
+          <strong>Histórico:</strong> v1.1 (17/04/2026) — alinhamento de foro com a sede da
+          Clinipharma (Brasília-DF) e ressalva ao foro do hipossuficiente; prazo de 10 dias úteis
+          para regularização de pendências documentais antes de suspensão; citação expressa da Lei
+          nº 14.063/2020 quanto à validade da assinatura eletrônica avançada via Clicksign; inclusão
+          de cláusula de equilíbrio econômico-regulatório (hardship).
+        </p>
       </div>
     </LegalLayout>
   )

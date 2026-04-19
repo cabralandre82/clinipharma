@@ -2,9 +2,11 @@
 
 ## Clinipharma × Farmácia Parceira
 
-**Versão:** 1.0 — Abril/2026
+**Versão:** 1.2 — 2026-04-17 (achados médios M-03, M-04, M-05, M-07, M-08 incorporados)
+**Versão anterior:** 1.1 — 2026-04-17 (achados críticos C-01 a C-21)
 **Instrumento:** Contrato bilateral com cláusula DPA integrada
-**Assinatura:** Via Clicksign (ICP-Brasil compatível)
+**Assinatura:** Via Clicksign — assinatura eletrônica avançada (Lei nº 14.063/2020, Art. 5º, c/c Art. 10, §2º, MP 2.200-2/2001)
+**URL pública (versão estável):** `clinipharma.com.br/legal/dpa-farmacias?version=1.1`
 
 ---
 
@@ -16,7 +18,7 @@
 
 **CONTRATADA / OPERADORA E CONTROLADORA INDEPENDENTE:**
 
-**[RAZÃO SOCIAL DA FARMÁCIA]**, pessoa jurídica de direito privado, inscrita no CNPJ sob nº **[CNPJ FARMÁCIA]**, com Autorização de Funcionamento (AFE) nº **[AFE]** expedida pela ANVISA, com sede na **SQS 212, Bloco K, Apto 402, Asa Sul, Brasília-DF, CEP 70275-110**, responsável técnico **[NOME DO RT]**, inscrito no CRF/**[UF]** sob nº **[CRF]**, neste ato representada por **[NOME DO REPRESENTANTE LEGAL]**, **[CARGO]**, portador(a) do CPF nº **[CPF]**, doravante denominada simplesmente **"FARMÁCIA"** ou **"OPERADORA"**;
+**[RAZÃO SOCIAL DA FARMÁCIA]**, pessoa jurídica de direito privado, inscrita no CNPJ sob nº **[CNPJ DA FARMÁCIA]**, com Autorização de Funcionamento (AFE) nº **[NÚMERO DA AFE]** expedida pela ANVISA e Alvará Sanitário nº **[NÚMERO]** expedido por **[ÓRGÃO EMISSOR]**, com sede na **[ENDEREÇO COMPLETO DA FARMÁCIA — logradouro, nº, complemento, bairro, município, UF, CEP]**, responsável técnico farmacêutico **[NOME DO RT]**, inscrito no CRF/**[UF]** sob nº **[NÚMERO DO CRF]**, neste ato representada por **[NOME DO REPRESENTANTE LEGAL]**, **[CARGO]**, portador(a) do CPF nº **[CPF]**, doravante denominada simplesmente **"FARMÁCIA"** ou **"OPERADORA"**;
 
 As partes acima qualificadas, em conjunto denominadas **"PARTES"**, celebram o presente **Contrato de Parceria Comercial e Acordo de Tratamento de Dados Pessoais** ("Contrato"), que se regerá pelas cláusulas e condições seguintes.
 
@@ -199,7 +201,7 @@ Para os fins deste Contrato, adotam-se as definições da LGPD (Art. 5º) e as s
 
 8.1. O tratamento de **dados de saúde** constantes de receitas médicas pelas PARTES requer base legal específica conforme Art. 11 da LGPD.
 
-8.2. A CLINIPHARMA trata dados de saúde das receitas com base no **Art. 11, II, "a"** (cumprimento de obrigação legal ou regulatória — ANVISA/Portaria 344/98, que exige a presença e retenção de receita para dispensação de medicamentos de controle especial e antimicrobianos) e **Art. 11, II, "b"** (execução de contrato com o titular ou procedimentos preliminares relacionados a contrato).
+8.2. A CLINIPHARMA trata dados de saúde das receitas com base no **Art. 11, II, "a"** (cumprimento de obrigação legal ou regulatória — ANVISA/Portaria 344/98, que exige a presença e retenção de receita para dispensação de medicamentos de controle especial e antimicrobianos) e no **Art. 11, II, "g"** (tutela da saúde, exclusivamente, em procedimento realizado por profissionais de saúde, serviços de saúde ou autoridade sanitária), atendendo aos requisitos do Art. 11, §4º, LGPD.
 
 8.3. A FARMÁCIA, ao acessar receitas médicas através da Plataforma como **Operadora**, o faz exclusivamente para finalidades descritas na Cláusula 5.1, com base nas mesmas bases legais acima indicadas, sob instrução da CLINIPHARMA.
 
@@ -217,7 +219,13 @@ Para os fins deste Contrato, adotam-se as definições da LGPD (Art. 5º) e as s
 
 **(e)** A FARMÁCIA deve garantir que os dispositivos utilizados para acesso às receitas na Plataforma possuam proteção de tela com bloqueio automático, criptografia de disco e controle de acesso por senha ou biometria.
 
-8.6. Quando a receita médica contiver dados de pacientes menores de 18 (dezoito) anos, as PARTES devem dispensar proteção reforçada nos termos do Art. 14 da LGPD, sem que isso altere as bases legais aplicáveis (obrigação legal ANVISA).
+8.6. Quando a receita médica contiver dados de **crianças** (até 12 anos incompletos, conforme Art. 2º do ECA — Lei nº 8.069/1990) ou de **adolescentes** (12 a 18 anos incompletos), as PARTES devem dispensar proteção reforçada nos termos do Art. 14 da LGPD e da Resolução CD/ANPD nº 4/2023, observado:
+
+**(a)** Para crianças, o consentimento específico e em destaque do pai, da mãe ou do responsável legal (Art. 14, §1º, LGPD) é obtido pela CLÍNICA controladora originária; à FARMÁCIA cabe somente confirmar contratualmente que a CLÍNICA prestou tal informação;
+
+**(b)** Para adolescentes, observa-se o princípio do melhor interesse, sendo o tratamento amparado nas mesmas bases legais aplicáveis a maiores (Art. 11, II, "a" e "g");
+
+**(c)** Em ambos os casos, o tratamento limita-se ao mínimo necessário para a dispensação do medicamento prescrito e não altera as bases legais aplicáveis (obrigação legal ANVISA + tutela da saúde).
 
 ### Cláusula 9ª — Tratamento Automatizado e Inteligência Artificial
 
@@ -229,7 +237,25 @@ Para os fins deste Contrato, adotam-se as definições da LGPD (Art. 5º) e as s
 
 9.2. A FARMÁCIA, em sua condição de Operadora, **não utiliza IA sobre dados de pedidos, receitas ou titulares acessados via Plataforma sem prévia autorização escrita da CLINIPHARMA**.
 
-9.3. Nos termos do Art. 20 da LGPD, os titulares de dados têm direito a solicitar revisão humana de qualquer decisão automatizada que os afete significativamente. A CLINIPHARMA garante esse direito através do canal privacidade@clinipharma.com.br.
+9.3. Nos termos do **Art. 20, caput**, da LGPD, os titulares de dados têm direito a solicitar **revisão humana** de qualquer decisão tomada unicamente com base em tratamento automatizado de dados pessoais que afete seus interesses, incluindo decisões destinadas a definir perfil pessoal, profissional, de consumo e de crédito ou os aspectos da personalidade. Adicionalmente, nos termos do **Art. 20, §1º**, os titulares têm direito a obter **informações claras e adequadas a respeito dos critérios e dos procedimentos** utilizados para a decisão automatizada, observados os segredos comercial e industrial. A CLINIPHARMA garante ambos os direitos através do canal privacidade@clinipharma.com.br, com resposta em até 15 (quinze) dias corridos, e mantém registro auditável dos critérios algorítmicos utilizados, em consonância com a Resolução CD/ANPD nº 11/2024 e diretrizes posteriores da ANPD sobre IA.
+
+### Cláusula 9-A — Dados Anonimizados (LGPD Art. 12)
+
+9-A.1. Nos termos do Art. 12 da LGPD, os dados anonimizados não são considerados dados pessoais e estão fora do alcance protetivo da Lei, salvo se o processo de anonimização puder ser revertido com o emprego de meios próprios e razoáveis.
+
+9-A.2. As PARTES reconhecem que a CLINIPHARMA poderá produzir e utilizar **datasets agregados e anonimizados** derivados dos dados tratados no âmbito desta parceria, exclusivamente para as seguintes finalidades:
+
+**(a)** Melhoria contínua dos produtos e da experiência do usuário;
+
+**(b)** Pesquisa estatística agregada e benchmark de mercado, sem reidentificação individual;
+
+**(c)** Treinamento e validação de modelos internos de prevenção a fraude e segurança;
+
+**(d)** Publicação de relatórios de transparência e relatórios setoriais agregados.
+
+9-A.3. A CLINIPHARMA emprega técnicas de anonimização de estado da arte (k-anonimato com k≥5, supressão de quase-identificadores, perturbação estatística quando necessário) e mantém documentação técnica auditável da metodologia utilizada, disponível à FARMÁCIA mediante solicitação fundamentada.
+
+9-A.4. Nenhum dataset anonimizado é compartilhado com terceiros sem que (i) seja realizada nova avaliação de risco de reidentificação; (ii) sejam impostas restrições contratuais equivalentes ao receptor; (iii) a FARMÁCIA seja informada quando o dataset incluir dados originados em pedidos por ela processados, ressalvado quando a comunicação for incompatível com a finalidade do compartilhamento.
 
 ---
 
@@ -336,6 +362,8 @@ Para os fins deste Contrato, adotam-se as definições da LGPD (Art. 5º) e as s
 
 13.2. A CLINIPHARMA se compromete a notificar a FARMÁCIA com **30 (trinta) dias de antecedência** sobre a inclusão de novos suboperadores, garantindo o direito da FARMÁCIA de se opor fundamentadamente à inclusão.
 
+13.2.1. **(M-04 — Direito de oposição motivada).** No prazo de **15 (quinze) dias corridos** contados da notificação, a FARMÁCIA poderá apresentar oposição motivada ao novo suboperador, indicando objetivamente os riscos identificados (jurídicos, técnicos ou regulatórios). Recebida a oposição, as PARTES envidarão melhores esforços para resolução amigável em até 15 dias adicionais. Não havendo consenso, a FARMÁCIA poderá rescindir este Contrato sem multa nem ônus, na parte afetada, com aviso prévio de 30 dias, mantida a obrigação de pagamento dos serviços já prestados. A inclusão fica suspensa em relação aos dados da FARMÁCIA opositora até a resolução do impasse, exceto quando a inclusão decorrer de exigência legal ou regulatória.
+
 13.3. A FARMÁCIA, como Operadora, poderá contratar **Suboperadores próprios** (listados no Anexo II) somente após autorização escrita prévia da CLINIPHARMA. A contratação deve ser formalizada com cláusulas de proteção de dados equivalentes às deste Contrato.
 
 **(Anexo II — Suboperadores pré-autorizados da FARMÁCIA)**
@@ -344,6 +372,8 @@ Para os fins deste Contrato, adotam-se as definições da LGPD (Art. 5º) e as s
 | --------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------- |
 | Sistema de gestão de farmácia (ERP/LIMS) homologado | Software de manipulação (Imaster, HIS, etc.) | Dados minimizados; contrato com cláusula LGPD              |
 | Servidor de e-mail corporativo                      | Google Workspace, Microsoft 365              | Comunicações internas apenas; sem arquivamento de receitas |
+
+> **(M-02 — Lista nominal por farmácia).** A FARMÁCIA compromete-se a fornecer, no momento do cadastro inicial e a cada alteração relevante, **listagem nominal estruturada** de seus suboperadores efetivamente em uso, em campos pré-definidos pela Plataforma (razão social, CNPJ, finalidade do tratamento, país de armazenamento, salvaguarda contratual). A lista categorial acima funciona apenas como pré-autorização-modelo; a lista nominal por farmácia, mantida atualizada na Plataforma, é o documento vinculante para fins de cadeia de responsabilidade.
 
 ---
 
@@ -424,6 +454,16 @@ Para os fins deste Contrato, adotam-se as definições da LGPD (Art. 5º) e as s
 
 **(i)** A CLINIPHARMA poderá exigir auditoria independente dos sistemas da FARMÁCIA caso o incidente tenha sido originado em seus sistemas, correndo os custos por conta da FARMÁCIA se comprovada sua responsabilidade.
 
+16.2. **(M-08 — Cláusula penal específica para atraso de notificação).** Sem prejuízo da indenização por perdas e danos prevista na Cláusula 18ª, o descumprimento dos prazos de notificação previstos nesta Cláusula 16ª (24 horas inter partes; 72 horas para a ANPD) sujeita a PARTE inadimplente a cláusula penal específica, na forma do art. 408 do Código Civil:
+
+**(a)** Atraso na notificação **inter partes** (Fase 1, alínea "a"): R$ 2.000,00 (dois mil reais) por hora de atraso, a partir da 25ª hora, até o limite de R$ 200.000,00 (duzentos mil reais);
+
+**(b)** Atraso na notificação à **ANPD** (Fase 2, alínea "d"), quando atribuível à PARTE responsável: R$ 5.000,00 (cinco mil reais) por hora de atraso, a partir da 73ª hora contada da ciência inequívoca do incidente, até o limite de R$ 500.000,00 (quinhentos mil reais);
+
+**(c)** Os valores acima são devidos cumulativamente para cada incidente e não excluem a obrigação de indenizar danos materiais ou morais que excedam o teto da cláusula penal (art. 416, parágrafo único, do Código Civil);
+
+**(d)** Restará afastada a cláusula penal quando o atraso decorrer comprovadamente de força maior, caso fortuito ou de necessidade objetiva de investigação prévia (art. 48, §1º, in fine, da LGPD), exigindo-se justificativa formal endereçada à parte afetada e, quando aplicável, à ANPD em até 5 (cinco) dias úteis após a remoção do impedimento.
+
 ---
 
 ## CAPÍTULO XI — AUDITORIA E DEMONSTRAÇÃO DE CONFORMIDADE
@@ -434,18 +474,23 @@ Para os fins deste Contrato, adotam-se as definições da LGPD (Art. 5º) e as s
 
 **(a)** Notificação prévia por escrito com antecedência mínima de **15 (quinze) dias corridos**, exceto em casos de incidente de segurança confirmado;
 
-**(b)** Frequência máxima de 1 (uma) auditoria por ano-calendário, salvo suspeita fundamentada de violação deste Contrato;
+**(b)** Frequência máxima de 1 (uma) auditoria por ano-calendário, salvo na hipótese da Cláusula 17.1.1 (M-03), abaixo;
 
 **(c)** A auditoria limitará seu escopo às atividades de tratamento relacionadas a dados da Plataforma Clinipharma, não abrangendo informações de negócio ou dados de clientes próprios da FARMÁCIA não relacionados à parceria;
 
 **(d)** Os custos da auditoria serão suportados pela CLINIPHARMA, exceto quando os resultados revelarem descumprimento das obrigações da FARMÁCIA, hipótese em que os custos serão suportados por esta.
 
-17.2. A FARMÁCIA deverá manter, e disponibilizar à CLINIPHARMA mediante solicitação, os seguintes registros:
+17.1.1. **(M-03 — Auditoria adicional somente com indícios concretos).** A realização de auditoria adicional, fora da frequência ordinária prevista em "b", depende da apresentação, pela CLINIPHARMA, de **indícios concretos e documentados** de descumprimento deste Contrato ou da legislação aplicável (e não de mera suspeita), garantido à FARMÁCIA o contraditório prévio em até 10 dias corridos para esclarecimentos antes da deflagração da auditoria.
 
-- Lista de usuários com acesso ativo à Plataforma e respectivos papéis;
-- Registro de treinamentos em proteção de dados realizados;
+17.2. A FARMÁCIA deverá manter, e disponibilizar à CLINIPHARMA mediante solicitação, os seguintes registros (M-07 — trilha mínima de evidências):
+
+- Lista de usuários com acesso ativo à Plataforma e respectivos papéis (RBAC);
+- Registro de treinamentos em proteção de dados realizados, com evidência (lista de presença, certificados);
 - Contratos de confidencialidade firmados com colaboradores com acesso à Plataforma;
-- Qualquer incidente de segurança registrado, mesmo que não comunicado à CLINIPHARMA por não ter atingido o limiar de comunicação.
+- Qualquer incidente de segurança registrado, mesmo que não comunicado à CLINIPHARMA por não ter atingido o limiar de comunicação;
+- Resultado da mais recente análise de vulnerabilidade (interna ou externa);
+- Configurações de criptografia em repouso (algoritmo, gestão de chaves) e em trânsito (versão TLS) aplicáveis aos dados da Plataforma;
+- Política interna de gestão de senhas e autenticação multifator (MFA) vigente.
 
 ---
 
@@ -508,19 +553,35 @@ Para os fins deste Contrato, adotam-se as definições da LGPD (Art. 5º) e as s
 
 22.2. A rescisão não exime as PARTES do cumprimento das obrigações já contraídas até a data da efetivação, nem das obrigações de confidencialidade, segurança e retenção, que sobrevivem pelo prazo previsto na Cláusula 2.2.
 
+### Cláusula 22-A — Equilíbrio Econômico-Regulatório (Hardship)
+
+22-A.1. As PARTES reconhecem que este Contrato é executado em ambiente regulatório dinâmico (LGPD, ANPD, ANVISA, CFF, RFB) e que a superveniência de norma, decisão regulatória vinculante ou jurisprudência consolidada que altere materialmente o equilíbrio econômico ou as obrigações operacionais aqui pactuadas pode justificar a renegociação dos seus termos.
+
+22-A.2. Configurada hipótese de onerosidade excessiva nos termos dos arts. 478 a 480 do Código Civil, a PARTE prejudicada notificará a outra, fundamentadamente, e as PARTES envidarão esforços de boa-fé para renegociar as cláusulas afetadas no prazo de até **60 (sessenta) dias corridos**.
+
+22-A.3. Não havendo consenso ao final do prazo previsto em 22-A.2, qualquer das PARTES poderá resolver o vínculo sem ônus, observados os deveres de transição ordenada (descarte de dados, comunicação aos titulares afetados quando aplicável, encerramento de pedidos em curso) previstos neste Contrato.
+
 ### Cláusula 23ª — Lei Aplicável e Foro
 
-23.1. Este Contrato é regido pelas leis da República Federativa do Brasil, especialmente pela Lei nº 13.709/2018 (LGPD), pelo Código Civil (Lei nº 10.406/2002) e pelas normas regulatórias da ANVISA, ANPD e CFF.
+23.1. Este Contrato é regido pelas leis da República Federativa do Brasil, especialmente pela Lei nº 13.709/2018 (LGPD), pelo Código Civil (Lei nº 10.406/2002), pelo Marco Civil da Internet (Lei nº 12.965/2014), pela Lei nº 14.063/2020 (assinatura eletrônica) e pelas normas regulatórias da ANVISA, ANPD e CFF.
 
-23.2. Fica eleito o foro da comarca de **Brasília-DF** para dirimir quaisquer controvérsias decorrentes deste Contrato, com expressa renúncia de qualquer outro, por mais privilegiado que seja, **ressalvada** a competência da ANPD para apuração de infrações à LGPD.
+23.2. Fica eleito o foro da Circunscrição Especial Judiciária de **Brasília-DF** para dirimir quaisquer controvérsias decorrentes deste Contrato, com expressa renúncia de qualquer outro, por mais privilegiado que seja, **ressalvadas** (i) a competência da ANPD para apuração de infrações à LGPD e (ii) a faculdade do hipossuficiente, na hipótese de pessoa natural figurar no polo ativo, de propor a ação no foro de seu domicílio.
 
 23.3. As PARTES comprometem-se a envidar esforços para resolução amigável de eventuais conflitos antes de recorrer ao Poder Judiciário, podendo acionar o DPO da CLINIPHARMA como mediador em questões exclusivamente relacionadas à proteção de dados.
+
+23.4. **(M-05 — Submissão à jurisdição brasileira no tratamento internacional).** As PARTES reconhecem que, mesmo nos casos em que dados pessoais sejam tratados por sub-processadores domiciliados no exterior (Anexo I), o tratamento permanece submetido à jurisdição brasileira por força do art. 3º da LGPD (extraterritorialidade) e do art. 11 do Marco Civil da Internet (Lei nº 12.965/2014). A CLINIPHARMA compromete-se a:
+
+**(a)** Cooperar com autoridades brasileiras (em especial ANPD, Comitê Gestor da Internet — CGI.br, Poder Judiciário) em quaisquer requisições legítimas relativas a dados tratados ao abrigo deste Contrato, inclusive quanto à preservação e ao fornecimento de logs nos termos dos arts. 13 a 15 do Marco Civil da Internet;
+
+**(b)** Manter cópia dos registros de aplicação (logs de acesso, modificação e eliminação) acessíveis a partir do território nacional, ainda que armazenados em infraestrutura internacional;
+
+**(c)** Garantir que os contratos com sub-processadores no exterior contenham (i) cláusulas-padrão de transferência internacional aceitas pela ANPD, (ii) compromisso de cooperação com requisições brasileiras lícitas e (iii) vedação ao fornecimento de dados a autoridades estrangeiras sem ordem judicial brasileira de exequatur, salvo nas hipóteses do art. 33 da LGPD.
 
 ---
 
 ## ASSINATURAS
 
-Por estarem justas e acordadas com todos os termos deste Contrato, as PARTES o assinam eletronicamente via Clicksign, nos termos do Art. 10, §2º, da MP 2.200-2/2001, tendo as assinaturas digitais o mesmo valor jurídico das assinaturas físicas.
+Por estarem justas e acordadas com todos os termos deste Contrato, as PARTES o assinam eletronicamente via Clicksign — provedor de **assinatura eletrônica avançada** com identificação multifatorial — nos termos do **Art. 5º da Lei nº 14.063/2020**, combinado com o Art. 10, §2º, da MP 2.200-2/2001, tendo as assinaturas eletrônicas avançadas plena equivalência probatória às assinaturas físicas, presumindo-se verdadeiras em relação aos signatários (CPC, Art. 411, II).
 
 **Local e data:** **\*\*\*\***\_**\*\*\*\***, **\_ de \*\***\_\_**\*\*** de 20\_\_\_.
 
@@ -564,6 +625,7 @@ _Este contrato é gerado automaticamente pela plataforma Clinipharma e enviado p
 
 ## ANEXO IV — REGISTRO DE ALTERAÇÕES
 
-| Versão | Data       | Descrição      | Responsável        |
-| ------ | ---------- | -------------- | ------------------ |
-| 1.0    | Abril/2026 | Versão inicial | André Cabral (DPO) |
+| Versão | Data       | Descrição                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Responsável        |
+| ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 1.0    | 2026-04    | Versão inicial.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | André Cabral (DPO) |
+| 1.1    | 2026-04-17 | (i) Correção do endereço-template da FARMÁCIA (anteriormente clonado do endereço da Clinipharma); (ii) Substituição da base legal Art. 11, II, "b" pela correta Art. 11, II, "g" (tutela da saúde); (iii) Distinção expressa entre criança e adolescente para Art. 14 LGPD; (iv) Inclusão do direito completo do Art. 20 LGPD (revisão + critérios); (v) Cláusula nova 9-A sobre dados anonimizados (Art. 12); (vi) Cláusula nova 22-A sobre equilíbrio econômico-regulatório (hardship); (vii) Atualização da referência à Lei nº 14.063/2020 quanto à validade da assinatura eletrônica avançada; (viii) Indicação de URL pública versionada. | Diretoria Jurídica |

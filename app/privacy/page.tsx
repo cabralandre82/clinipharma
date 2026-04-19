@@ -18,9 +18,9 @@ export default function PrivacyPage() {
   return (
     <LegalLayout
       title="Política de Privacidade"
-      version="1.0"
+      version="1.2"
       effectiveDate="08 de abril de 2026"
-      updatedDate="08 de abril de 2026"
+      updatedDate="17 de abril de 2026"
     >
       <Highlight>
         Esta Política de Privacidade foi elaborada em conformidade com a Lei Geral de Proteção de
@@ -99,9 +99,11 @@ export default function PrivacyPage() {
         <Warning>
           <strong>Dado sensível:</strong> Informações relacionadas à saúde do paciente eventualmente
           presentes em formulários de manipulação são tratadas com base no Art. 11, II,
-          &ldquo;f&rdquo; da LGPD (tutela da saúde) e ficam acessíveis exclusivamente ao médico
-          prescritor, à farmácia executante e ao paciente, nunca sendo compartilhadas com terceiros
-          para fins comerciais.
+          &ldquo;a&rdquo; (cumprimento de obrigação legal — RDC ANVISA nº 67/2007 e Portaria SVS/MS
+          nº 344/1998) e no Art. 11, II, &ldquo;g&rdquo; da LGPD (tutela da saúde, exclusivamente,
+          em procedimento realizado por profissionais de saúde, serviços de saúde ou autoridade
+          sanitária) e ficam acessíveis exclusivamente ao médico prescritor, à farmácia executante e
+          ao paciente, nunca sendo compartilhadas com terceiros para fins comerciais.
         </Warning>
       </Section>
 
@@ -122,21 +124,44 @@ export default function PrivacyPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {[
-                ['Autenticação e controle de acesso', 'Art. 7º, II — execução de contrato'],
-                ['Processamento de pedidos e pagamentos', 'Art. 7º, II — execução de contrato'],
-                ['Emissão de NF-e/NFS-e', 'Art. 7º, II e V — obrigação legal'],
-                ['Contratos digitais (Clicksign)', 'Art. 7º, II — execução de contrato'],
-                ['Verificação de CNPJ e situação fiscal', 'Art. 7º, V — obrigação legal'],
-                ['Compliance regulatório ANVISA/CFF', 'Art. 7º, II e V — obrigação legal'],
-                ['Notificações transacionais (e-mail, SMS)', 'Art. 7º, II — execução de contrato'],
-                ['Suporte ao usuário e gestão de tickets', 'Art. 7º, II — execução de contrato'],
+                ['Autenticação e controle de acesso', 'Art. 7º, V — execução de contrato'],
+                ['Processamento de pedidos e pagamentos', 'Art. 7º, V — execução de contrato'],
+                [
+                  'Emissão de NF-e/NFS-e e escrituração fiscal',
+                  'Art. 7º, II — cumprimento de obrigação legal/regulatória',
+                ],
+                ['Contratos digitais (Clicksign)', 'Art. 7º, V — execução de contrato'],
+                [
+                  'Verificação de CNPJ e situação cadastral',
+                  'Art. 7º, V — execução de contrato (procedimento preliminar); Art. 7º, IX — legítimo interesse de prevenção a fraude',
+                ],
+                [
+                  'Compliance regulatório ANVISA/CFF',
+                  'Art. 7º, II — cumprimento de obrigação legal/regulatória',
+                ],
+                ['Notificações transacionais (e-mail, SMS)', 'Art. 7º, V — execução de contrato'],
+                ['Suporte ao usuário e gestão de tickets', 'Art. 7º, V — execução de contrato'],
                 [
                   'Auditoria e logs de acesso',
-                  'Art. 7º, V — obrigação legal; Art. 7º, IX — legítimo interesse',
+                  'Art. 7º, II — obrigação legal (Marco Civil da Internet, Art. 15); Art. 7º, IX — legítimo interesse de segurança',
                 ],
-                ['Análise de desempenho da plataforma', 'Art. 7º, IX — legítimo interesse'],
+                [
+                  'Análise de desempenho da plataforma (dados agregados)',
+                  'Art. 7º, IX — legítimo interesse',
+                ],
                 ['Prevenção a fraudes', 'Art. 7º, IX — legítimo interesse'],
-                ['LGPD: atendimento aos direitos do titular', 'Art. 7º, V — obrigação legal'],
+                [
+                  'Atendimento aos direitos do titular (LGPD)',
+                  'Art. 7º, II — cumprimento de obrigação legal/regulatória',
+                ],
+                [
+                  'Tratamento de dados de saúde em receitas (cocontrole com a clínica)',
+                  'Art. 11, II, "a" — obrigação legal (ANVISA); Art. 11, II, "g" — tutela da saúde',
+                ],
+                [
+                  'Datasets anonimizados para pesquisa, segurança e produto',
+                  'Art. 12 — dados anonimizados não estão sujeitos à LGPD',
+                ],
               ].map(([fin, base], i) => (
                 <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
                   <td className="px-3 py-2 text-slate-700">{fin}</td>
@@ -155,28 +180,106 @@ export default function PrivacyPage() {
       </Section>
 
       {/* 4 */}
-      <Section title="4. Compartilhamento de Dados">
+      <Section title="4. Compartilhamento de Dados (Operadores e Suboperadores)">
         <P>
           Compartilhamos dados estritamente na medida necessária para a prestação dos serviços, com
-          os seguintes operadores e terceiros:
+          os seguintes operadores e suboperadores. Esta lista é a fonte única de verdade e está
+          alinhada com os Acordos de Tratamento de Dados (DPAs) celebrados com clínicas e farmácias
+          parceiras:
         </P>
-        <UL
-          items={[
-            'Asaas Pagamentos S.A. — processamento de cobranças e split de pagamentos (PCI DSS)',
-            'Clicksign Gestão de Documentos S.A. — assinatura eletrônica com validade jurídica (ICP-Brasil)',
-            'Supabase Inc. — banco de dados e autenticação (servidores na região São Paulo / us-east-1, com DPA assinado)',
-            'Vercel Inc. — hospedagem e CDN (infraestrutura serverless, DPA assinado)',
-            'Resend Inc. — envio de e-mails transacionais',
-            'Twilio Inc. — envio de SMS transacionais',
-            'Inngest Inc. — processamento de jobs assíncronos (background tasks)',
-            'ReceitaWS — consulta de situação cadastral de CNPJs (dados públicos)',
-            'Autoridades públicas — mediante ordem judicial ou regulatória (ANVISA, Receita Federal, CFF)',
-          ]}
-        />
+        <div className="mt-3 overflow-hidden rounded-lg border">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b bg-slate-50 font-semibold text-slate-600">
+                <th className="px-3 py-2 text-left">Operador</th>
+                <th className="px-3 py-2 text-left">País-sede</th>
+                <th className="px-3 py-2 text-left">Finalidade</th>
+                <th className="px-3 py-2 text-left">Instrumento</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {[
+                [
+                  'Supabase Inc.',
+                  'EUA',
+                  'Banco de dados PostgreSQL e autenticação',
+                  'DPA Supabase + Cláusulas Contratuais Padrão',
+                ],
+                ['Vercel Inc.', 'EUA', 'Hospedagem e edge runtime', 'DPA Vercel'],
+                ['Cloudflare Inc.', 'EUA', 'CDN, DNS e proteção contra ataques', 'DPA Cloudflare'],
+                [
+                  'Asaas Pagamentos S.A.',
+                  'Brasil',
+                  'Gateway de pagamento (PCI DSS Level 1) e split',
+                  'Contrato bilateral Asaas',
+                ],
+                [
+                  'Clicksign Gestão de Documentos S.A.',
+                  'Brasil',
+                  'Assinatura eletrônica avançada (Lei 14.063/2020, Art. 5º)',
+                  'Contrato bilateral Clicksign',
+                ],
+                ['Resend Inc.', 'EUA', 'E-mail transacional', 'DPA Resend'],
+                [
+                  'Zenvia Mobile Serviços Digitais S.A.',
+                  'Brasil',
+                  'SMS e WhatsApp transacionais',
+                  'Contrato bilateral Zenvia',
+                ],
+                [
+                  'Google LLC (Firebase Cloud Messaging)',
+                  'EUA',
+                  'Push notifications (token FCM)',
+                  'DPA Google Cloud',
+                ],
+                [
+                  'OpenAI LLC',
+                  'EUA',
+                  'OCR de documentos cadastrais e (sob demanda) receitas; classificação de tickets',
+                  'DPA OpenAI — zero data retention via API',
+                ],
+                ['Inngest Inc.', 'EUA', 'Orquestração de jobs assíncronos', 'DPA Inngest'],
+                [
+                  'Sentry (Functional Software Inc.)',
+                  'EUA',
+                  'Monitoramento de erros (sem PII no payload)',
+                  'DPA Sentry',
+                ],
+                [
+                  'Nuvem Fiscal',
+                  'Brasil',
+                  'Emissão de NF-e/NFS-e',
+                  'Contrato bilateral Nuvem Fiscal',
+                ],
+                [
+                  'ReceitaWS / SerproWS',
+                  'Brasil',
+                  'Consulta de situação cadastral de CNPJ (dados públicos da Receita Federal)',
+                  'Termos de uso públicos',
+                ],
+                [
+                  'Autoridades públicas (ANPD, ANVISA, RFB, CFF, Poder Judiciário)',
+                  'Brasil',
+                  'Cumprimento de ordem judicial, requisição regulatória ou obrigação legal',
+                  'LGPD Art. 7º, II e VI',
+                ],
+              ].map(([op, pais, fin, inst], i) => (
+                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                  <td className="px-3 py-2 font-medium text-slate-700">{op}</td>
+                  <td className="px-3 py-2 text-slate-600">{pais}</td>
+                  <td className="px-3 py-2 text-slate-600">{fin}</td>
+                  <td className="px-3 py-2 text-slate-500">{inst}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <P>
-          Todos os operadores são contratualmente obrigados a tratar dados pessoais exclusivamente
-          conforme nossas instruções, manter medidas de segurança adequadas e não subcontratarem
-          terceiros sem nossa autorização prévia por escrito.
+          Todos os operadores e suboperadores são contratualmente obrigados a tratar dados pessoais
+          exclusivamente conforme nossas instruções, manter medidas de segurança adequadas e não
+          subcontratarem terceiros sem nossa autorização prévia por escrito. A inclusão de novo
+          suboperador é comunicada às clínicas e farmácias parceiras com antecedência mínima de{' '}
+          <strong>30 (trinta) dias corridos</strong>, com direito de oposição motivada.
         </P>
       </Section>
 
@@ -254,13 +357,16 @@ export default function PrivacyPage() {
           items={[
             'Criptografia em trânsito: TLS 1.3 em todas as conexões',
             'Criptografia em repouso: AES-256-GCM para dados sensíveis (telefone, CRM, formulários)',
-            'Autenticação: JWT com expiração curta + blacklist de tokens revogados',
-            'Controle de acesso: RBAC granular com Row Level Security (RLS) no banco de dados',
-            'Auditoria: log imutável de todas as ações críticas com X-Request-ID rastreável',
+            'Autenticação: JWT com expiração curta + blacklist de tokens revogados; sessões revogadas imediatamente em caso de desativação ou suspeita de comprometimento',
+            'Controle de acesso: RBAC granular com Row Level Security (RLS) no banco de dados — cada entidade acessa apenas seus dados',
+            'Auditoria: log imutável de todas as ações críticas com X-Request-ID rastreável; retenção de 5 anos (10 anos para registros financeiros)',
             'Rate limiting: por IP e por usuário em todos os endpoints da API',
-            'Monitoramento: alertas de anomalia via Sentry e UptimeRobot',
-            'Backups: automáticos pelo Supabase com retenção configurável',
-            'Política de senha: mínimo 8 caracteres com reset seguro',
+            'Circuit breaker em integrações externas (Resend, Zenvia, OpenAI, Asaas, Clicksign)',
+            'Monitoramento: alertas de anomalia via Sentry e UptimeRobot; deep health probe contínuo',
+            'Backups automáticos com point-in-time recovery e ledger criptográfico de integridade',
+            'Política de senha: mínimo 12 caracteres com complexidade (maiúsculas, minúsculas, números e símbolos); troca obrigatória em caso de suspeita de comprometimento',
+            'MFA disponível para todos os usuários e exigido para perfis com acesso a dados sensíveis',
+            'Rotação automatizada de segredos críticos com ledger encadeado (hash chain SHA-256)',
           ]}
         />
         <P>
@@ -278,16 +384,18 @@ export default function PrivacyPage() {
         </P>
         <UL
           items={[
-            'Confirmação — saber se tratamos seus dados pessoais',
-            'Acesso — obter cópia dos dados que mantemos sobre você',
-            'Correção — solicitar atualização de dados incompletos, inexatos ou desatualizados',
-            'Anonimização, bloqueio ou eliminação — de dados desnecessários ou tratados em desconformidade',
-            'Portabilidade — receber seus dados em formato estruturado e interoperável',
-            'Eliminação — dos dados tratados com base em consentimento',
-            'Informação sobre compartilhamento — saber com quem compartilhamos seus dados',
-            'Revogação do consentimento — quando o tratamento for baseado em consentimento',
-            'Oposição — ao tratamento baseado em legítimo interesse',
-            'Revisão de decisões automatizadas — solicitar revisão humana',
+            'Confirmação da existência de tratamento (Art. 18, I)',
+            'Acesso — obter cópia dos dados que mantemos sobre você (Art. 18, II)',
+            'Correção de dados incompletos, inexatos ou desatualizados (Art. 18, III)',
+            'Anonimização, bloqueio ou eliminação de dados desnecessários, excessivos ou tratados em desconformidade (Art. 18, IV)',
+            'Portabilidade dos dados a outro fornecedor de serviço, em formato estruturado e interoperável (Art. 18, V)',
+            'Eliminação dos dados tratados com base em consentimento, ressalvadas as hipóteses do Art. 16 (Art. 18, VI)',
+            'Informação sobre as entidades públicas e privadas com as quais o controlador realizou uso compartilhado (Art. 18, VII)',
+            'Informação sobre a possibilidade de não fornecer consentimento e suas consequências (Art. 18, VIII)',
+            'Revogação do consentimento, quando o tratamento for baseado nesta hipótese (Art. 18, IX)',
+            'Oposição ao tratamento realizado com fundamento em uma das hipóteses de dispensa de consentimento, em caso de descumprimento da LGPD (Art. 18, §2º)',
+            'Revisão de decisões automatizadas que afetem seus interesses (Art. 20, caput)',
+            'Informação clara e adequada sobre os critérios e procedimentos utilizados para a decisão automatizada (Art. 20, §1º)',
           ]}
         />
         <Highlight>
@@ -314,12 +422,90 @@ export default function PrivacyPage() {
       </Section>
 
       {/* 10 */}
-      <Section title="10. Dados de Menores de Idade">
+      <Section title="10. Crianças e Adolescentes (LGPD Art. 14)">
         <P>
           A Clinipharma é uma plataforma exclusivamente <strong>B2B</strong>, destinada a pessoas
-          jurídicas e profissionais de saúde devidamente habilitados. Não coletamos dados de pessoas
-          menores de 18 anos de forma intencional. Caso identifiquemos tal coleta acidental,
-          eliminaremos os dados imediatamente.
+          jurídicas e profissionais de saúde devidamente habilitados.{' '}
+          <strong>
+            Não coletamos dados de crianças (menores de 12 anos) ou de adolescentes (12 a 18 anos
+            incompletos) de forma direta.
+          </strong>
+        </P>
+        <P>
+          Eventualmente, dados de crianças ou adolescentes podem constar de receitas médicas
+          inseridas pelas clínicas parceiras. Nesses casos:
+        </P>
+        <UL
+          items={[
+            'Para crianças (até 12 anos incompletos), o tratamento ocorre com consentimento específico e em destaque do pai, da mãe ou do responsável legal, obtido pela clínica controladora originária, conforme Art. 14, §1º, LGPD;',
+            'Para adolescentes (12 a 18 anos incompletos), o tratamento observa o princípio do melhor interesse e o regime previsto na Resolução CD/ANPD nº 4/2023;',
+            'Em ambos os casos, aplicam-se as bases legais do Art. 11, II, "a" (obrigação legal — ANVISA) e "g" (tutela da saúde) e as salvaguardas reforçadas previstas nos DPAs com as clínicas.',
+          ]}
+        />
+      </Section>
+
+      {/* 10A */}
+      <Section title="10A. Pacientes (não-usuários da plataforma)">
+        <P>
+          Pacientes cujos dados constam em receitas médicas inseridas pelas clínicas{' '}
+          <strong>não possuem relação contratual direta com a Clinipharma</strong>. A clínica que
+          atendeu o paciente é a <strong>controladora originária</strong> e o ponto de contato
+          primário para exercício de direitos. A Clinipharma atua como{' '}
+          <strong>cocontroladora</strong> apenas para os fins estritamente necessários à
+          intermediação tecnológica entre clínica e farmácia.
+        </P>
+        <Sub title="Direitos do paciente">
+          <P>
+            Mesmo sem relação contratual direta, o paciente pode exercer{' '}
+            <strong>todos os direitos previstos no art. 18 da LGPD</strong> (confirmação, acesso,
+            correção, anonimização, eliminação, portabilidade, informação sobre compartilhamento,
+            revogação de consentimento e oposição) por dois caminhos:
+          </P>
+          <UL
+            items={[
+              'Canal primário (recomendado): contatar a clínica que originou o atendimento, indicada na receita ou no documento de origem.',
+              'Canal direto à Clinipharma: privacidade@clinipharma.com.br ou dpo@clinipharma.com.br — encaminharemos à clínica controladora e cooperaremos para resposta em até 15 dias corridos (LGPD art. 19, II).',
+              'Canal de denúncia: titulares também podem peticionar diretamente à ANPD (gov.br/anpd) caso entendam que seus direitos não foram atendidos.',
+            ]}
+          />
+        </Sub>
+        <Sub title="Como identificar a clínica controladora">
+          <P>
+            Caso o paciente não disponha do contato direto da clínica, basta nos enviar dados
+            mínimos (nome, e-mail e, se possível, data aproximada da prescrição); identificaremos a
+            clínica controladora e faremos a ponte, sem expor dados sensíveis adicionais a
+            terceiros.
+          </P>
+        </Sub>
+        <Sub title="Decisões automatizadas">
+          <P>
+            O paciente tem direito a <strong>revisão humana</strong> de decisões automatizadas que o
+            afetem (LGPD art. 20), inclusive nas hipóteses em que a Clinipharma utilize OCR/IA no
+            tratamento de receitas — caso disponível e ativado pela clínica.
+          </P>
+        </Sub>
+      </Section>
+
+      {/* 10B */}
+      <Section title="10B. Dados Anonimizados (LGPD Art. 12)">
+        <P>
+          Conforme o Art. 12 da LGPD, dados anonimizados não são considerados dados pessoais.
+          Podemos produzir e utilizar <strong>datasets agregados e anonimizados</strong> derivados
+          dos dados que tratamos, exclusivamente para finalidades de:
+        </P>
+        <UL
+          items={[
+            'Melhoria contínua dos produtos e da experiência do usuário',
+            'Pesquisa estatística agregada e benchmark de mercado (sem reidentificação)',
+            'Treinamento e validação de modelos internos de prevenção a fraude e segurança',
+            'Publicação de relatórios de transparência e relatórios setoriais agregados',
+          ]}
+        />
+        <P>
+          Os datasets anonimizados <strong>não podem ser revertidos</strong> para identificação dos
+          titulares. Caso a anonimização seja revertida ou se demonstrar reversível, o conjunto
+          retorna ao regime de dados pessoais e às regras desta Política. O titular pode solicitar
+          informações sobre a metodologia de anonimização adotada nos termos do Art. 12, §3º, LGPD.
         </P>
       </Section>
 
@@ -354,9 +540,29 @@ export default function PrivacyPage() {
       </Section>
 
       <div className="mt-8 border-t pt-6 text-xs text-slate-400">
-        Clinipharma — Política de Privacidade v1.0 · Vigência: 08/04/2026 · Referências: LGPD (Lei
-        nº 13.709/2018), Marco Civil da Internet (Lei nº 12.965/2014), RDC ANVISA nº 67/2007, RDC
-        ANVISA nº 204/2017, Código Civil Brasileiro, Lei nº 9.613/1998.
+        <p>
+          Clinipharma — Política de Privacidade v1.2 · Vigência original: 08/04/2026 · Última
+          atualização: 17/04/2026 (M-06: ampliação da seção de pacientes não-usuários).
+        </p>
+        <p className="mt-2">
+          <strong>Referências normativas:</strong> LGPD (Lei nº 13.709/2018), Resolução CD/ANPD nº
+          2/2022 (RIPD e RAT), Resolução CD/ANPD nº 4/2023 (sanções), Marco Civil da Internet (Lei
+          nº 12.965/2014), Lei nº 14.063/2020 (assinaturas eletrônicas), MP 2.200-2/2001
+          (ICP-Brasil), RDC ANVISA nº 67/2007, RDC ANVISA nº 20/2011, RDC ANVISA nº 204/2017,
+          Portaria SVS/MS nº 344/1998, Resolução CFM nº 1.821/2007, Código Civil (Lei nº
+          10.406/2002), Código de Defesa do Consumidor (Lei nº 8.078/1990, em hipóteses
+          subsidiárias), Lei nº 9.613/1998 (PLD), Estatuto da Criança e do Adolescente (Lei nº
+          8.069/1990).
+        </p>
+        <p className="mt-2">
+          <strong>Histórico:</strong> v1.1 (17/04/2026) — correção das bases legais do Art. 7º LGPD;
+          correção da citação do Art. 11, II, &ldquo;g&rdquo; (tutela da saúde); alinhamento da
+          lista de operadores com os DPAs vigentes (substituição de Twilio por Zenvia; inclusão de
+          Cloudflare, OpenAI, Sentry, Inngest, Firebase, Asaas e Nuvem Fiscal); senha mínima de 12
+          caracteres; inclusão do direito completo do Art. 20 LGPD (revisão e explicação de
+          critérios); seção específica para crianças e adolescentes (Art. 14); seção específica para
+          pacientes (não-titulares contratuais); seção sobre dados anonimizados (Art. 12).
+        </p>
       </div>
     </LegalLayout>
   )

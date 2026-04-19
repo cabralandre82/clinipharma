@@ -2,9 +2,11 @@
 
 ## Clinipharma × Clínica Parceira
 
-**Versão:** 1.0 — Abril/2026
+**Versão:** 1.2 — 2026-04-17 (achados médios M-03, M-04, M-05, M-07, M-08 incorporados)
+**Versão anterior:** 1.1 — 2026-04-17 (achados críticos C-01 a C-21)
 **Instrumento:** Contrato bilateral com cláusula DPA integrada
-**Assinatura:** Via Clicksign (ICP-Brasil compatível)
+**Assinatura:** Via Clicksign — assinatura eletrônica avançada (Lei nº 14.063/2020, Art. 5º, c/c Art. 10, §2º, MP 2.200-2/2001)
+**URL pública (versão estável):** `clinipharma.com.br/legal/dpa-clinicas?version=1.2`
 
 ---
 
@@ -16,7 +18,7 @@
 
 **CONTRATADA / CLÍNICA ADERENTE:**
 
-**[RAZÃO SOCIAL DA CLÍNICA]**, pessoa jurídica de direito privado, inscrita no CNPJ sob nº **[CNPJ CLÍNICA]**, registrada no Conselho Regional de Medicina sob nº **[CRM-PJ/UF]** (ou nº equivalente junto ao conselho de classe competente), com licença sanitária nº **[NÚMERO]** expedida pelo **[ÓRGÃO EMISSOR]**, com sede na **SQS 212, Bloco K, Apto 402, Asa Sul, Brasília-DF, CEP 70275-110**, **diretor técnico médico [NOME]**, CRM/[UF] nº [CRM], neste ato representada por **[NOME DO REPRESENTANTE LEGAL]**, **[CARGO]**, portador(a) do CPF nº **[CPF]**, doravante denominada **"CLÍNICA"**;
+**[RAZÃO SOCIAL DA CLÍNICA]**, pessoa jurídica de direito privado, inscrita no CNPJ sob nº **[CNPJ DA CLÍNICA]**, registrada no Conselho Regional de Medicina (ou conselho de classe competente) sob nº **[CRM-PJ/UF ou equivalente]**, com Cadastro Nacional de Estabelecimentos de Saúde (CNES) nº **[NÚMERO DO CNES]** e Alvará Sanitário nº **[NÚMERO]** expedido por **[ÓRGÃO EMISSOR]**, com sede na **[ENDEREÇO COMPLETO DA CLÍNICA — logradouro, nº, complemento, bairro, município, UF, CEP]**, diretor técnico médico **[NOME]**, CRM/**[UF]** nº **[NÚMERO DO CRM]**, neste ato representada por **[NOME DO REPRESENTANTE LEGAL]**, **[CARGO]**, portador(a) do CPF nº **[CPF]**, doravante denominada **"CLÍNICA"**;
 
 As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataforma e Acordo de Tratamento de Dados Pessoais** ("Contrato").
 
@@ -28,7 +30,7 @@ As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataf
 
 **CONSIDERANDO** que a CLÍNICA, ao utilizar a plataforma, inserirá, tratará e compartilhará dados pessoais de seus colaboradores (administradores, médicos), dados profissionais de médicos vinculados e, de forma necessária e regulatória, dados de saúde de pacientes contidos em receitas médicas obrigatórias;
 
-**CONSIDERANDO** que a CLÍNICA, em relação aos dados de seus pacientes, já atua como **Controladora Independente** perante a LGPD, o CFM, o CFO, o CFTA e demais conselhos de classe, respondendo autonomamente pela proteção dos dados de seus pacientes em seu prontuário eletrônico e demais sistemas;
+**CONSIDERANDO** que a CLÍNICA, em relação aos dados de seus pacientes, já atua como **Controladora Independente** perante a LGPD, o Conselho Federal de Medicina (CFM), o Conselho Federal de Farmácia (CFF) e os demais conselhos de classe pertinentes às atividades por ela exercidas, respondendo autonomamente pela proteção dos dados de seus pacientes em seu prontuário eletrônico e demais sistemas;
 
 **CONSIDERANDO** que a Plataforma Clinipharma, ao receber e processar dados de pacientes inseridos pela CLÍNICA nas receitas médicas, torna-se **cocontroladora** desses dados para a finalidade específica de execução dos pedidos de manipulação, respondendo solidariamente pelos dados de saúde que armazena e processa;
 
@@ -138,7 +140,7 @@ As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataf
 
 **(c)** CPF ou RG de pacientes, salvo quando estritamente exigido pela ANVISA para dispensação de medicamentos de controle especial (ex: notificações de receita) — nesse caso, a inserção é autorizada e deve ser minimizada;
 
-**(d)** Dados de pacientes menores de 18 anos sem que a CLÍNICA tenha obtido consentimento expresso do responsável legal, nos termos do Art. 14 da LGPD.
+**(d)** Dados de **crianças** (até 12 anos incompletos, conforme Art. 2º do ECA — Lei nº 8.069/1990) sem que a CLÍNICA tenha obtido consentimento específico e em destaque do pai, da mãe ou do responsável legal, nos termos do Art. 14, §1º, da LGPD; e dados de **adolescentes** (12 a 18 anos incompletos) sem observância ao princípio do melhor interesse e ao regime previsto na Resolução CD/ANPD nº 4/2023.
 
 ### Cláusula 6ª — Finalidades Autorizadas para Tratamento pela CLINIPHARMA
 
@@ -257,7 +259,13 @@ As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataf
 
 **(f)** O acesso às receitas por colaboradores da CLINIPHARMA (SUPER_ADMIN) é restrito a situações de supervisão regulatória ou atendimento a requisição judicial/da ANPD, sendo registrado no log de auditoria.
 
-10.4. **Crianças e adolescentes:** quando receitas de pacientes menores de 18 anos forem inseridas na Plataforma, a CLÍNICA deve ter obtido consentimento expresso do responsável legal para compartilhamento dos dados com a Clinipharma e a farmácia, conforme Art. 14 da LGPD. A CLINIPHARMA não é responsável pela obtenção desse consentimento, mas processará esses dados com restrições adicionais de acesso.
+10.4. **Crianças e adolescentes:** o regime do Art. 14 da LGPD aplica-se com a seguinte distinção:
+
+**(a)** Para **crianças** (até 12 anos incompletos, ECA Art. 2º), a CLÍNICA deve ter obtido **consentimento específico e em destaque** do pai, da mãe ou do responsável legal para compartilhamento dos dados com a Clinipharma e a farmácia, nos termos do Art. 14, §1º, LGPD;
+
+**(b)** Para **adolescentes** (12 a 18 anos incompletos), o tratamento observa o **princípio do melhor interesse** e o regime previsto na Resolução CD/ANPD nº 4/2023, podendo amparar-se nas mesmas bases legais aplicáveis a maiores quando justificado pela tutela da saúde (Art. 11, II, "g") ou pela obrigação legal regulatória (Art. 11, II, "a");
+
+**(c)** Em qualquer hipótese, a CLINIPHARMA não é responsável pela obtenção do consentimento dos responsáveis, mas processará esses dados com restrições adicionais de acesso e registrará os pedidos com flag específico para auditoria reforçada.
 
 10.5. **Retenção de dados de saúde:** As receitas médicas armazenadas na Plataforma serão retidas por **10 (dez) anos** a contar da data do pedido, em cumprimento à ANVISA RDC 67/2007 e às normas de documentação farmacêutica. Após esse período, serão eliminadas de forma segura com registro no log de auditoria.
 
@@ -272,7 +280,23 @@ As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataf
 | **Geração de contratos**                | Nome, tipo de entidade, cidade (sem CPF ou dados de pacientes)                 | Execução de contrato (Art. 7º, V)           | Dados mínimos; sem PII sensível                          |
 | **Classificação de tickets de suporte** | Texto livre dos tickets (sem dados de pacientes)                               | Legítimo interesse (eficiência operacional) | Sem identificadores diretos; sem histórico de saúde      |
 
-11.2. Nos termos do Art. 20 da LGPD, a CLÍNICA tem direito de solicitar **revisão humana** de qualquer decisão automatizada que a afete significativamente, incluindo decisões sobre classificação de risco de churn, priorização de suporte e avaliação de cadastro. Solicitações devem ser enviadas a **privacidade@clinipharma.com.br**.
+11.2. Nos termos do **Art. 20, caput**, da LGPD, a CLÍNICA tem direito de solicitar **revisão humana** de qualquer decisão automatizada que a afete significativamente, incluindo decisões sobre classificação de risco de churn, priorização de suporte e avaliação de cadastro. Adicionalmente, nos termos do **Art. 20, §1º**, a CLÍNICA tem direito a obter **informações claras e adequadas a respeito dos critérios e dos procedimentos** utilizados para a decisão automatizada, observados os segredos comercial e industrial. Solicitações devem ser enviadas a **privacidade@clinipharma.com.br**, com resposta em até 15 (quinze) dias corridos.
+
+11.3. **OCR de receitas (opt-in expresso).** O processamento de imagens de receitas médicas pelo OpenAI Vision para extração automatizada de dados (OCR) caracteriza-se como tratamento de dados sensíveis de saúde por subprocessador internacional e, por isso:
+
+**(a)** Constitui **funcionalidade opcional**, ativada caso a caso por SUPER_ADMIN da CLINIPHARMA mediante demanda explícita registrada no log de auditoria;
+
+**(b)** Antes do envio à OpenAI, a CLINIPHARMA aplica, sempre que tecnicamente viável, **redação automatizada de campos identificatórios** do paciente (nome completo, CPF, data de nascimento e endereço) presentes na imagem, mantendo apenas dados clínicos e do prescritor necessários à finalidade;
+
+**(c)** A CLÍNICA, ao firmar este Contrato, **declara ciência** de que tal funcionalidade pode ser utilizada nos pedidos por ela submetidos, nos termos do RIPD-001 (`docs/legal/ripd-receitas-medicas.md`), e **autoriza** o tratamento adicional, ressalvado seu direito de revogar tal autorização específica mediante comunicação escrita ao DPO, com efeito a partir do recebimento;
+
+**(d)** A revogação do opt-in não invalida a vigência geral do Contrato e não compromete o restante do tratamento de dados das receitas necessário ao cumprimento das obrigações ANVISA.
+
+### Cláusula 11-A — Dados Anonimizados (LGPD Art. 12)
+
+11-A.1. Nos termos do Art. 12 da LGPD, dados anonimizados não são considerados dados pessoais. As PARTES reconhecem que a CLINIPHARMA poderá produzir e utilizar **datasets agregados e anonimizados** derivados dos dados tratados no âmbito desta parceria, exclusivamente para finalidades de melhoria de produto, pesquisa estatística agregada, prevenção a fraude, segurança e relatórios de transparência setorial.
+
+11-A.2. Nenhum dataset anonimizado é usado para reidentificação dos titulares ou para finalidades comerciais que sejam incompatíveis com a tutela da saúde do paciente. A CLÍNICA tem direito a obter informações sobre a metodologia de anonimização utilizada, nos termos do Art. 12, §3º, LGPD.
 
 ---
 
@@ -297,6 +321,8 @@ As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataf
 | OpenAI LLC                           | EUA    | IA / Visão computacional      | Documentos de cadastro e receitas (em situações específicas, v. Cláusula 11.1) | DPA OpenAI — zero data retention via API |
 
 12.2. A CLINIPHARMA notificará a CLÍNICA com **30 (trinta) dias de antecedência** sobre a inclusão de novos suboperadores que impliquem mudanças relevantes no tratamento dos dados inseridos por esta.
+
+12.2.1. **(M-04 — Direito de oposição motivada).** No prazo de **15 (quinze) dias corridos** contados da notificação, a CLÍNICA poderá apresentar oposição motivada ao novo suboperador, indicando objetivamente os riscos identificados (jurídicos, técnicos ou regulatórios). Recebida a oposição, as PARTES envidarão melhores esforços para resolução amigável em até 15 dias adicionais. Não havendo consenso, a CLÍNICA poderá rescindir este Contrato sem multa nem ônus, na parte afetada, com aviso prévio de 30 dias, mantida a obrigação de pagamento dos serviços já prestados. A inclusão fica suspensa em relação aos dados da CLÍNICA opositora até a resolução do impasse, exceto quando a inclusão decorrer de exigência legal ou regulatória.
 
 12.3. A transferência de dados para suboperadores nos **Estados Unidos** é amparada pelas seguintes garantias: **(i)** cláusulas contratuais padrão (SCCs) reconhecidas internacionalmente; **(ii)** DPAs com compromissos de segurança de nível europeu; **(iii)** para OpenAI: zero data retention para dados enviados via API, conforme contratado.
 
@@ -410,6 +436,16 @@ As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataf
 
 16.3. **Responsabilidade pela notificação à ANPD:** As PARTES acordam que, em incidentes de cocontrole (dados compartilhados entre ambas), a **CLINIPHARMA** fará a notificação unificada à ANPD, com ciência e cooperação da CLÍNICA.
 
+16.4. **(M-08 — Cláusula penal específica para atraso de notificação).** Sem prejuízo da indenização por perdas e danos prevista na Cláusula 17ª, o descumprimento dos prazos de notificação previstos nesta Cláusula 16ª (24 horas inter partes; 72 horas para a ANPD) sujeita a PARTE inadimplente a cláusula penal específica, na forma do art. 408 do Código Civil:
+
+**(a)** Atraso na notificação **inter partes** (Cláusula 16.1.a / 16.2.a): R$ 2.000,00 (dois mil reais) por hora de atraso, a partir da 25ª hora, até o limite de R$ 200.000,00 (duzentos mil reais);
+
+**(b)** Atraso na notificação à **ANPD** (Cláusula 16.1.b), quando atribuível à PARTE responsável: R$ 5.000,00 (cinco mil reais) por hora de atraso, a partir da 73ª hora contada da ciência inequívoca do incidente, até o limite de R$ 500.000,00 (quinhentos mil reais);
+
+**(c)** Os valores acima são devidos cumulativamente para cada incidente e não excluem a obrigação de indenizar danos materiais ou morais que excedam o teto da cláusula penal (art. 416, parágrafo único, do Código Civil);
+
+**(d)** Restará afastada a cláusula penal quando o atraso decorrer comprovadamente de força maior, caso fortuito, ou de necessidade objetiva de investigação prévia (art. 48, §1º, in fine, da LGPD), exigindo-se justificativa formal endereçada à parte afetada e, quando aplicável, à ANPD em até 5 (cinco) dias úteis após a remoção do impedimento.
+
 ---
 
 ## CAPÍTULO XII — RESPONSABILIDADE E INDENIZAÇÃO
@@ -422,7 +458,19 @@ As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataf
 
 17.3. **Solidariedade no cocontrole:** para danos causados a pacientes em razão do tratamento de dados de saúde das receitas (cocontrole), as PARTES respondem solidariamente perante o titular, nos termos do Art. 42, §1º, da LGPD. Entre si, a responsabilidade é proporcional à contribuição causal de cada uma para o dano, com direito de regresso.
 
-17.4. **Limitação de responsabilidade:** a responsabilidade de qualquer das PARTES perante a outra, em decorrência deste Contrato, fica limitada ao **valor total dos pedidos processados pela CLÍNICA nos 12 meses anteriores ao evento gerador**, exceto nos casos de dolo, culpa grave, violação de dados de saúde de pacientes, infração à LGPD constatada pela ANPD ou dano de natureza extrapatrimonial a titulares.
+17.4. **Limitação de responsabilidade:** a responsabilidade de qualquer das PARTES perante a outra, em decorrência deste Contrato, fica limitada ao **maior valor entre (i) R$ 50.000,00 (cinquenta mil reais) atualizados pelo IPCA desde a assinatura, e (ii) o valor total dos pedidos processados pela CLÍNICA nos 12 (doze) meses anteriores ao evento gerador**, exceto nos casos de:
+
+**(a)** dolo, fraude ou culpa grave;
+
+**(b)** violação de dados de saúde de pacientes (Art. 11 LGPD);
+
+**(c)** infração à LGPD constatada por sanção administrativa irrecorrível da ANPD;
+
+**(d)** dano de natureza extrapatrimonial a titulares de dados;
+
+**(e)** descumprimento intencional ou reiterado das obrigações de confidencialidade, segurança ou notificação de incidente; ou
+
+**(f)** condenação solidária por ato exclusivamente atribuível à PARTE responsabilizada.
 
 ---
 
@@ -430,7 +478,7 @@ As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataf
 
 ### Cláusula 18ª — Direitos de Auditoria
 
-18.1. A CLINIPHARMA disponibilizará à CLÍNICA, mediante solicitação escrita:
+18.1. A CLINIPHARMA disponibilizará à CLÍNICA, mediante solicitação escrita formal e fundamentada (limitada a 1 solicitação por ano-calendário, salvo em caso de incidente confirmado):
 
 **(a)** Informação sobre quais suboperadores tiveram acesso aos dados inseridos pela CLÍNICA;
 
@@ -441,6 +489,32 @@ As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataf
 **(d)** Cópia dos DPAs vigentes com os suboperadores, exceto cláusulas protegidas por sigilo comercial dos fornecedores.
 
 18.2. A CLÍNICA tem o direito de solicitar **revisão do RIPD** relativo ao tratamento de dados de saúde das receitas, quando disponível, para fins de avaliação de conformidade própria.
+
+18.3. **(M-03 — Auditoria com indícios concretos).** A realização de auditoria presencial ou remota in loco depende da apresentação, pela CLÍNICA, de **indícios concretos e documentados** de descumprimento deste Contrato ou da legislação aplicável (e não de mera suspeita), e fica condicionada a:
+
+**(a)** Aviso prévio mínimo de **30 (trinta) dias corridos**;
+
+**(b)** Realização em horário comercial e por auditor independente sujeito a obrigação de confidencialidade equivalente à deste Contrato;
+
+**(c)** Custos do auditor por conta da CLÍNICA solicitante, salvo se a auditoria comprovar não-conformidade material, hipótese em que serão ressarcidos pela CLINIPHARMA;
+
+**(d)** Limitação ao escopo dos dados inseridos pela própria CLÍNICA, preservando dados de outras clínicas e segredos comerciais da Plataforma.
+
+18.4. **(M-07 — Trilha mínima de evidências).** Em qualquer auditoria realizada nos termos da Cláusula 18.3, a CLINIPHARMA fornecerá ao auditor designado pela CLÍNICA, no mínimo:
+
+**(a)** Lista de usuários ativos com acesso aos dados da CLÍNICA, por papel (RBAC) e nível de privilégio;
+
+**(b)** Comprovantes de treinamento em segurança e LGPD da equipe técnica que opera a Plataforma, referentes aos 12 meses anteriores;
+
+**(c)** Relatório de incidentes de segurança ocorridos no período auditado, ainda que não notificáveis à ANPD, com descrição, impacto e ações corretivas;
+
+**(d)** Resultado do mais recente self-audit OWASP ASVS L1 e, quando disponível, do mais recente pen-test independente;
+
+**(e)** Configurações de criptografia em repouso (algoritmo, gestão de chaves) e em trânsito (versão TLS) para os dados da CLÍNICA;
+
+**(f)** Atestação dos sub-processadores quanto às certificações vigentes (SOC 2, ISO 27001, ISO 27701);
+
+**(g)** Logs de acesso a dados RESTRITOS (saúde) referentes aos pedidos da CLÍNICA no período, com data, autor e finalidade.
 
 ---
 
@@ -473,33 +547,49 @@ As PARTES acima qualificadas celebram o presente **Contrato de Adesão à Plataf
 
 22.3. A CLINIPHARMA pode encerrar a adesão da CLÍNICA, com efeito imediato e justa causa, em caso de: inserção reiterada de receitas falsificadas; uso da Plataforma para fins ilícitos; descumprimento grave das obrigações deste Contrato; condenação da CLÍNICA por infração à LGPD.
 
+### Cláusula 22-A — Equilíbrio Econômico-Regulatório (Hardship)
+
+22-A.1. As PARTES reconhecem que este Contrato é executado em ambiente regulatório dinâmico (LGPD, ANPD, ANVISA, CFM, CFF, RFB) e que a superveniência de norma, decisão regulatória vinculante ou jurisprudência consolidada que altere materialmente o equilíbrio econômico ou as obrigações operacionais aqui pactuadas pode justificar a renegociação dos seus termos.
+
+22-A.2. Configurada hipótese de onerosidade excessiva nos termos dos arts. 478 a 480 do Código Civil, a PARTE prejudicada notificará a outra, fundamentadamente, e as PARTES envidarão esforços de boa-fé para renegociar as cláusulas afetadas no prazo de até **60 (sessenta) dias corridos**.
+
+22-A.3. Não havendo consenso ao final do prazo previsto em 22-A.2, qualquer das PARTES poderá resolver o vínculo sem ônus, observados os deveres de transição ordenada (descarte de dados, comunicação aos titulares afetados quando aplicável, encerramento de pedidos em curso) previstos neste Contrato e o disposto na Cláusula 22.
+
 ### Cláusula 23ª — Lei Aplicável e Foro
 
-23.1. Este Contrato é regido pelas leis da República Federativa do Brasil, especialmente pela LGPD (Lei nº 13.709/2018), pelo Código Civil (Lei nº 10.406/2002), pelo Marco Civil da Internet (Lei nº 12.965/2014), pelas normas do CFM, ANVISA e ANPD.
+23.1. Este Contrato é regido pelas leis da República Federativa do Brasil, especialmente pela LGPD (Lei nº 13.709/2018), pelo Código Civil (Lei nº 10.406/2002), pelo Marco Civil da Internet (Lei nº 12.965/2014), pela Lei nº 14.063/2020 (assinatura eletrônica) e pelas normas regulamentares do CFM, ANVISA e ANPD.
 
-23.2. Fica eleito o foro da comarca de **Brasília-DF** para dirimir controvérsias, ressalvada a competência da ANPD.
+23.2. Fica eleito o foro da Circunscrição Especial Judiciária de **Brasília-DF** para dirimir controvérsias, ressalvadas (i) a competência da ANPD para questões sancionatórias e (ii) a faculdade do hipossuficiente, na hipótese de pessoa natural figurar no polo ativo, de propor a ação no foro de seu domicílio.
 
 23.3. As PARTES comprometem-se à tentativa de resolução amigável antes de recorrer ao Poder Judiciário.
+
+23.4. **(M-05 — Submissão à jurisdição brasileira no tratamento internacional).** As PARTES reconhecem que, mesmo nos casos em que dados pessoais sejam tratados por sub-processadores domiciliados no exterior (Anexo II), o tratamento permanece submetido à jurisdição brasileira por força do art. 3º da LGPD (extraterritorialidade) e do art. 11 do Marco Civil da Internet (Lei nº 12.965/2014). A CLINIPHARMA compromete-se a:
+
+**(a)** Cooperar com autoridades brasileiras (em especial ANPD, Comitê Gestor da Internet — CGI.br, Poder Judiciário) em quaisquer requisições legítimas relativas a dados tratados ao abrigo deste Contrato, inclusive quanto à preservação e ao fornecimento de logs nos termos dos arts. 13 a 15 do Marco Civil da Internet;
+
+**(b)** Manter cópia dos registros de aplicação (logs de acesso, modificação e eliminação) acessíveis a partir do território nacional, ainda que armazenados em infraestrutura internacional;
+
+**(c)** Garantir que os contratos com sub-processadores no exterior contenham (i) cláusulas-padrão de transferência internacional aceitas pela ANPD, (ii) compromisso de cooperação com requisições brasileiras lícitas e (iii) vedação ao fornecimento de dados a autoridades estrangeiras sem ordem judicial brasileira de exequatur, salvo nas hipóteses do art. 33 da LGPD.
 
 ---
 
 ## DECLARAÇÃO ESPECÍFICA SOBRE DADOS DE SAÚDE
 
+> **(M-01 — Forma).** Esta Declaração reafirma, de forma sintética e em destaque, compromissos já constantes da Cláusula 7ª, com a finalidade exclusiva de visibilidade no momento da assinatura eletrônica. Em caso de divergência interpretativa, prevalece o conteúdo das cláusulas substantivas do corpo do Contrato.
+
 A CLÍNICA, ao assinar este Contrato, **declara expressamente** que:
 
-**(I)** Está ciente de que os dados de saúde dos pacientes constantes nas receitas médicas inseridas na Plataforma são tratados pela CLINIPHARMA como cocontroladora, exclusivamente para as finalidades descritas neste Contrato;
+**(I)** Possui base legal adequada perante seus pacientes (consentimento livre e informado para dados sensíveis, art. 11, I, LGPD; ou tutela da saúde, art. 11, II, "g") para o compartilhamento de dados de saúde com a Plataforma e as farmácias parceiras;
 
-**(II)** Possui base legal adequada perante seus pacientes para o compartilhamento de dados de saúde com a Plataforma Clinipharma e as farmácias parceiras, seja por consentimento, obrigação legal ou execução de contrato;
+**(II)** Informa, ou se compromete a informar, seus pacientes de forma clara e acessível sobre o compartilhamento de dados de receitas com a Plataforma e as farmácias, conforme exigido pelos arts. 9º e 11, §2º, da LGPD;
 
-**(III)** Informará, ou já informa, seus pacientes de forma clara e acessível sobre o compartilhamento de dados de receitas com a Plataforma e as farmácias, conforme exigido pelo Art. 9º da LGPD;
-
-**(IV)** Adota, em seus próprios sistemas, medidas de segurança adequadas ao tratamento de dados de saúde, nos termos do Art. 46 da LGPD e das normas do CFM.
+**(III)** Mantém prontuário próprio nos termos da Resolução CFM nº 1.821/2007, sendo a Plataforma mero canal de intermediação tecnológica de pedidos.
 
 ---
 
 ## ASSINATURAS
 
-As PARTES assinam eletronicamente este Contrato via Clicksign, com validade jurídica equivalente à assinatura física, nos termos do Art. 10, §2º, da MP 2.200-2/2001 e do Art. 6º da Lei nº 14.063/2020.
+As PARTES assinam eletronicamente este Contrato via Clicksign — provedor de **assinatura eletrônica avançada** com identificação multifatorial — nos termos do **Art. 5º da Lei nº 14.063/2020**, combinado com o Art. 10, §2º, da MP 2.200-2/2001, tendo as assinaturas eletrônicas avançadas plena equivalência probatória às assinaturas físicas, presumindo-se verdadeiras em relação aos signatários (CPC, Art. 411, II).
 
 **Local e data:** **\*\*\*\***\_**\*\*\*\***, **\_ de \*\***\_\_**\*\*** de 20\_\_\_.
 
@@ -543,6 +633,7 @@ _Este contrato é gerado automaticamente pela plataforma Clinipharma e enviado p
 
 ## ANEXO — REGISTRO DE ALTERAÇÕES
 
-| Versão | Data       | Descrição      | Responsável        |
-| ------ | ---------- | -------------- | ------------------ |
-| 1.0    | Abril/2026 | Versão inicial | André Cabral (DPO) |
+| Versão | Data       | Descrição                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Responsável        |
+| ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
+| 1.0    | 2026-04    | Versão inicial.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | André Cabral (DPO) |
+| 1.1    | 2026-04-17 | (i) Correção do endereço-template da CLÍNICA (anteriormente clonado do endereço da Clinipharma); (ii) Remoção da citação a "CFTA" (conselho inexistente); (iii) Distinção expressa entre criança e adolescente para Art. 14 LGPD; (iv) Inclusão do direito completo do Art. 20 LGPD (revisão + critérios); (v) Cláusula nova 11.3 sobre OCR de receitas opt-in com pseudonimização; (vi) Cláusula nova 11-A sobre dados anonimizados (Art. 12); (vii) Cláusula 17.4 com piso mínimo de R$ 50.000,00 e ampliação das exceções; (viii) Cláusula nova 22-A sobre equilíbrio econômico-regulatório (hardship); (ix) Atualização da referência à Lei nº 14.063/2020 quanto à validade da assinatura eletrônica avançada; (x) Indicação de URL pública versionada. | Diretoria Jurídica |

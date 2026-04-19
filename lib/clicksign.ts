@@ -132,6 +132,18 @@ const CLINIPHARMA = {
   site: 'clinipharma.com.br',
 }
 
+/**
+ * Versão atualmente vigente do DPA referenciado por este gerador.
+ * Atualizar simultaneamente nos arquivos `docs/legal/dpa-{farmacias,clinicas}.md`.
+ *
+ * Importante (parecer jurídico 2026-04-17, item C-08): a incorporação por
+ * referência exige version pinning explícito para que a parte aderente saiba
+ * exatamente qual texto está incorporando, evitando a tese de incorporação
+ * dinâmica (LGPD + CC art. 47 + boa-fé objetiva CC art. 422).
+ */
+const DPA_VERSION = '1.1'
+const DPA_VERSION_DATE = '2026-04-17'
+
 // ── PDF layout helpers ────────────────────────────────────────────────────────
 
 interface PageContext {
@@ -277,10 +289,8 @@ export async function generateDpaPdf(params: {
   const ctx = await createPageContext(doc)
   const { type, party } = params
   const date = params.date ?? new Date().toLocaleDateString('pt-BR')
-  const dpaUrl =
-    type === 'PHARMACY'
-      ? `${CLINIPHARMA.site}/legal/dpa-farmacias`
-      : `${CLINIPHARMA.site}/legal/dpa-clinicas`
+  const dpaSlug = type === 'PHARMACY' ? 'dpa-farmacias' : 'dpa-clinicas'
+  const dpaUrl = `${CLINIPHARMA.site}/legal/${dpaSlug}?version=${DPA_VERSION}`
 
   const title =
     type === 'PHARMACY'
@@ -328,29 +338,31 @@ export async function generateDpaPdf(params: {
 
   // ── Clause 1 – Object ──────────────────────────────────────────────────────
   drawSection(ctx, 'CLÁUSULA 1 — OBJETO', [
-    '1.1. O presente instrumento tem por objeto formalizar a adesão do Parceiro ao Acordo de Processamento de Dados (DPA) da Clinipharma, na versão vigente disponível em ' +
-      dpaUrl +
-      ', o qual regula o tratamento de dados pessoais realizados no âmbito da utilização da plataforma digital Clinipharma, nos termos da Lei 13.709/2018 (LGPD).',
+    `1.1. O presente instrumento tem por objeto formalizar a adesão do Parceiro ao Acordo de Tratamento de Dados Pessoais (DPA) da Clinipharma — versão ${DPA_VERSION} de ${DPA_VERSION_DATE} — disponível em ${dpaUrl}, o qual regula o tratamento de dados pessoais realizado no âmbito da utilização da plataforma digital Clinipharma, nos termos da Lei nº 13.709/2018 (LGPD).`,
     '',
-    '1.2. O DPA incorporado é parte integrante e indissociável deste instrumento, tendo plena eficácia jurídica como se aqui transcrito estivesse.',
+    `1.2. O DPA versão ${DPA_VERSION} é parte integrante e indissociável deste instrumento, tendo plena eficácia jurídica como se aqui transcrito estivesse (Código Civil, art. 47).`,
+    '',
+    `1.3. A incorporação é estática: o Parceiro fica vinculado exclusivamente à versão ${DPA_VERSION} referenciada nesta Cláusula. Eventuais alterações subsequentes do DPA somente produzirão efeitos perante o Parceiro mediante (i) aditivo contratual escrito e assinado eletronicamente, ou (ii) aceite eletrônico expresso após notificação formal com antecedência mínima de 30 (trinta) dias corridos. A simples publicação de nova versão na URL referenciada não substitui esta versão para fins deste instrumento.`,
+    '',
+    `1.4. A Clinipharma manterá as versões anteriores do DPA acessíveis em URL permanente (formato: clinipharma.com.br/legal/${dpaSlug}?version=X.Y) durante o prazo previsto na Cláusula 8.2, para fins probatórios.`,
   ])
 
   // ── Clause 2 – Roles ──────────────────────────────────────────────────────
   if (type === 'CLINIC') {
     drawSection(ctx, 'CLÁUSULA 2 — QUALIFICAÇÃO DAS PARTES', [
-      '2.1. A Clinipharma e a Clínica Parceira atuam como CONTROLADORAS CONJUNTAS (art. 65, I, LGPD) em relação aos dados pessoais de pacientes inseridos na plataforma para fins de intermediação de pedidos de medicamentos.',
+      '2.1. A Clinipharma e a Clínica Parceira atuam, em relação aos dados pessoais de pacientes inseridos na plataforma para fins de intermediação de pedidos de medicamentos, como CONTROLADORAS CONJUNTAS, nos termos do art. 5º, VI, da LGPD e da orientação interpretativa da ANPD, definindo conjuntamente as finalidades e os meios essenciais do tratamento.',
       '',
-      '2.2. A Clínica é a originadora dos dados do paciente (nome, data de nascimento, prescrição médica), sendo responsável por obter o consentimento livre, informado e inequívoco do paciente antes de inserir seus dados na plataforma.',
+      '2.2. A Clínica é a controladora originária dos dados do paciente (nome, data de nascimento, prescrição médica), sendo responsável por possuir base legal válida (consentimento, execução de contrato de prestação de serviços médicos, obrigação legal ou tutela da saúde) e por informar o paciente sobre o compartilhamento dos dados com a Clinipharma e com a farmácia executante (LGPD, art. 9º).',
       '',
-      '2.3. A Clinipharma processa esses dados para execução do contrato (art. 7º, V, LGPD) — intermediação, faturamento e logística — e para cumprimento de obrigações legais.',
+      '2.3. A Clinipharma processa esses dados para execução do contrato com o Parceiro (art. 7º, V, LGPD), para cumprimento de obrigações legais (art. 7º, II) e, no que toca a dados de saúde, com fundamento no art. 11, II, "a" (obrigação legal — ANVISA) e no art. 11, II, "g" (tutela da saúde).',
     ])
   } else {
     drawSection(ctx, 'CLÁUSULA 2 — QUALIFICAÇÃO DAS PARTES', [
       '2.1. A Farmácia Parceira atua como OPERADORA (art. 5º, VII, LGPD) em relação aos dados pessoais de pacientes transmitidos pela Clinipharma para fins de processamento e entrega de pedidos.',
       '',
-      '2.2. A Farmácia atua adicionalmente como CONTROLADORA INDEPENDENTE em relação aos dados que deve manter por imposição legal (ANVISA, Portaria SVS/MS 344/1998, RDC 20/2011), sem subordinação à Clinipharma para esses fins.',
+      '2.2. A Farmácia atua adicionalmente como CONTROLADORA INDEPENDENTE em relação aos dados que deve manter por imposição legal regulatória autônoma (ANVISA — RDC 67/2007, Portaria SVS/MS 344/1998 e RDC 20/2011), sem subordinação à Clinipharma para esses fins.',
       '',
-      '2.3. A Farmácia somente tratará os dados pessoais dos pacientes nas finalidades estritamente necessárias para executar o pedido e cumprir obrigações regulatórias, sendo vedado qualquer uso secundário sem base legal autônoma.',
+      '2.3. A Farmácia somente tratará os dados pessoais dos pacientes nas finalidades estritamente necessárias para executar o pedido e cumprir obrigações regulatórias, sendo vedado qualquer uso secundário sem base legal autônoma e específica.',
     ])
   }
 
@@ -358,11 +370,11 @@ export async function generateDpaPdf(params: {
   drawSection(ctx, 'CLÁUSULA 3 — CATEGORIAS DE DADOS TRATADOS', [
     '3.1. São tratados no âmbito desta parceria:',
     '  (a) DADOS COMUNS: nome, e-mail, telefone, endereço, CNPJ/CPF, dados de faturamento.',
-    '  (b) DADOS DE SAÚDE (sensíveis — art. 11 LGPD): prescrições médicas, CRM do prescritor, medicamentos, posologia, diagnóstico implícito.',
+    '  (b) DADOS DE SAÚDE (sensíveis — art. 11 LGPD): prescrições médicas, CRM do prescritor, medicamentos, posologia, diagnóstico quando expresso na receita.',
     '',
     '3.2. O tratamento de dados de saúde baseia-se em:',
-    '  • Tutela da saúde (art. 11, II, "f", LGPD) — para entrega do medicamento ao paciente.',
-    '  • Cumprimento de obrigação legal (art. 11, II, "a") — para escrituração nos livros de dispensação exigidos pela ANVISA.',
+    '  • Cumprimento de obrigação legal (art. 11, II, "a", LGPD) — escrituração nos livros de dispensação exigidos pela ANVISA (RDC 67/2007, Portaria 344/98, RDC 20/2011).',
+    '  • Tutela da saúde (art. 11, II, "g", LGPD) — exclusivamente em procedimento realizado por profissionais de saúde, serviços de saúde ou autoridade sanitária, para a entrega do medicamento ao paciente.',
     '',
     '3.3. Nenhum dado de saúde será utilizado para fins de marketing, profiling ou inteligência comercial sem base legal autônoma e específica.',
   ])
@@ -392,33 +404,46 @@ export async function generateDpaPdf(params: {
 
   // ── Clause 6 – Data subject rights ───────────────────────────────────────
   drawSection(ctx, 'CLÁUSULA 6 — DIREITOS DOS TITULARES', [
-    '6.1. Os titulares de dados (pacientes, médicos) poderão exercer seus direitos previstos no art. 18 da LGPD (acesso, correção, portabilidade, eliminação, revogação) diretamente pela plataforma ou pelo e-mail privacidade@clinipharma.com.br.',
+    '6.1. Os titulares de dados (pacientes, médicos) poderão exercer todos os direitos previstos no art. 18 da LGPD (confirmação, acesso, correção, anonimização, bloqueio, eliminação, portabilidade, informação sobre compartilhamento, revogação de consentimento, oposição) diretamente pela plataforma ou pelo e-mail privacidade@clinipharma.com.br.',
     '',
-    '6.2. Ambas as partes cooperarão para atender solicitações de titulares no prazo de 15 dias corridos, conforme exigido pela ANPD.',
+    '6.2. Os titulares têm também direito (a) à revisão humana de decisões automatizadas que afetem seus interesses (art. 20, caput, LGPD), e (b) a obter informações claras e adequadas sobre os critérios e procedimentos utilizados em tais decisões automatizadas (art. 20, §1º, LGPD), observados os segredos comercial e industrial.',
+    '',
+    '6.3. Ambas as Partes cooperarão para atender solicitações de titulares no prazo de 15 (quinze) dias corridos, prorrogáveis por igual período mediante justificativa, conforme art. 19 da LGPD.',
+  ])
+
+  // ── Clause 6-A – Anonimized data (LGPD Art. 12) ──────────────────────────
+  drawSection(ctx, 'CLÁUSULA 6-A — DADOS ANONIMIZADOS (LGPD ART. 12)', [
+    '6-A.1. As Partes reconhecem que dados anonimizados não são considerados dados pessoais (art. 12, LGPD) e que a Clinipharma poderá produzir e utilizar datasets agregados e anonimizados derivados dos dados tratados nesta parceria, exclusivamente para finalidades de melhoria de produto, pesquisa estatística agregada, prevenção a fraude, segurança e relatórios de transparência setorial, observada a impossibilidade técnica razoável de reidentificação.',
   ])
 
   // ── Clause 7 – Liability ──────────────────────────────────────────────────
   drawSection(ctx, 'CLÁUSULA 7 — RESPONSABILIDADE E PENALIDADES', [
     '7.1. O descumprimento de qualquer cláusula deste instrumento ou do DPA incorporado sujeitará a parte infratora a:',
-    '  (i) Rescisão imediata desta parceria, sem ônus para a parte inocente;',
-    '  (ii) Indenização integral pelos danos diretos e indiretos causados à outra parte e a titulares de dados;',
-    '  (iii) Notificação à ANPD, quando a infração constituir violação grave à LGPD.',
+    '  (i) Rescisão imediata desta parceria, sem ônus para a parte inocente, observado contraditório quando cabível;',
+    '  (ii) Indenização integral pelos danos emergentes e lucros cessantes nos termos dos arts. 402 e 403 do Código Civil, sendo expressamente excluídos danos indiretos não pactuados; e',
+    '  (iii) Notificação à ANPD na forma do art. 48 da LGPD, quando a infração constituir violação grave que possa acarretar risco ou dano relevante a titulares.',
     '',
-    '7.2. A responsabilidade de cada parte por atos de seus próprios subprocessadores é solidária perante os titulares de dados, conforme art. 42 LGPD.',
+    '7.2. A responsabilidade civil das Partes perante titulares de dados rege-se pelo art. 42 da LGPD, observando-se: (a) a responsabilidade solidária prevista no art. 42, §1º, I, quando a Operadora descumprir as obrigações da LGPD ou as instruções lícitas da Controladora; (b) a responsabilidade solidária prevista no art. 42, §1º, II, entre controladores diretamente envolvidos no tratamento que originou o dano; e (c) o direito de regresso entre as Partes na proporção de suas respectivas culpas (art. 42, §4º).',
+    '',
+    '7.3. As limitações de responsabilidade entre as Partes não se aplicam aos casos de dolo, fraude, culpa grave, violação de dados sensíveis de saúde, descumprimento intencional ou reiterado das obrigações de notificação de incidente, nem às sanções administrativas aplicadas pela ANPD em razão de conduta exclusivamente imputável a uma das Partes.',
   ])
 
   // ── Clause 8 – Term ───────────────────────────────────────────────────────
   drawSection(ctx, 'CLÁUSULA 8 — VIGÊNCIA', [
-    '8.1. Este instrumento entra em vigor na data de assinatura eletrônica por ambas as partes e permanece válido enquanto houver relação comercial ativa entre as partes.',
+    '8.1. Este instrumento entra em vigor na data da assinatura eletrônica avançada por ambas as Partes e permanece válido enquanto houver relação comercial ativa entre elas, conforme o DPA versão ' +
+      DPA_VERSION +
+      ' incorporado por referência.',
     '',
-    '8.2. As obrigações de confidencialidade e proteção de dados subsistem por 5 anos após o término desta parceria ou pelo prazo exigido por lei, o que for maior.',
+    '8.2. As obrigações de confidencialidade, segurança e retenção de dados subsistem por prazo não inferior a 10 (dez) anos após o término desta parceria ou pelo prazo exigido pela legislação aplicável (em especial RDC ANVISA 67/2007, Portaria SVS/MS 344/98 e CTN art. 195), o que for maior.',
   ])
 
   // ── Clause 9 – Governing law ──────────────────────────────────────────────
   drawSection(ctx, 'CLÁUSULA 9 — LEI APLICÁVEL E FORO', [
-    `9.1. Este instrumento é regido pelas leis da República Federativa do Brasil, em especial pela LGPD (Lei 13.709/2018) e legislação regulatória da ANVISA.`,
+    `9.1. Este instrumento é regido pelas leis da República Federativa do Brasil, em especial pela LGPD (Lei nº 13.709/2018), pelo Código Civil (Lei nº 10.406/2002), pelo Marco Civil da Internet (Lei nº 12.965/2014), pela Lei nº 14.063/2020 e pela legislação regulatória da ANVISA, ANPD e dos conselhos de classe pertinentes.`,
     '',
-    `9.2. Fica eleito o Foro da ${CLINIPHARMA.foro} para dirimir quaisquer controvérsias decorrentes deste instrumento, renunciando as partes a qualquer outro, por mais privilegiado que seja.`,
+    `9.2. Fica eleito o Foro da ${CLINIPHARMA.foro} para dirimir quaisquer controvérsias decorrentes deste instrumento, com renúncia a qualquer outro por mais privilegiado que seja, ressalvada (i) a competência da ANPD para apuração de infrações à LGPD; e (ii) o direito do Parceiro hipossuficiente, quando aplicável, de propor ação no foro de seu domicílio.`,
+    '',
+    `9.3. Este instrumento é assinado eletronicamente via Clicksign, provedor de assinatura eletrônica avançada com identificação multifatorial, nos termos do art. 5º da Lei nº 14.063/2020 c/c art. 10, §2º, da MP 2.200-2/2001, com plena equivalência probatória às assinaturas físicas (CPC, art. 411, II).`,
   ])
 
   // ── Signature block ───────────────────────────────────────────────────────
@@ -509,21 +534,68 @@ export async function generateContractPdf(params: {
     CLINIC: [],
     PHARMACY: [],
     DOCTOR: [
-      `Pelo presente instrumento, o médico acima identificado ("Contratante") adere à`,
-      `plataforma Clinipharma ("Contratada"), concordando com os termos de uso, política`,
-      `de privacidade e regras operacionais vigentes, disponíveis em clinipharma.com.br.`,
+      `1. OBJETO. Pelo presente instrumento, o médico acima identificado ("Médico") adere à`,
+      `plataforma Clinipharma ("Plataforma"), operada pela Contratada, para fins de`,
+      `processamento de pedidos de medicamentos manipulados por ele prescritos, vinculados`,
+      `à(s) clínica(s) à(s) qual(is) esteja regularmente associado.`,
       ``,
-      `O Contratante declara possuir registro ativo no CRM e autoriza a Clinipharma a`,
-      `processar pedidos de medicamentos em seu nome, vinculados à(s) clínica(s) à(s)`,
-      `qual(is) está associado.`,
+      `2. DECLARAÇÕES. O Médico declara, sob as penas da lei: (i) possuir registro ativo`,
+      `e em situação regular no CRM da unidade da federação indicada acima; (ii) não estar`,
+      `sujeito a sanção ética ou administrativa que impeça o exercício da medicina; (iii)`,
+      `realizar prescrições estritamente dentro de sua área de atuação, observada a`,
+      `Resolução CFM nº 1.931/2009 (Código de Ética Médica) e a Resolução CFM nº 2.314/2022`,
+      `(telemedicina), quando aplicável.`,
+      ``,
+      `3. AUTONOMIA E SIGILO. O Médico atua com plena autonomia técnica e profissional,`,
+      `mantendo o sigilo médico nos termos do Código de Ética Médica e da LGPD (art. 11),`,
+      `respondendo pessoalmente pelas prescrições emitidas. A Contratada não interfere em`,
+      `decisões clínicas e atua exclusivamente como intermediadora tecnológica.`,
+      ``,
+      `4. PROTEÇÃO DE DADOS. O tratamento de dados pessoais decorrente deste instrumento`,
+      `observa a Política de Privacidade vigente em clinipharma.com.br/privacy e o DPA`,
+      `aplicável à clínica à qual o Médico está vinculado.`,
+      ``,
+      `5. AUSÊNCIA DE VÍNCULO EMPREGATÍCIO. Este instrumento não estabelece vínculo`,
+      `empregatício, societário ou de representação entre as Partes (CLT arts. 2º e 3º a`,
+      `contrario sensu), tratando-se de adesão a serviço tecnológico.`,
+      ``,
+      `6. VIGÊNCIA E RESCISÃO. Vigência por prazo indeterminado a partir da assinatura,`,
+      `podendo ser rescindido por qualquer Parte mediante notificação com antecedência de`,
+      `30 dias, e imediatamente em caso de cassação do CRM ou descumprimento das normas do`,
+      `CFM ou desta plataforma.`,
     ],
     CONSULTANT: [
-      `Pelo presente instrumento, o consultor acima identificado ("Contratado") firma`,
-      `contrato de prestação de serviços comerciais com a Clinipharma ("Contratante").`,
+      `1. OBJETO. Pelo presente instrumento, o consultor acima identificado ("Consultor")`,
+      `presta à Clinipharma ("Contratante") serviços autônomos de captação, suporte`,
+      `comercial e relacionamento com clínicas e médicos para utilização da plataforma,`,
+      `sem subordinação jurídica, hierárquica ou habitualidade no sentido celetista.`,
       ``,
-      `O Contratado atuará na captação e gestão de clínicas e médicos na plataforma,`,
-      `recebendo comissão percentual sobre o valor dos pedidos das clínicas sob sua`,
-      `responsabilidade, conforme tabela de comissões vigente.`,
+      `2. NATUREZA AUTÔNOMA. As Partes ajustam expressamente que (i) inexiste vínculo`,
+      `empregatício, societário, de mandato ou de representação comercial nos termos da Lei`,
+      `4.886/65, (ii) o Consultor é livre para definir seu método de trabalho, horários e`,
+      `localização, e (iii) cabe ao Consultor recolher os tributos, contribuições e demais`,
+      `encargos incidentes sobre a remuneração recebida (CC art. 593 — prestação de serviço).`,
+      ``,
+      `3. REMUNERAÇÃO. O Consultor receberá comissão percentual sobre o valor líquido dos`,
+      `pedidos efetivamente pagos pelas clínicas sob sua responsabilidade comercial,`,
+      `conforme tabela de comissões vigente, mediante apresentação de Nota Fiscal de`,
+      `Serviço (NFS-e), no prazo acordado entre as Partes após a confirmação do pagamento`,
+      `pelo cliente final.`,
+      ``,
+      `4. CONFIDENCIALIDADE E PROTEÇÃO DE DADOS. O Consultor obriga-se a manter sigilo`,
+      `sobre todas as informações comerciais, técnicas, financeiras e pessoais a que tiver`,
+      `acesso, observando a LGPD (Lei nº 13.709/2018) e o DPA Clínicas/Farmácias quando`,
+      `pertinente, com obrigação de sigilo subsistente por 5 (cinco) anos após o término.`,
+      ``,
+      `5. NÃO-CONCORRÊNCIA. Durante a vigência e por 12 (doze) meses após o término, o`,
+      `Consultor não poderá prestar serviços a plataforma concorrente direta da Clinipharma`,
+      `nem aliciar clínicas ou farmácias da carteira ativa, sob pena de multa contratual`,
+      `equivalente a 6 (seis) vezes a média mensal das comissões pagas nos últimos 12 meses.`,
+      ``,
+      `6. VIGÊNCIA E RESCISÃO. Vigência por prazo indeterminado, podendo ser rescindido`,
+      `por qualquer Parte mediante notificação com antecedência de 30 dias, e imediatamente`,
+      `por justa causa em caso de violação das obrigações de confidencialidade ou`,
+      `não-concorrência.`,
     ],
   }
 
@@ -595,14 +667,17 @@ export async function generateContractPdf(params: {
   })
   y -= 20
 
-  page.drawText(`Este contrato é regido pelas leis brasileiras. Foro: ${CLINIPHARMA.foro}.`, {
-    x: 50,
-    y,
-    font,
-    size: 9,
-    color: rgb(0.5, 0.5, 0.5),
-  })
-  y -= 15
+  const lawLines = [
+    `Regido pelas leis da República Federativa do Brasil, em especial Código Civil, Marco Civil`,
+    `da Internet (Lei 12.965/2014), LGPD (Lei 13.709/2018) e Lei 14.063/2020.`,
+    `Foro: ${CLINIPHARMA.foro}, ressalvado o direito do hipossuficiente de propor ação no foro de seu domicílio.`,
+    `Assinatura eletrônica avançada via Clicksign (Lei 14.063/2020, art. 5º; MP 2.200-2/2001).`,
+  ]
+  for (const line of lawLines) {
+    page.drawText(line, { x: 50, y, font, size: 8, color: rgb(0.5, 0.5, 0.5) })
+    y -= 11
+  }
+  y -= 4
   page.drawText(`Data: ${date}`, { x: 50, y, font, size: 9, color: rgb(0.5, 0.5, 0.5) })
 
   y -= 60
