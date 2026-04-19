@@ -1,12 +1,13 @@
 # Database Performance Baseline
 
-| Field         | Value                                           |
-| ------------- | ----------------------------------------------- |
-| Owner         | Engineering / DBA                               |
-| Last reviewed | 2026-04-18                                      |
-| Engine        | Supabase Postgres 16 (managed)                  |
-| Region        | `gru1` (São Paulo)                              |
-| Migrations    | 56 versioned files under `supabase/migrations/` |
+| Field         | Value                                                                                                                |
+| ------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Owner         | Engineering / DBA                                                                                                    |
+| Last reviewed | 2026-04-19                                                                                                           |
+| Engine        | Supabase Postgres 18 (managed)                                                                                       |
+| Region        | `gru1` (São Paulo)                                                                                                   |
+| Migrations    | 57 versioned files under `supabase/migrations/`                                                                      |
+| Drift gate    | `.github/workflows/schema-drift.yml` Layer 2 active — see [`schema-drift-detection.md`](./schema-drift-detection.md) |
 
 This is the canonical reference for "what good looks like" on the
 database. It documents the baseline numbers, the indexes that hold the

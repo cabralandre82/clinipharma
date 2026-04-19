@@ -4,6 +4,7 @@
 
 - ✅ EXECUTADO (modo tabletop, 5 cenários) em **2026-04-18**.
 - ✅ EXECUTADO (modo **live**, Cenário 3 — restore real do offsite backup) em **2026-04-19** via workflow `restore-drill.yml`. Total **51s**, 0 erros reais, 65+23 tabelas, 9 users, 37 audit_logs restaurados de R2 → vanilla `postgres:18` ephemeral.
+- ✅ ATIVADO (mesma data, **2026-04-19**) o workflow `schema-drift.yml` Layer 2 — diff diário entre as migrations do repo e o schema vivo de produção, com `vars.HAS_PROD_DB_URL=true`. Resultado atual: **0 linhas de drift**. Procedimento e rotação on-call em [`docs/database/schema-drift-detection.md`](../database/schema-drift-detection.md).
 - 🟡 Próximo drill **live multi-cenário** (1, 2, 4, 5): 2026-Q3 — depende de provisão de staging Vercel + Supabase staging.
 
 **Evidência tabletop:** `docs/security/dr-evidence/2026-04-18/` (postmortem incluso)
