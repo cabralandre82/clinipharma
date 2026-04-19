@@ -154,6 +154,15 @@ jobs:
           DO $$ BEGIN
             CREATE ROLE service_role NOLOGIN BYPASSRLS;
           EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+          -- Realtime publication. Migration 034 calls
+          -- `ALTER PUBLICATION supabase_realtime ADD TABLE public.orders`;
+          -- in real Supabase the publication is created by the realtime
+          -- extension at provisioning. CREATE PUBLICATION ... WITH NO
+          -- TABLES is the supported "empty" form.
+          DO $$ BEGIN
+            CREATE PUBLICATION supabase_realtime;
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
           SQL
           echo "✓ Supabase-shaped bootstrap complete"
 
