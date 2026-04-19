@@ -21,6 +21,14 @@ const securityHeaders = [
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
   { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
   { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
+  // Wave Hardening III — `credentialless` enables cross-origin isolation
+  // (window.crossOriginIsolated === true) for SharedArrayBuffer and
+  // performance.measureUserAgentSpecificMemory, while still allowing
+  // no-credentials fetches to non-CORP-tagged subresources (e.g.
+  // Supabase Storage public objects, Sentry CDN). Stricter `require-corp`
+  // would break those — revisit when every cross-origin asset is served
+  // with `Cross-Origin-Resource-Policy: cross-origin`.
+  { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
   { key: 'X-Permitted-Cross-Domain-Policies', value: 'none' },
   { key: 'Origin-Agent-Cluster', value: '?1' },
 ]

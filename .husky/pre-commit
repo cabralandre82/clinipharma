@@ -1,1 +1,28 @@
 npx lint-staged
+
+# Wave Hardening III — local secret scan as a fast gate before push.
+#
+# We scan ONLY staged changes (`--staged`) so the cost is bounded by
+# the diff, not the full history (the CI Gitleaks job covers history).
+# If `gitleaks` is not installed locally we skip silently — CI is the
+# authoritative gate and we don't want to block contributors who
+# haven't installed the tool yet. Install via:
+#   • macOS: brew install gitleaks
+#   • linux: download from https://github.com/gitleaks/gitleaks/releases
+if command -v gitleaks >/dev/null 2>&1; then
+  echo "→ gitleaks (staged scan)"
+  if ! gitleaks protect --staged --redact --verbose; then
+    echo
+    echo "✖ gitleaks found a potential secret in staged changes."
+    echo "  Inspect the redacted output above, remove the secret, and"
+    echo "  if it's a false positive add an entry to .gitleaks.toml."
+    exit 1
+  fi
+else
+  # Print once per session to nudge installation without being noisy.
+  if [ -z "$CLINIPHARMA_GITLEAKS_REMINDER_SHOWN" ]; then
+    echo "ℹ gitleaks not installed locally — relying on CI scan."
+    echo "  Recommended: install gitleaks for fast local feedback."
+    export CLINIPHARMA_GITLEAKS_REMINDER_SHOWN=1
+  fi
+fi
