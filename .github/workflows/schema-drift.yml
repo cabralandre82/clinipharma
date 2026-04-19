@@ -72,6 +72,76 @@ jobs:
           echo "::error::postgres never became ready"
           exit 1
 
+      - name: Bootstrap Supabase-owned schemas + extensions
+        env:
+          PGPASSWORD: postgres
+          PGHOST: localhost
+          PGUSER: postgres
+          PGDATABASE: drift_check
+        run: |
+          # Repo migrations expect a Supabase-shaped database. We do not
+          # need the FULL Supabase platform — only the namespaces that
+          # `001_initial_schema.sql` etc. reference (auth, storage, etc.)
+          # and the extensions our app uses. The point of this job is to
+          # validate our own SQL, not Supabase's.
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE SCHEMA IF NOT EXISTS auth;
+          CREATE SCHEMA IF NOT EXISTS storage;
+          CREATE SCHEMA IF NOT EXISTS realtime;
+          CREATE SCHEMA IF NOT EXISTS vault;
+          CREATE SCHEMA IF NOT EXISTS extensions;
+
+          CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+          CREATE EXTENSION IF NOT EXISTS pgcrypto;
+          CREATE EXTENSION IF NOT EXISTS pg_trgm;
+          CREATE EXTENSION IF NOT EXISTS btree_gin;
+          CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+          -- Stub the auth helper functions our policies reference. We
+          -- never INVOKE them in this job (no rows are inserted), but
+          -- CREATE POLICY validates the function signature at parse time.
+          CREATE TABLE IF NOT EXISTS auth.users (
+            id uuid PRIMARY KEY,
+            email text,
+            encrypted_password text,
+            email_confirmed_at timestamptz,
+            phone text,
+            phone_confirmed_at timestamptz,
+            confirmation_token text,
+            recovery_token text,
+            email_change_token_new text,
+            email_change text,
+            raw_app_meta_data jsonb,
+            raw_user_meta_data jsonb,
+            is_super_admin boolean,
+            created_at timestamptz DEFAULT now(),
+            updated_at timestamptz DEFAULT now(),
+            last_sign_in_at timestamptz,
+            role text
+          );
+          CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
+            LANGUAGE sql STABLE AS $$ SELECT NULL::uuid $$;
+          CREATE OR REPLACE FUNCTION auth.role() RETURNS text
+            LANGUAGE sql STABLE AS $$ SELECT 'anon'::text $$;
+          CREATE OR REPLACE FUNCTION auth.email() RETURNS text
+            LANGUAGE sql STABLE AS $$ SELECT NULL::text $$;
+          CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb
+            LANGUAGE sql STABLE AS $$ SELECT '{}'::jsonb $$;
+
+          -- Roles the policies grant to. CREATE ROLE IF NOT EXISTS is
+          -- not portable; fall back to a DO block.
+          DO $$ BEGIN
+            CREATE ROLE anon NOLOGIN;
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+          DO $$ BEGIN
+            CREATE ROLE authenticated NOLOGIN;
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+          DO $$ BEGIN
+            CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+          SQL
+          echo "✓ Supabase-shaped bootstrap complete"
+
       - name: Apply migrations sequentially
         env:
           PGPASSWORD: postgres
