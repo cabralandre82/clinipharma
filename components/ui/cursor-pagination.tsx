@@ -22,7 +22,7 @@ const linkClass = cn(
 export function CursorPagination({
   nextCursor,
   prevCursor,
-  pageSize,
+  pageSize: _pageSize,
   resultCount,
 }: CursorPaginationProps) {
   const pathname = usePathname()

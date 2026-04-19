@@ -1,14 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import {
-  ScanText,
-  CheckCircle2,
-  AlertTriangle,
-  Loader2,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react'
+import { ScanText, AlertTriangle, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface ExtractedDoc {

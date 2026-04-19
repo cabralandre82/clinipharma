@@ -1,13 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import {
-  hasRole,
-  hasAnyRole,
-  isAdmin,
-  isSuperAdmin,
-  isSalesConsultant,
-  canManageClinic,
-  canManagePharmacy,
-} from '@/lib/rbac'
+import { isSalesConsultant, canManageClinic, canManagePharmacy } from '@/lib/rbac'
 import type { ProfileWithRoles } from '@/types'
 
 // Mock getCurrentUser so requireRole/requireRolePage can be tested

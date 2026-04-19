@@ -35,7 +35,6 @@ vi.mock('@/lib/inngest', () => ({
   },
 }))
 
-import * as notificationsModule from '@/lib/notifications'
 import * as aiModule from '@/lib/ai'
 import * as clicksignModule from '@/lib/clicksign'
 import * as adminModule from '@/lib/db/admin'

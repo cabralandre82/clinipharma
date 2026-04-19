@@ -46,17 +46,30 @@ function InputGroupAddon({
   align = 'inline-start',
   ...props
 }: React.ComponentProps<'div'> & VariantProps<typeof inputGroupAddonVariants>) {
+  const focusSiblingInput = (target: EventTarget) => {
+    const el = target as HTMLElement
+    if (el.closest('button')) return
+    el.parentElement?.querySelector('input')?.focus()
+  }
+
   return (
+    // Visual addon (icon, prefix, suffix) wrapping an <input>. The click/key
+    // handlers are convenience focus-forwarders; keyboard users already reach
+    // the underlying <input> via Tab. We add onKeyDown to make the
+    // mouse-equivalence accessible, and silence the noninteractive-role rule
+    // since adding role="button" would (incorrectly) imply this wraps a button.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
       role="group"
       data-slot="input-group-addon"
       data-align={align}
       className={cn(inputGroupAddonVariants({ align }), className)}
-      onClick={(e) => {
-        if ((e.target as HTMLElement).closest('button')) {
-          return
+      onClick={(e) => focusSiblingInput(e.currentTarget)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          focusSiblingInput(e.currentTarget)
         }
-        e.currentTarget.parentElement?.querySelector('input')?.focus()
       }}
       {...props}
     />

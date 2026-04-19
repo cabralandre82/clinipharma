@@ -5,7 +5,6 @@
  * detection logic without actually connecting to Redis.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { parseCursorParams, sliceCursorResult } from '@/lib/cursor-pagination'
 
 // ── Rate limiter — in-memory backend ──────────────────────────────────────
 // Import after vi.mock to get a fresh module

@@ -121,7 +121,6 @@ export function ProductForm({
     setLoading(true)
     try {
       if (isEditing && product) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { price_current: _price, ...updateData } = data
         const result = await updateProduct(product.id, updateData)
         if (result.error) {

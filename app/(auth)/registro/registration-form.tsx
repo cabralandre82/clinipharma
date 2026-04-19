@@ -163,7 +163,7 @@ export function RegistrationForm() {
   }
 
   // ── Step 2 → step 3: save draft silently ──
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   async function handleFormNext(_data: ClinicFormData | DoctorFormData) {
     setSavingDraft(true)
     try {

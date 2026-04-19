@@ -111,7 +111,6 @@ export async function evaluateOrderDocuments(orderId: string, actorUserId: strin
     .select('id, status, rejection_reason')
     .eq('order_id', orderId)
 
-  const hasRejected = docs?.some((d) => d.status === 'REJECTED') ?? false
   const hasPending = docs?.some((d) => d.status === 'PENDING') ?? false
 
   // Determine per-item doc_status

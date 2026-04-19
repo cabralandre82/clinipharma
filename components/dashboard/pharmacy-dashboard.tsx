@@ -2,15 +2,7 @@ import { Suspense } from 'react'
 import { createAdminClient } from '@/lib/db/admin'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import {
-  Package,
-  Truck,
-  AlertTriangle,
-  Clock,
-  FlaskConical,
-  FileSearch,
-  PackageCheck,
-} from 'lucide-react'
+import { Truck, AlertTriangle, Clock, FlaskConical, FileSearch, PackageCheck } from 'lucide-react'
 import type { ProfileWithRoles } from '@/types'
 import Link from 'next/link'
 import { formatCurrency, formatDate } from '@/lib/utils'

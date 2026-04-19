@@ -125,7 +125,9 @@ export function CategoriesManager({ categories: initial }: CategoriesManagerProp
     })
   }
 
-  function handleReorder(id: string, value: string) {
+  // Reserved for upcoming drag-and-drop reorder UI; kept here so the server
+  // action `reorderCategory` is exercised by typecheck and not tree-shaken.
+  function _handleReorder(id: string, value: string) {
     const n = Number(value)
     if (isNaN(n)) return
     startTransition(async () => {

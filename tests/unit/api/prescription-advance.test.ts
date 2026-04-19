@@ -49,7 +49,6 @@ function makeParams(id = 'order-1') {
 function makeAdmin(order: object | null) {
   const historyInsert = vi.fn().mockResolvedValue({ error: null })
   const orderUpdate = vi.fn().mockResolvedValue({ error: null })
-  const historyInsertChain = { insert: historyInsert }
   const orderChain = {
     update: () => ({ eq: () => orderUpdate() }),
     insert: () => historyInsert(),

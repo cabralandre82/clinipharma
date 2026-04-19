@@ -11,7 +11,7 @@
  * 7. DB constraint logic (simulated)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 // ── 6. SMS / WhatsApp empty phone guards ────────────────────────────────────
 

@@ -102,7 +102,7 @@ describe('getSlaConfigs', () => {
 
   it('fallback values are internally consistent (warning < alert < critical)', () => {
     // Test the fallback math directly
-    for (const [status, days] of Object.entries(STALE_THRESHOLDS)) {
+    for (const [, days] of Object.entries(STALE_THRESHOLDS)) {
       const warning = Math.floor(days * 0.6)
       const alert = days
       const critical = Math.ceil(days * 1.5)

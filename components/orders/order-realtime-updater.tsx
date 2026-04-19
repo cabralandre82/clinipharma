@@ -46,7 +46,7 @@ interface Props {
  */
 export function OrderRealtimeUpdater({ orderId, onConnectionChange }: Props) {
   const router = useRouter()
-  const [connected, setConnected] = useState(false)
+  const [, setConnected] = useState(false)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const clientRef = useRef<SupabaseClient | null>(null)
 

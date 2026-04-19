@@ -36,7 +36,7 @@ export const churnDetectionJob = inngest.createFunction(
       const admin = createAdminClient()
 
       // Clinics with at least 1 completed order — compute avg cycle + days since last order
-      const { data: cycleData, error: cycleErr } = await admin.rpc('compute_clinic_order_cycles')
+      const { error: cycleErr } = await admin.rpc('compute_clinic_order_cycles')
 
       if (cycleErr) {
         // Fallback: inline query if RPC doesn't exist
@@ -182,8 +182,6 @@ export const churnDetectionJob = inngest.createFunction(
 
     // Notify for each at-risk clinic
     await step.run('send-churn-notifications', async () => {
-      const admin = createAdminClient()
-
       for (const signal of atRisk) {
         const riskLabel = signal.score >= 60 ? 'ALTO' : 'MODERADO'
         const message =

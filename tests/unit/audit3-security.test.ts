@@ -7,7 +7,7 @@
  * 3. State machine edge cases
  * 4. Commission calculation edge cases
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { isValidTransition, getAllowedTransitions } from '@/lib/orders/status-machine'
 
 // ─── State Machine Tests ────────────────────────────────────────────────────

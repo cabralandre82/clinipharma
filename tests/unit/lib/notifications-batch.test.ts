@@ -4,7 +4,7 @@
  * We test the isPreferenceEnabled pure function (exported indirectly via
  * the module behavior) and the batch-query flow via mocked admin client.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { SILENCEABLE_TYPES, CRITICAL_TYPES } from '@/lib/notification-types'
 
 // ── isPreferenceEnabled (pure function, tested directly) ──────────────────
