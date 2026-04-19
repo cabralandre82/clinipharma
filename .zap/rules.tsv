@@ -12,6 +12,39 @@
 #
 # Reference: https://www.zaproxy.org/docs/alerts/
 
+# ─── Cookie No HttpOnly Flag (10010) ─────────────────────────────────
+# The `__Host-csrf` cookie is INTENTIONALLY non-HttpOnly. Double-submit
+# CSRF defence requires the client JS to read the cookie and echo it
+# back via the X-CSRF-Token header — HttpOnly would defeat that. The
+# cookie carries no auth material; only an opaque 32-byte token whose
+# only purpose is to be matched against a request header. See
+# `lib/security/csrf.ts:236` and `docs/security/csp.md`.
+10010	IGNORE	(__Host-csrf must be JS-readable for double-submit CSRF; carries no auth material)
+
+# ─── Cross-Domain Misconfiguration (10098) ───────────────────────────
+# Vercel sets `Access-Control-Allow-Origin: *` on `/_next/static/**`
+# (CSS chunks, JS bundles, font files, images). Those assets are
+# already public to anyone who loads the site — CORS `*` only allows
+# programmatic fetch from other origins of files that browsers serve
+# unrestricted to anyone. There is no exposed credential or secret.
+# This rule cannot be scoped to a path glob in the baseline action,
+# so we suppress globally; if we ever set CORS `*` on an API endpoint
+# carrying credentials, the regression will surface via CodeQL +
+# integration tests, not this rule.
+10098	IGNORE	(Static asset CORS `*` is intentional Vercel default; bundles carry no secrets)
+
+# ─── CSP Notices (10055) ─────────────────────────────────────────────
+# ZAP flags two patterns in our CSP:
+#   1. `style-src-attr 'unsafe-inline'` — required so React's inline
+#      `style={{...}}` JSX prop renders. Without it every dynamic style
+#      breaks. Cannot be hashed at build time. Documented in
+#      `lib/security/csp.ts:55`.
+#   2. `script-src https: http:` fallback for legacy browsers without
+#      `'strict-dynamic'` support. Modern browsers ignore the fallback.
+#      The `'strict-dynamic'` directive is the actual gate.
+# Both are documented decisions, not regressions.
+10055	IGNORE	(style-src-attr 'unsafe-inline' = React style prop; https: fallback = pre-strict-dynamic browsers)
+
 # ─── Anti-CSRF tokens (10202) ────────────────────────────────────────
 # We protect mutating endpoints with the Origin/Referer + double-submit
 # cookie pattern (lib/security/csrf.ts), not synchroniser tokens. ZAP's

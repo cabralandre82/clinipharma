@@ -41,6 +41,10 @@ const apiCacheHeaders = [
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
+  // Strip the `X-Powered-By: Next.js` response header. Surfaces the
+  // framework version to anyone scanning, which is gratuitous tech-stack
+  // disclosure (CWE-497). Caught by ZAP baseline scan rule 10037.
+  poweredByHeader: false,
   images: {
     remotePatterns: [
       {

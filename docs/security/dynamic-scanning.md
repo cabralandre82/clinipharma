@@ -57,15 +57,21 @@ The active overrides live in `.zap/rules.tsv`. Each entry MUST carry
 a one-line justification — drift in the rationale is a code-review
 smell.
 
-| ID    | Action | Why                                                                                                |
-| ----- | ------ | -------------------------------------------------------------------------------------------------- |
-| 10202 | IGNORE | We use Origin + double-submit cookie (`lib/security/csrf.ts`); ZAP heuristic flags every form.     |
-| 10049 | IGNORE | Streaming RSC default; sensitive routes set their own `no-store` via dedicated handlers.           |
-| 10054 | WARN   | Supabase SSR cookies use browser-default SameSite; CSRF mitigated one layer up.                    |
-| 10021 | WARN   | `X-Content-Type-Options` enforced in `next.config.ts`; streaming may delay first-chunk inspection. |
+| ID    | Action | Why                                                                                                           |
+| ----- | ------ | ------------------------------------------------------------------------------------------------------------- |
+| 10010 | IGNORE | `__Host-csrf` MUST be JS-readable for double-submit pattern; carries no auth material.                        |
+| 10098 | IGNORE | Vercel sets CORS `*` on `/_next/static/**`; bundles are public assets, no secrets exposed.                    |
+| 10055 | IGNORE | `style-src-attr 'unsafe-inline'` required for React inline styles; `https:` fallback is pre-`strict-dynamic`. |
+| 10202 | IGNORE | We use Origin + double-submit cookie (`lib/security/csrf.ts`); ZAP heuristic flags every form.                |
+| 10049 | IGNORE | Streaming RSC default; sensitive routes set their own `no-store` via dedicated handlers.                      |
+| 10054 | WARN   | Supabase SSR cookies use browser-default SameSite; CSRF mitigated one layer up.                               |
+| 10021 | WARN   | `X-Content-Type-Options` enforced in `next.config.ts`; streaming may delay first-chunk inspection.            |
 
-Re-evaluate the entire table annually (next: 2027-04). Any new
-IGNORE during interim must be paired with a tracking issue.
+Each `IGNORE` was reviewed during the **2026-04-19 baseline triage**
+of the first scheduled run (issue #17). Re-evaluate the entire table
+annually (next: 2027-04). Any new `IGNORE` during interim must be
+paired with a tracking issue and cite the workflow run that surfaced
+the false positive.
 
 ## 4. Gate and alerting
 
@@ -148,6 +154,7 @@ What this scan does NOT cover, with the trigger to revisit:
 
 ## 9. Change log
 
-| Date       | Change                                                                |
-| ---------- | --------------------------------------------------------------------- |
-| 2026-04-19 | Initial activation. Weekly cadence, Medium+ gate, 4 suppressed rules. |
+| Date       | Change                                                                                                                                                                                                                                                                 |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-04-19 | Initial activation. Weekly cadence, Medium+ gate, 4 suppressed rules.                                                                                                                                                                                                  |
+| 2026-04-19 | First baseline triage (run 24642147184, issue #17): 12 findings → 0 real issues remaining. Added IGNORE rules 10010, 10098, 10055 with written rationale; fixed one Low (`poweredByHeader: false` in `next.config.ts` strips `X-Powered-By: Next.js`, ZAP rule 10037). |
