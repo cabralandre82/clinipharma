@@ -91,11 +91,15 @@ jobs:
           CREATE SCHEMA IF NOT EXISTS vault;
           CREATE SCHEMA IF NOT EXISTS extensions;
 
-          CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-          CREATE EXTENSION IF NOT EXISTS pgcrypto;
-          CREATE EXTENSION IF NOT EXISTS pg_trgm;
-          CREATE EXTENSION IF NOT EXISTS btree_gin;
-          CREATE EXTENSION IF NOT EXISTS btree_gist;
+          -- Supabase installs every extension into the `extensions`
+          -- schema (see their `_supabase` setup). Migration 055 calls
+          -- `extensions.digest(...)`, which is pgcrypto. We mirror the
+          -- placement so the qualified call resolves.
+          CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA extensions;
+          CREATE EXTENSION IF NOT EXISTS pgcrypto SCHEMA extensions;
+          CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA extensions;
+          CREATE EXTENSION IF NOT EXISTS btree_gin SCHEMA extensions;
+          CREATE EXTENSION IF NOT EXISTS btree_gist SCHEMA extensions;
 
           -- Stub the auth helper functions our policies reference. We
           -- never INVOKE them in this job (no rows are inserted), but
