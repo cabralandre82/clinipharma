@@ -273,15 +273,26 @@ jobs:
       - name: Diff schemas
         id: diff
         run: |
-          # Normalise both files (trim whitespace, sort statements when
-          # they're semantically order-independent like CREATE INDEX).
-          # We use a soft diff that ignores `SET` statements and comments
-          # so PG version drift in the dumper itself doesn't trigger a
-          # false positive.
-          diff -u \
-            <(grep -vE '^(SET |--)' schema-from-migrations.sql | sort -u) \
-            <(grep -vE '^(SET |--)' schema-from-production.sql | sort -u) \
-            > schema-drift.diff || true
+          # Normalise both files. We strip:
+          #   - SET statements and SQL comments (line-level pg_dump output)
+          #   - \restrict / \unrestrict markers — pg_dump 18 emits a random
+          #     token per dump, never stable
+          #   - Supabase platform-managed objects: extensions (pg_graphql,
+          #     supabase_vault, pg_stat_statements), event triggers
+          #     installed by Supabase (issue_pg_*, pgrst_*, set_graphql_*)
+          #     and the supabase_realtime_messages_publication that comes
+          #     with the realtime extension. These are the platform's
+          #     property and we must not codify them in our migrations.
+          # Then sort -u so semantically order-independent statements
+          # (CREATE INDEX, ALTER PUBLICATION ADD TABLE, etc.) don't
+          # produce false positives.
+          NORMALIZE='grep -vE "^(SET |--|\\\\restrict|\\\\unrestrict)" \
+            | grep -vE "(pg_graphql|supabase_vault|supabase_realtime_messages_publication|issue_pg_cron_access|issue_pg_graphql_access|issue_pg_net_access|issue_graphql_placeholder|pgrst_ddl_watch|pgrst_drop_watch|set_graphql_placeholder|grant_pg_cron_access|grant_pg_graphql_access|grant_pg_net_access)" \
+            | grep -vE "^(COMMENT ON EXTENSION|CREATE EXTENSION IF NOT EXISTS) (pg_stat_statements)" \
+            | sort -u'
+          eval "$NORMALIZE" < schema-from-migrations.sql > /tmp/mig.norm
+          eval "$NORMALIZE" < schema-from-production.sql > /tmp/prod.norm
+          diff -u /tmp/mig.norm /tmp/prod.norm > schema-drift.diff || true
           if [ -s schema-drift.diff ]; then
             echo "drift=true" >> "$GITHUB_OUTPUT"
             echo "::error::Schema drift detected — see schema-drift.diff artifact."
