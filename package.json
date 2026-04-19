@@ -18,6 +18,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:smoke": "playwright test smoke --project=chromium",
     "test:e2e:report": "playwright show-report",
+    "secrets:export-manifest": "node scripts/secrets/export-manifest.mjs",
     "prepare": "husky"
   },
   "lint-staged": {
