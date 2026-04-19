@@ -1,10 +1,11 @@
 # Synthetic Monitoring
 
-| Field         | Value                                                           |
-| ------------- | --------------------------------------------------------------- |
-| Owner         | Engineering / SRE                                               |
-| Last reviewed | 2026-04-18                                                      |
-| Pairs with    | `docs/observability/slos.md`, `docs/observability/burn-rate.md` |
+| Field         | Value                                                                   |
+| ------------- | ----------------------------------------------------------------------- |
+| Owner         | Engineering / SRE                                                       |
+| Last reviewed | 2026-04-19                                                              |
+| Pairs with    | `docs/observability/slos.md`, `docs/observability/burn-rate.md`         |
+| Layers active | **Layer 1** (in-cluster cron) + **Layer 2** (external — GitHub Actions) |
 
 ## Why synthetic monitoring exists
 
@@ -26,14 +27,18 @@ We have **two layers**:
    hits `/api/health/{live,ready}` + `/api/status/summary` from
    _another_ function in the same Vercel project. Catches everything
    except a full Vercel project outage.
-2. **External probe** _(promotion path)_ — third-party uptime checker
-   (UptimeRobot / BetterStack / Checkly) hitting the same URLs from
-   distinct PoPs. Catches the failures the in-cluster probe cannot
-   see.
+2. **External probe** — `.github/workflows/external-probe.yml`, every
+   5 min, hits the same public URLs from a GitHub Actions runner.
+   GitHub Actions runs on Microsoft Azure, completely independent of
+   our Vercel project, so it stays up when Vercel is down. Catches
+   the failures the in-cluster probe cannot see.
 
-The in-cluster probe is shipped today. The external probe is documented
-below as the explicit next step when incident frequency justifies the
-additional cost.
+Both layers are shipped and active. The split between them is
+load-bearing: a green Layer 1 + red Layer 2 means our edge is fine but
+the platform is unreachable from outside (DNS, TLS, Vercel-wide
+outage); a red Layer 1 + green Layer 2 means the public surface is
+healthy but our internal control plane is broken (cron infra, DB
+connectivity from cron, etc.).
 
 ## Layer 1 — In-cluster probe (shipped)
 
@@ -107,47 +112,115 @@ For drills, set `SYNTHETIC_PROBE_BASE_URL` to a sinkhole
 Reset to the production URL after the drill and document it in
 `docs/runbooks/fire-drill-YYYY-MM.md`.
 
-## Layer 2 — External probe (promotion path)
+## Layer 2 — External probe (shipped 2026-04-19)
 
-### When to add it
+### Why GitHub Actions instead of a vendor
 
-Add an external probe when **either** of these is true:
+We considered BetterStack, Checkly, and UptimeRobot. GitHub Actions
+won on three criteria:
 
-- Two consecutive months had a P1 incident invisible to the
-  in-cluster probe (i.e. the project itself was down).
-- A customer SLA contract requires third-party uptime evidence.
+1. **Auditability.** The probe configuration is a workflow file in this
+   repo. No vendor account, no separate UI to lose track of, every
+   change to the cadence or targets shows up in `git log`.
+2. **Cost.** This repo is public, which means Actions minutes are
+   unlimited. Vendor free tiers cap at 10 monitors / 3-min cadence
+   (BetterStack) or 50 monitors / 5-min cadence (UptimeRobot).
+3. **Independence.** GitHub Actions runs on Microsoft Azure
+   infrastructure. A Vercel-wide outage cannot take it down. A
+   GitHub-wide outage CAN take it down, but a GitHub outage and a
+   Vercel outage at the same time is correlated risk we accept.
 
-Until then the in-cluster probe is sufficient and zero-cost.
+We retain the option to layer a third-party probe on top later if the
+incident pattern warrants it.
 
-### Recommended providers (no commitment)
+### Schedule
 
-| Provider    | Notes                                            |
-| ----------- | ------------------------------------------------ |
-| BetterStack | Generous free tier (10 monitors, 3-min cadence). |
-| Checkly     | Code-as-monitor (Playwright scripts), great DX.  |
-| UptimeRobot | Cheapest, 5-min cadence on free tier.            |
+| When                | What                                                               |
+| ------------------- | ------------------------------------------------------------------ |
+| `*/5 * * * *`       | Scheduled run from GitHub. Cadence matches Layer 1.                |
+| `workflow_dispatch` | Manual run. Optional `target_url` input lets you point at staging. |
 
-All three support webhook-style alerting. Wire the webhook to the
-PagerDuty schedule named in `docs/observability/burn-rate.md`.
+`concurrency.cancel-in-progress: true` ensures a slow probe never
+queues up behind the next 5-min tick.
 
-### What to probe externally
+### Targets
 
-Same three URLs as Layer 1, plus a single deep-probe of the login
-page (`/login` returns 200 and contains the string `Clinipharma`).
-The login probe catches frontend asset bundling failures that the
-JSON health endpoints cannot see.
+| Target              | Validates                             |
+| ------------------- | ------------------------------------- |
+| `/api/health/live`  | function process boots, no panic      |
+| `/api/health/ready` | DB reachable, all required envs set   |
+| `/login`            | edge serves HTML, app bundle loads    |
+| `/registro`         | public registration page is reachable |
 
-### Required Vercel configuration
+`/api/status/summary` and `/status` are deliberately NOT probed because
+they 307-redirect to `/login?next=...` (auth gate) and a redirect
+following can mask a real failure on the original endpoint. Layer 1
+hits them from inside the project where redirects don't apply.
 
-If the external probe needs to bypass the deployment-protection
-shield (for preview environments), set:
+### Authentication
+
+None. Every probed URL is public by design — these are the same paths
+an end user can hit without an account. The probe identifies itself
+with `user-agent: clinipharma-external-probe/1.0` so it can be
+filtered out of analytics.
+
+If you ever add an authenticated target, prefer:
+
+1. Mint a short-lived JWT inside the workflow with a probe-only role
+   (store the signing key in `secrets.PROBE_JWT_SIGNING_KEY`).
+2. Verify the JWT in the target via the standard middleware path —
+   no special probe-only branch.
+
+### Result handling
+
+Each run writes a `probe.jsonl` artifact (one line per target) with
+status code, latency, body size, and a `reason` field on failure.
+Retention is 7 days, enough to triage two consecutive weekend outages
+without manual log-shipping.
+
+When ANY target fails:
+
+1. The job exits non-zero (so the GitHub run is red and the
+   `external-probe.yml` workflow shows an X in the Actions tab).
+2. A second job (`alert`) opens — or comments on — a GitHub Issue
+   labelled `probe-failure`. The label is auto-created on first use.
+   Issue title is fixed (`🔴 External probe failing`) so dedup is
+   trivial: never more than one open issue at a time.
+3. If you wire `secrets.SLACK_WEBHOOK_URL` (not done today), the
+   `alert` job can also POST to Slack — see the commented block at
+   the bottom of the workflow.
+
+When ALL targets pass and there is an open `probe-failure` issue, the
+`recover` job inspects the previous run on `main`. If it ALSO passed,
+the issue auto-closes. This `2-greens-to-close` rule prevents flapping
+issues from a single transient blip.
+
+### Drill cadence
+
+Quarterly fire-drill: dispatch the workflow with
+`target_url=https://httpbin.org/status/503` and verify the alert path
+fires (issue opens, comment lands, label applied). Reset to default
+afterward and document the drill in `docs/runbooks/fire-drill-YYYY-QN.md`.
+
+### Bypassing Vercel deployment protection (staging)
+
+Production aliases (`clinipharma.com.br`) are public. Preview
+deployments behind Vercel's automation bypass shield require:
 
 ```bash
-vercel env add VERCEL_AUTOMATION_BYPASS_SECRET production
+gh secret set VERCEL_AUTOMATION_BYPASS_SECRET --body '<secret>'
 ```
 
-then configure the probe to send `x-vercel-protection-bypass:
-$VERCEL_AUTOMATION_BYPASS_SECRET` on every request.
+then add to the probe step:
+
+```yaml
+-H "x-vercel-protection-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}"
+-H "x-vercel-set-bypass-cookie: true"
+```
+
+Today we probe production only; the staging branch is left un-probed
+until that secret is provisioned (see PENDING items in the Wave-16
+roadmap).
 
 ## Verification
 
@@ -166,6 +239,7 @@ local dev server is healthy.
 
 ## Change log
 
-| Date       | Change                                                                                   |
-| ---------- | ---------------------------------------------------------------------------------------- |
-| 2026-04-18 | Initial publication. Layer 1 (in-cluster) shipped, Layer 2 documented as promotion path. |
+| Date       | Change                                                                                                                                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-04-18 | Initial publication. Layer 1 (in-cluster) shipped, Layer 2 documented as promotion path.                                                                                                          |
+| 2026-04-19 | Layer 2 shipped via `.github/workflows/external-probe.yml`. Probes 4 public URLs every 5 min from a GitHub-hosted runner; auto-opens/closes a `probe-failure` issue with 2-greens-to-close dedup. |
