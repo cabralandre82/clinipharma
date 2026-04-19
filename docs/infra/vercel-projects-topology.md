@@ -1,119 +1,159 @@
 # Topologia dos projetos Vercel
 
-> **Status:** Vivo (atualizado em 2026-04-19, após reconciliação de envs).
+> **Status:** Vivo. Última mudança: **2026-04-19** — consolidação no projeto
+> `clinipharma`, projeto `b2b-med-platform` desligado do Git (em quarentena).
 > **Owner:** Plataforma + DPO.
 
-## TL;DR
+## TL;DR (estado atual)
 
-O domínio público `clinipharma.com.br` (clientes reais) e o domínio interno
-`b2b-med-platform.vercel.app` (uso operacional + base do staging) são servidos
-por **dois projetos Vercel distintos**, ambos buildando o **mesmo branch
-`main`** do mesmo repo Git. Não é uma relação prod ↔ stage; é **prod ↔ prod
-paralela**. O staging real fica num **terceiro target**: o branch `staging` do
-projeto `b2b-med-platform` (Vercel "Preview" + Supabase de staging).
+Existe **um único projeto Vercel ativo**: `clinipharma`. Ele serve:
+
+- `clinipharma.com.br` ← branch `main` (produção, clientes reais)
+- `staging.clinipharma.com.br` ← branch `staging` (Vercel Preview, Supabase de
+  staging). DNS público desse subdomínio **não está configurado** ainda — o
+  alias existe no Vercel, mas o registro CNAME no DNS público nunca foi criado.
+  Acessível via `https://clinipharma-git-staging-cabralandre-3009s-projects.vercel.app`
+  (com bypass de Deployment Protection).
 
 ```
                                  ┌─────────────────────────────────────────┐
    github.com/.../main           │ Vercel project: clinipharma             │
    ─────────────► branch main ──►│ Domain: clinipharma.com.br (clientes)   │
                                  │ Supabase prod (jomdntq…)                │
+   ─────────────► branch staging ──► alias staging.clinipharma.com.br      │
+                                 │ Supabase staging (ghjexiy…)             │
                                  └─────────────────────────────────────────┘
-                       │
-                       │ mesmo commit, dois builds
-                       ▼
+
+   Em quarentena (sem Git, congelado, mantido como backup até 2026-05-03):
                                  ┌─────────────────────────────────────────┐
                                  │ Vercel project: b2b-med-platform        │
                                  │ Domain: b2b-med-platform.vercel.app     │
-                                 │ Supabase prod (jomdntq…)                │
-                                 │                                         │
-                                 │ + branch staging ──► Preview deploy     │
-                                 │   Domain: b2b-med-platform-git-staging… │
-                                 │   Supabase staging (ghjexiy…)           │
+                                 │ Git link: REMOVIDO                      │
+                                 │ Crons: ainda agendados (mas dedup via   │
+                                 │ Upstash lock — sem double execution)    │
                                  └─────────────────────────────────────────┘
 ```
 
-## Por que dois projetos servindo o mesmo `main`?
+## Como chegamos aqui (histórico)
 
-Histórico: o domínio `clinipharma.com.br` foi conectado ao projeto `clinipharma`
-antes do projeto `b2b-med-platform` existir. Quando o repo migrou de nome, o
-projeto novo foi criado pra refletir o novo nome do repo, mas o domínio nunca
-foi reapontado. Os dois projetos seguiram em paralelo, e as envs novas (Sentry,
-Upstash, Zenvia) foram adicionadas só no novo, gerando drift silencioso.
+1. **Origem (pré-2026-04-09):** projeto `clinipharma` foi criado primeiro,
+   com o domínio `clinipharma.com.br` apontado pra ele. Era a única coisa
+   servindo clientes.
+2. **2026-04-17:** projeto `b2b-med-platform` foi criado (provavelmente
+   resultado de um rename do repo). Vercel reconectou o repo a um nome novo,
+   mas o domínio `clinipharma.com.br` permaneceu no projeto antigo.
+3. **2026-04-17 → 2026-04-19:** waves de hardening (Sentry, Upstash, Zenvia
+   substituindo Twilio/Evolution) foram aplicadas **só** em
+   `b2b-med-platform`. O `clinipharma` (= produção real) ficou com:
+   - Sentry desligado → erros não capturados.
+   - Rate-limit em memória → sem proteção distribuída.
+   - **SMS desabilitado** → clientes não recebiam confirmação de pedido,
+     pagamento, despacho etc. O código (`lib/zenvia.ts:40`) só logava
+     `warn` e seguia em frente.
+   - OpenAI desligado → OCR e document-review silenciosamente desativados.
+   - Cron jobs duplicados rodando sem coordenação (sem Redis lock).
+4. **2026-04-19 (manhã):** drift detectado.
+5. **2026-04-19 (tarde):** **reconciliação** — 10 envs de produção e 6 de
+   staging copiadas pro `clinipharma`. Domain `staging.clinipharma.com.br`
+   movido pro `clinipharma`. Projeto `b2b-med-platform` desconectado do Git
+   (deploys automáticos parados). Documentado neste arquivo.
 
-## Drift detectado em 2026-04-19
+## Por que `b2b-med-platform` ficou em quarentena (não deletado)
 
-Antes da reconciliação, o projeto `clinipharma` (= produção real do
-`clinipharma.com.br`) **não tinha** as seguintes envs, que existem no projeto
-`b2b-med-platform`:
+- Histórico de deploys e logs preservados para forense em caso de regressão.
+- Reverter a inversão é trivial: re-linkar o repo, re-mover o subdomínio
+  de staging, atualizar `.vercel/project.json`. ~2 minutos.
+- **Crons ainda estão agendados** lá. Como o `clinipharma` agora também tem
+  Upstash, o `lib/cron/guarded.ts` faz lock distribuído via Redis e cada
+  job roda no máximo uma vez (independente de quantos projetos disparam).
+  Risco de double execution = ~0.
+- **Plano de remoção:** após 2 semanas de operação estável (= 2026-05-03),
+  deletar o projeto `b2b-med-platform`. Update este doc.
 
-| Env                            | Impacto da ausência em prod real                                            |
-| ------------------------------ | --------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SENTRY_DSN`       | Sentry desativado (client + server). Erros não capturados.                  |
-| `SENTRY_ORG`, `SENTRY_PROJECT` | Source maps não associados a release no Sentry.                             |
-| `UPSTASH_REDIS_REST_URL`       | Rate-limit cai pra in-memory (`lib/rate-limit.ts:201`). Sem persistência    |
-| `UPSTASH_REDIS_REST_TOKEN`     | entre lambdas e sem proteção real contra abuso distribuído.                 |
-| `ZENVIA_API_TOKEN`             | **Crítico**: SMS/WhatsApp silenciosamente desabilitados                     |
-| `ZENVIA_SMS_FROM`              | (`lib/zenvia.ts:40` apenas loga `warn` e pula). Clientes reais não recebiam |
-| `ZENVIA_WHATSAPP_FROM`         | nada. Twilio/Evolution não voltam — foram removidos do código.              |
-| `OPENAI_API_KEY`               | Funcionalidades de IA (OCR, classificação, document review) silenciosas.    |
-| `CLINIPHARMA_REP_EMAIL`        | E-mails de contato/representante saíam vazios ou com fallback.              |
+## Inversão executada — registro técnico
 
-`SENTRY_AUTH_TOKEN` ficou de fora porque está vazia também em
-`b2b-med-platform` (token foi rotacionado e removido por engano; rotação está
-no backlog do runbook `secret-rotation.md`).
+| Passo                                                                    | Ferramenta                                                                                    | Resultado                                                                                                    |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 1. Copiar 10 envs production (Sentry, Upstash, Zenvia, OpenAI, repEmail) | `vercel env pull` + `POST /v10/projects/clinipharma/env`                                      | 10/10 OK; `ZENVIA_WHATSAPP_FROM` removida depois (WhatsApp não configurado ainda)                            |
+| 2. Redeploy production do `clinipharma`                                  | `POST /v13/deployments?forceNew=1`                                                            | `dpl_EEZoxiesedo4wbb2G1rSvjzbSfHf` READY; CSP `connect-src` passou a incluir endpoint Sentry automaticamente |
+| 3. Copiar 6 envs staging (Supabase staging + Asaas URL + bypass)         | mesmo método, com `gitBranch=staging`                                                         | 6/6 OK                                                                                                       |
+| 4. Setar `buildCommand` e `installCommand` explícitos no `clinipharma`   | `PATCH /v9/projects/clinipharma`                                                              | OK                                                                                                           |
+| 5. Mover `staging.clinipharma.com.br` entre projetos                     | `DELETE /v9/projects/b2b-med-platform/domains/...` + `POST /v10/projects/clinipharma/domains` | OK, `verified=true` imediato (Vercel não reverifica subdomínio dentro da mesma org)                          |
+| 6. Deploy do branch `staging` no `clinipharma`                           | `POST /v13/deployments` com `gitSource.ref=staging`                                           | `dpl_8fBLAVGs9Gz3XzgbCgnnPoNJuUC9` READY; alias `staging.clinipharma.com.br` vinculado                       |
+| 7. Desconectar Git do `b2b-med-platform`                                 | `DELETE /v9/projects/b2b-med-platform/link`                                                   | OK; deploys automáticos pausados                                                                             |
 
-## Reconciliação executada em 2026-04-19
+## O que **NÃO** foi feito (intencional ou pendente)
 
-```
-POST /v10/projects/clinipharma/env  (10 envs, target=production+preview)
-- Tipos preservados (encrypted/plain) iguais aos do projeto fonte.
-- Após upsert: redeploy production forçado (forceNew=1).
-- Build OK; CSP report-only correta; connect-src passou a incluir
-  o endpoint do Sentry automaticamente; /api/health=200.
-```
+- **DNS público de `staging.clinipharma.com.br`** — não criado. Esse
+  subdomínio nunca foi resolvível externamente (é uma config histórica
+  fantasma). Quem quer abrir staging pra mais usuários precisa criar o
+  CNAME apontando pro Vercel.
+- **Bypass token de staging** — copiei a env `VERCEL_AUTOMATION_BYPASS_SECRET`
+  do projeto antigo, mas o token bypass é configurado **por projeto** em
+  Settings → Deployment Protection. Pra liberar acesso programático ao
+  staging novo, ativar o bypass no projeto `clinipharma` (gera novo secret)
+  e atualizar a env.
+- **WhatsApp** — env `ZENVIA_WHATSAPP_FROM` não foi propagada. Sender
+  WhatsApp ainda não foi registrado na Zenvia. Stack trata graciosamente
+  (`lib/zenvia.ts:117-120`): só loga `warn` e pula. Quando o sender for
+  configurado, basta adicionar a env nos targets `production` e `preview`.
 
-Ferramenta usada: Vercel REST API (`v10/projects/{id}/env` + `v13/deployments`),
-não a CLI, por causa do prompt interativo de branch que `vercel env add`
-exige em targets `preview`.
-
-## Recomendações futuras
-
-1. **Médio prazo (recomendado):** mover o domínio `clinipharma.com.br` para o
-   projeto `b2b-med-platform` e arquivar o projeto `clinipharma`. Isso elimina
-   a possibilidade de drift voltar a aparecer. Janela: ~5 min de potencial
-   propagação DNS; passo a passo no Vercel: `Settings → Domains → Transfer to
-another project`.
-2. **Curto prazo (até a migração):** qualquer env nova adicionada ao projeto
-   `b2b-med-platform` precisa ser replicada manualmente para `clinipharma`. O
-   PR template tem checklist; o processo ainda não é automático.
-3. **Idealmente:** adicionar workflow de CI que faça `vercel env ls` em ambos
-   os projetos e quebre se a interseção das chaves divergir. Issue tracker
-   referenciar `docs/infra/vercel-projects-topology.md`.
-
-## Comandos úteis
+## Conta de comandos para próximas vezes
 
 ```bash
-# Listar envs (chaves apenas, sem decryptar) de cada projeto
+# Vincular CLI ao projeto correto (clinipharma)
+cd <repo>
+vercel link --yes --project clinipharma --scope cabralandre-3009s-projects \
+  --token "$VERCEL_TOKEN"
+
+# Listar envs (chaves apenas)
 curl -sS "https://api.vercel.com/v10/projects/clinipharma/env?teamId=$VERCEL_ORG_ID" \
   -H "Authorization: Bearer $VERCEL_TOKEN" \
-  | jq -r '.envs[] | "\(.key) \(.target | join(",")) \(.gitBranch // "")"' | sort
+  | jq -r '.envs[] | "\(.key)\t\(.target | join(","))\t\(.gitBranch // "")"' | sort
 
-curl -sS "https://api.vercel.com/v10/projects/b2b-med-platform/env?teamId=$VERCEL_ORG_ID" \
-  -H "Authorization: Bearer $VERCEL_TOKEN" \
-  | jq -r '.envs[] | "\(.key) \(.target | join(",")) \(.gitBranch // "")"' | sort
-
-# Diff rápido das chaves (deve sair vazio em prod target):
-diff \
-  <(curl ... clinipharma | jq -r '.envs[] | select(.target | contains(["production"])) | .key' | sort -u) \
-  <(curl ... b2b-med-platform | jq -r '.envs[] | select(.target | contains(["production"])) | .key' | sort -u)
-
-# Pull decryptado pra debug local (cuidado: gera arquivo em claro)
-cd /tmp && mkdir vercel-pull && cd vercel-pull
+# Pull decryptado (CUIDADO: arquivo em claro em disco)
+mkdir -p /tmp/vp && cd /tmp/vp
 vercel link --yes --project clinipharma --scope cabralandre-3009s-projects --token "$VERCEL_TOKEN"
-vercel env pull .env.prod --environment production --token "$VERCEL_TOKEN"
+vercel env pull .env.prod    --environment production --token "$VERCEL_TOKEN"
+vercel env pull .env.staging --environment preview --git-branch staging --token "$VERCEL_TOKEN"
 # … inspecionar …
-rm -rf /tmp/vercel-pull   # IMPORTANTE: não deixar valores claros em disco
+cd - && rm -rf /tmp/vp
+
+# Forçar redeploy production
+DEPLOY_ID=$(curl -sS "https://api.vercel.com/v6/deployments?teamId=$VERCEL_ORG_ID&projectId=clinipharma&target=production&limit=1&state=READY" \
+  -H "Authorization: Bearer $VERCEL_TOKEN" | jq -r '.deployments[0].uid')
+curl -sS -X POST "https://api.vercel.com/v13/deployments?teamId=$VERCEL_ORG_ID&forceNew=1" \
+  -H "Authorization: Bearer $VERCEL_TOKEN" -H "Content-Type: application/json" \
+  -d "{\"name\":\"clinipharma\",\"deploymentId\":\"$DEPLOY_ID\",\"target\":\"production\"}"
+
+# Disparar build de uma branch específica (preview)
+curl -sS -X POST "https://api.vercel.com/v13/deployments?teamId=$VERCEL_ORG_ID&forceNew=1" \
+  -H "Authorization: Bearer $VERCEL_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"clinipharma","gitSource":{"type":"github","ref":"staging","repoId":1205329895}}'
 ```
+
+## Reverter a inversão (caso de emergência)
+
+Se algo quebrar e precisar voltar ao estado pré-inversão:
+
+```bash
+# 1. Re-conectar Git ao b2b-med-platform
+curl -sS -X POST "https://api.vercel.com/v13/projects/b2b-med-platform/link?teamId=$VERCEL_ORG_ID" \
+  -H "Authorization: Bearer $VERCEL_TOKEN" -H "Content-Type: application/json" \
+  -d '{"type":"github","repo":"cabralandre82/clinipharma","productionBranch":"main"}'
+
+# 2. Mover staging subdomínio de volta
+curl -sS -X DELETE "https://api.vercel.com/v9/projects/clinipharma/domains/staging.clinipharma.com.br?teamId=$VERCEL_ORG_ID" \
+  -H "Authorization: Bearer $VERCEL_TOKEN"
+curl -sS -X POST "https://api.vercel.com/v10/projects/b2b-med-platform/domains?teamId=$VERCEL_ORG_ID" \
+  -H "Authorization: Bearer $VERCEL_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"staging.clinipharma.com.br","gitBranch":"staging"}'
+
+# 3. Atualizar local .vercel/project.json para apontar de volta
+vercel link --yes --project b2b-med-platform --scope cabralandre-3009s-projects --token "$VERCEL_TOKEN"
+```
+
+Tempo total estimado: ~2min. Não toca nada em código nem DNS.
 
 ## Referências
 
@@ -121,3 +161,4 @@ rm -rf /tmp/vercel-pull   # IMPORTANTE: não deixar valores claros em disco
 - CSP report-only ativo: [`docs/security/csp.md`](../security/csp.md)
 - Runbook de rotação: [`docs/runbooks/secret-rotation.md`](../runbooks/secret-rotation.md)
 - Manifest de segredos: [`docs/security/secrets-manifest.json`](../security/secrets-manifest.json)
+- Cron lock distribuído: [`lib/cron/guarded.ts`](../../lib/cron/guarded.ts)

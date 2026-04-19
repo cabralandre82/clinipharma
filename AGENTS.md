@@ -18,19 +18,24 @@ os locais de origem.
   (também espelhado em `~/.config/agent/credentials.env`).
 - **Org / Team ID**: `team_fccKc8W6hyQmvCcZAGCqV1UK`
   (slug `cabralandre-3009`).
-- **Projetos visíveis**: `b2b-med-platform`, `clinipharma`,
-  `omni-runner-portal`, `project-running`.
-- **Projeto vinculado a este repo**: `b2b-med-platform`
-  (`.vercel/project.json`).
-- **⚠ Topologia importante**: existem **dois projetos Vercel** servindo
-  o mesmo branch `main`:
-  - `clinipharma` → domínio `clinipharma.com.br` (clientes reais)
-  - `b2b-med-platform` → `b2b-med-platform.vercel.app` + branch `staging`
-    (usa Supabase de staging em Preview)
+- **Projetos visíveis**: `b2b-med-platform` (em quarentena), `clinipharma`
+  (ativo), `omni-runner-portal`, `project-running`.
+- **Projeto ATIVO deste repo**: `clinipharma` — serve `clinipharma.com.br`
+  (main) e `staging.clinipharma.com.br` (branch staging). Para vincular
+  o CLI local ao projeto certo:
 
-  Sempre que adicionar/mudar uma env em **um** deles, replicar no outro
-  ou justificar a divergência. Detalhes em
-  [`docs/infra/vercel-projects-topology.md`](docs/infra/vercel-projects-topology.md).
+  ```bash
+  vercel link --yes --project clinipharma --scope cabralandre-3009s-projects \
+    --token "$VERCEL_TOKEN"
+  ```
+
+  (`.vercel/project.json` é gitignored — cada agente roda esse comando
+  uma vez por máquina.)
+
+- **⚠ Projeto em quarentena**: `b2b-med-platform` continua existindo na
+  conta Vercel, mas com Git desconectado (sem novos deploys automáticos)
+  e mantido como backup até **2026-05-03**. Não adicionar envs nele.
+  Histórico: [`docs/infra/vercel-projects-topology.md`](docs/infra/vercel-projects-topology.md).
 
 #### Por que `VERCEL_TOKEN` env var não basta sozinho
 
