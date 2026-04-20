@@ -232,7 +232,7 @@ curl -X POST https://app.clinipharma.com.br/api/admin/features/refresh \
 
 A tabela `secret_rotation_record` é **append-only** com hash chain (sha256). Retenção mínima: **5 anos** (alinhada à retenção de audit log). Não permitir UPDATE/DELETE direto — apenas inserção via RPC `secret_rotation_record(...)`.
 
-A view `public.secret_inventory` agrega o último estado por segredo e expõe `age_seconds` em tempo real para `/api/health/deep` e dashboards.
+A view `public.secret_inventory` agrega o último estado por segredo e expõe `secret_inventory.age_seconds` em tempo real para `/api/health/deep` e dashboards (métrica emitida: `secret_age_seconds`).
 
 ---
 

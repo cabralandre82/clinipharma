@@ -11,7 +11,7 @@
 ## 1. Sintomas observados
 
 - Sentry alerta: `audit chain tampered` com `firstBrokenSeq`, `firstBrokenId`.
-- `cron_runs` tem a linha mais recente de `verify-audit-chain` com `status='failed'`, `duration_ms` dentro do normal.
+- `cron_runs` tem a linha mais recente de `verify-audit-chain` com `status='failed'`, `cron_runs.duration_ms` dentro do normal.
 - `audit_chain_checkpoints` pode ter um checkpoint novo _se_ for purge legítimo (ver §5). Caso contrário, é tampering.
 - Qualquer INSERT em `audit_logs` continua funcionando (a cadeia cresce a partir do hash corrompido adiante).
 

@@ -209,7 +209,7 @@ e quais foram retidos (com a base legal específica).
 | Implementação do cron principal     | `lib/retention-policy.ts`                       |
 | Histórico de execuções              | tabela `cron_runs`                              |
 | Logs estruturados                   | `server_logs` (severidade INFO/WARN/ERROR)      |
-| Métrica de bloqueios por legal hold | `legal_hold_purge_blocked_total`                |
+| Métrica de bloqueios por legal hold | `legal_hold_blocked_purge_total`                |
 | Teste de invariantes do catálogo    | `tests/unit/lib/retention-catalog.test.ts`      |
 
 A cobertura de testes específicos para `enforce-retention` está em

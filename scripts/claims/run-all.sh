@@ -20,6 +20,7 @@ VERIFIERS=(
   "check-cron-claims.mjs"
   "check-feature-flags.mjs"
   "check-invariants.sh"
+  "check-metric-emission.mjs"
 )
 
 EXIT_CODE=0

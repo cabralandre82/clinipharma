@@ -22,15 +22,16 @@ the actual codebase and fails loud when a claim becomes a lie.
 
 ## What it verifies (today)
 
-Five verifiers under `scripts/claims/`:
+Six verifiers under `scripts/claims/`:
 
-| Verifier                | Claim being verified                                                      |
-| ----------------------- | ------------------------------------------------------------------------- |
-| `check-skill-structure` | Every `.cursor/skills/*/SKILL.md` has valid frontmatter + trigger phrase. |
-| `check-cross-links`     | Every link from skills/rules/runbooks/AGENTS.md resolves to a real file.  |
-| `check-cron-claims`     | Every `/api/cron/X` mentioned in docs exists in `vercel.json` + as route. |
-| `check-feature-flags`   | Every `feature_flags` key referenced in docs has a migration defining it. |
-| `check-invariants`      | AGENTS.md invariants hold — see expanded matrix below.                    |
+| Verifier                | Claim being verified                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| `check-skill-structure` | Every `.cursor/skills/*/SKILL.md` has valid frontmatter + trigger phrase.                               |
+| `check-cross-links`     | Every link from skills/rules/runbooks/AGENTS.md resolves to a real file.                                |
+| `check-cron-claims`     | Every `/api/cron/X` mentioned in docs exists in `vercel.json` + as route.                               |
+| `check-feature-flags`   | Every `feature_flags` key referenced in docs has a migration defining it.                               |
+| `check-invariants`      | AGENTS.md invariants hold — see expanded matrix below.                                                  |
+| `check-metric-emission` | Every metric name backtick-cited in a runbook/skill/rule/AGENTS.md is actually emitted by the codebase. |
 
 Each verifier emits JSON to `scripts/claims/.results/<name>.json`:
 
@@ -111,6 +112,7 @@ Run any single verifier:
 ./scripts/claims/check-cron-claims.mjs     | jq
 ./scripts/claims/check-feature-flags.mjs   | jq
 ./scripts/claims/check-invariants.sh       | jq
+./scripts/claims/check-metric-emission.mjs | jq
 ```
 
 Run all + print the markdown summary:
@@ -151,7 +153,6 @@ count still exits `0`.
 
 Low-hanging extensions, ranked by effort × value:
 
-- **`check-metric-emission`** — every metric name referenced in runbooks (`money_drift_total`, `rls_canary_violations_total`, `rate_limit_suspicious_ips_total`, `csrf_blocked_total`, …) has a matching emission in `lib/metrics.ts` or an `app/api/**` route.
 - **`check-rls-policy-coverage`** — every table in `supabase/migrations/` has at least one `CREATE POLICY` (complements Wave 16.2's event-trigger invariant, which only guarantees RLS _enabled_, not that a policy exists beyond the deny-all default).
 - **`check-skill-trigger-overlap`** — no two skills' descriptions claim the same trigger phrase; reduces agent dispatch ambiguity.
 - **`check-retention-policies`** — every entry in `lib/retention/policies.ts` corresponds to a real table + column pair; every destructive cron references a retention policy.
@@ -183,7 +184,8 @@ questions correctly-but-wrongly.
 
 ## Change log
 
-| Date       | Change                                                                                                                                                                                                                                                                             |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-04-20 | Initial implementation — 5 verifiers (skill-structure, cross-links, cron-claims, feature-flags, invariants).                                                                                                                                                                       |
-| 2026-04-20 | Wave 16 — 6 new invariants: API rate-limit/auth gate, RLS event-trigger, migration numbering, `.env.example` secret scan, `/(private)` layout gate, compliance-cron documentation. Surfaced a real defect in `/api/tracking` (no rate-limit on public token endpoint) — now fixed. |
+| Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-04-20 | Initial implementation — 5 verifiers (skill-structure, cross-links, cron-claims, feature-flags, invariants).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 2026-04-20 | Wave 16 — 6 new invariants: API rate-limit/auth gate, RLS event-trigger, migration numbering, `.env.example` secret scan, `/(private)` layout gate, compliance-cron documentation. Surfaced a real defect in `/api/tracking` (no rate-limit on public token endpoint) — now fixed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 2026-04-20 | `check-metric-emission` verifier added. Reads emission catalog from `lib/metrics.ts` registry + direct `incCounter`/`observeHistogram`/`setGauge` literals; flags any metric backtick-cited in docs that isn't emitted. Severity promoted to `fail` when the citing doc is compliance-critical (audit-chain, money, DSAR, RLS canary, backup, legal-hold, secret-rotation). Historical docs (`execution-log.md`, `PENDING.md`, `implementation-plan.md`, `performance-baseline.md`, `REVIEW-*.md`) are skipped. Surfaced 4 real doc drifts: `legal_hold_purge_blocked_total` (wrong word order in `retention-policy.md`), `duration_ms`/`age_seconds` (ambiguous column refs, now qualified as `table.column`), `runs_total` shorthand (expanded to `rls_canary_runs_total`), and two fake example metrics in `observability.mdc` replaced with real ones. |

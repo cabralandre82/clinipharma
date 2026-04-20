@@ -46,8 +46,8 @@ exato (quais tabelas, quantas linhas) está em
    ```
 
    Se a última execução foi um falso positivo (canário caiu por erro
-   transitório de DB), confirme verificando que `runs_total` ainda
-   incrementou em duas execuções seguintes sem violation.
+   transitório de DB), confirme verificando que `rls_canary_runs_total`
+   ainda incrementou em duas execuções seguintes sem violation.
 
 2. **Inspecione o detalhamento** — o JSON `details.violating` lista as
    tabelas que vazaram. Para cada uma, identifique se é:

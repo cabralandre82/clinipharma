@@ -28,7 +28,8 @@ Reference: `docs/observability/slos.md`,
 
 - `lib/metrics.ts` emits Prometheus-style counters/histograms.
 - Counter naming: `<domain>_<entity>_<event>_total` (e.g.
-  `auth_login_attempts_total`, `rate_limit_violations_total`).
+  `rate_limit_hits_total`, `rate_limit_denied_total`,
+  `csrf_blocked_total`, `audit_chain_break_total`).
 - Histograms: `<domain>_<operation>_duration_ms` with explicit buckets.
 - New metric → add a panel to the Grafana dashboard (or at least
   document in `docs/observability/metrics.md`). Orphan metrics are

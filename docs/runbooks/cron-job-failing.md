@@ -20,7 +20,7 @@
 - 19 crons em produção (ver lista em `.cursor/skills/health-check-triage/SKILL.md` §3 ou `vercel.json`).
 - Cada execução é registrada em `public.cron_runs`:
   - `job_name` (path sem `/api/cron/`)
-  - `started_at`, `completed_at`, `duration_ms`
+  - Colunas: `started_at`, `completed_at`, `cron_runs.duration_ms`
   - `status`: `running` | `success` | `failed` | `timed_out`
   - `error` quando aplicável
 - Distributed lock via Upstash Redis (`lib/cron/guarded.ts`) evita double-run (TTL = schedule interval).
