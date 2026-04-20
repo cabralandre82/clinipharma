@@ -1,7 +1,9 @@
 # Topologia dos projetos Vercel
 
-> **Status:** Vivo. Última mudança: **2026-04-19** — consolidação no projeto
-> `clinipharma`, projeto `b2b-med-platform` desligado do Git (em quarentena).
+> **Status:** Vivo. Última mudança: **2026-04-18** — rotação do
+> `ZENVIA_API_TOKEN` em produção (SMS-only) e limpeza dos secrets Zenvia
+> remanescentes no projeto em quarentena. Consolidação anterior em 2026-04-19
+> (ver histórico abaixo).
 > **Owner:** Plataforma + DPO.
 
 ## TL;DR (estado atual)
@@ -29,6 +31,7 @@ Existe **um único projeto Vercel ativo**: `clinipharma`. Ele serve:
                                  │ Vercel project: b2b-med-platform        │
                                  │ Domain: b2b-med-platform.vercel.app     │
                                  │ Git link: REMOVIDO                      │
+                                 │ Secrets Zenvia: REMOVIDOS (2026-04-18)  │
                                  │ Crons: ainda agendados (mas dedup via   │
                                  │ Upstash lock — sem double execution)    │
                                  └─────────────────────────────────────────┘
@@ -48,8 +51,8 @@ Existe **um único projeto Vercel ativo**: `clinipharma`. Ele serve:
    - Sentry desligado → erros não capturados.
    - Rate-limit em memória → sem proteção distribuída.
    - **SMS desabilitado** → clientes não recebiam confirmação de pedido,
-     pagamento, despacho etc. O código (`lib/zenvia.ts:40`) só logava
-     `warn` e seguia em frente.
+     pagamento, despacho etc. O código (`lib/zenvia.ts`, `zenviaPost()`)
+     só logava `warn` e seguia em frente.
    - OpenAI desligado → OCR e document-review silenciosamente desativados.
    - Cron jobs duplicados rodando sem coordenação (sem Redis lock).
 4. **2026-04-19 (manhã):** drift detectado.
@@ -57,6 +60,22 @@ Existe **um único projeto Vercel ativo**: `clinipharma`. Ele serve:
    staging copiadas pro `clinipharma`. Domain `staging.clinipharma.com.br`
    movido pro `clinipharma`. Projeto `b2b-med-platform` desconectado do Git
    (deploys automáticos parados). Documentado neste arquivo.
+6. **2026-04-18 (noite, horário BRT):** **rotação Zenvia + kill-switch
+   WhatsApp.** Onboarding Zenvia concluído (canal SMS aprovado com sender
+   `Clinipharma`); WhatsApp fora de escopo no launch. Ações:
+   - `clinipharma`: `ZENVIA_API_TOKEN` rotacionado (entrada recriada como
+     `type=sensitive` para evitar o wrapper encrypted+`decrypt=true`
+     retornar texto encapsulado em inspeções futuras). Nova env
+     `WHATSAPP_ENABLED=false` criada nos três targets (production,
+     preview, development). `ZENVIA_SMS_FROM` mantido em `Clinipharma`.
+   - Código: `sendWhatsApp()` passa a ser no-op silencioso quando a
+     flag está off (commit `eb6d028`). Produção verificada saudável após
+     auto-deploy (200 em `/api/health`, DB OK).
+   - `b2b-med-platform` (quarentena): removidas as 4 envs Zenvia
+     remanescentes (2× `ZENVIA_API_TOKEN`, `ZENVIA_SMS_FROM`,
+     `ZENVIA_WHATSAPP_FROM`) para não deixar credenciais antigas rotando
+     em projeto dormente. Quarentena mantida até 2026-05-03 conforme
+     plano — só as credenciais saíram, o projeto fica para forense.
 
 ## Por que `b2b-med-platform` ficou em quarentena (não deletado)
 
@@ -93,10 +112,15 @@ Existe **um único projeto Vercel ativo**: `clinipharma`. Ele serve:
   Settings → Deployment Protection. Pra liberar acesso programático ao
   staging novo, ativar o bypass no projeto `clinipharma` (gera novo secret)
   e atualizar a env.
-- **WhatsApp** — env `ZENVIA_WHATSAPP_FROM` não foi propagada. Sender
-  WhatsApp ainda não foi registrado na Zenvia. Stack trata graciosamente
-  (`lib/zenvia.ts:117-120`): só loga `warn` e pula. Quando o sender for
-  configurado, basta adicionar a env nos targets `production` e `preview`.
+- **WhatsApp** — desligado por design no launch. Existe um kill-switch
+  explícito: `WHATSAPP_ENABLED` (default `false`). O `sendWhatsApp()` em
+  `lib/zenvia.ts` retorna silenciosamente sem log enquanto a flag estiver
+  desligada (decisão registrada em 2026-04-18, após onboarding Zenvia
+  concluído com canal SMS aprovado mas WhatsApp fora do escopo de
+  lançamento). Para ligar depois: (1) verificar o número de WhatsApp
+  Business na Meta Business Manager; (2) registrar o sender no portal
+  Zenvia; (3) setar `WHATSAPP_ENABLED=true` + `ZENVIA_WHATSAPP_FROM` nos
+  targets `production` e `preview`. Sem mudança de código.
 
 ## Conta de comandos para próximas vezes
 
