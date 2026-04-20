@@ -117,9 +117,10 @@ const RE_REF = new RegExp(
   'g'
 );
 
-// Historical / planning docs: logs of what we've done or will do. Not
-// operator-facing runbooks. Metric references here are aspirational or
-// archival, not part of the incident-response path.
+// Historical / planning / meta docs: logs of what we've done or will do,
+// or documentation OF the audit itself. Not operator-facing runbooks.
+// Metric references here are aspirational, archival, or cited as bad
+// examples in a change-log — not part of the incident-response path.
 const HISTORICAL_DOC_PATTERNS = [
   /^docs\/execution-log\.md$/,
   /^docs\/PENDING\.md$/,
@@ -127,6 +128,7 @@ const HISTORICAL_DOC_PATTERNS = [
   /^docs\/audit-qa-plena-[^/]+\.md$/,
   /^docs\/database\/performance-baseline\.md$/,
   /^docs\/legal\/REVIEW-[^/]+\.md$/,
+  /^docs\/operations\/claims-audit\.md$/,  // meta: changelog cites fixed drifts
 ];
 function isHistorical(p) {
   return HISTORICAL_DOC_PATTERNS.some(rx => rx.test(p));
