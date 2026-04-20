@@ -45,12 +45,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     outputs:
-      total_alerts: ${{ steps.parse.outputs.total }}
-      high_alerts: ${{ steps.parse.outputs.high }}
-      medium_alerts: ${{ steps.parse.outputs.medium }}
-      low_alerts: ${{ steps.parse.outputs.low }}
-      info_alerts: ${{ steps.parse.outputs.info }}
-      target_url: ${{ steps.target.outputs.url }}
+      total_alerts:   ${{ steps.parse.outputs.total }}
+      high_alerts:    ${{ steps.parse.outputs.high }}
+      medium_alerts:  ${{ steps.parse.outputs.medium }}
+      low_alerts:     ${{ steps.parse.outputs.low }}
+      info_alerts:    ${{ steps.parse.outputs.info }}
+      ignored_alerts: ${{ steps.parse.outputs.ignored }}
+      target_url:     ${{ steps.target.outputs.url }}
 
     steps:
       - uses: actions/checkout@v6
@@ -98,35 +99,66 @@ jobs:
           REPORT=report_json.json
           if [ ! -f "$REPORT" ]; then
             echo "ZAP did not produce a JSON report — assuming clean run."
-            for k in total high medium low info; do
+            for k in total high medium low info ignored; do
               echo "${k}=0" >> "$GITHUB_OUTPUT"
             done
             exit 0
           fi
           # ZAP's report_json structure:
-          #   { site: [ { alerts: [ { riskcode, ... }, ... ] } ] }
+          #   { site: [ { alerts: [ { pluginid, riskcode, instances:[...] } ] } ] }
           # riskcode: 0=Info, 1=Low, 2=Medium, 3=High.
+          #
+          # IMPORTANT: ZAP's `rules.tsv` IGNORE only removes the alert from
+          # the FAIL-NEW summary printed to stdout; the JSON report still
+          # lists every finding (with its original riskcode). To make the
+          # gate consistent with what we suppressed, we read rules.tsv
+          # ourselves and exclude IGNORED plugin IDs before bucketising.
           node -e '
             const fs = require("fs");
             const r = JSON.parse(fs.readFileSync("report_json.json", "utf8"));
+
+            // Build the IGNORE set from .zap/rules.tsv. Format:
+            //   <pluginid>\t<action>\t<comment>
+            // Lines starting with `#` or blank are skipped.
+            const ignored = new Set();
+            try {
+              const tsv = fs.readFileSync(".zap/rules.tsv", "utf8");
+              for (const raw of tsv.split("\n")) {
+                const line = raw.trim();
+                if (!line || line.startsWith("#")) continue;
+                const cols = line.split(/\s+/);
+                if (cols.length >= 2 && cols[1].toUpperCase() === "IGNORE") {
+                  ignored.add(cols[0]);
+                }
+              }
+            } catch (e) {
+              console.log("No .zap/rules.tsv found — counting all findings");
+            }
+            console.log("Ignored plugin IDs:", [...ignored].join(", ") || "(none)");
+
             const buckets = { 0: 0, 1: 0, 2: 0, 3: 0 };
+            let ignoredCount = 0;
             for (const site of r.site || []) {
               for (const a of site.alerts || []) {
+                if (ignored.has(String(a.pluginid))) {
+                  ignoredCount += a.instances?.length || 1;
+                  continue;
+                }
                 const k = Number(a.riskcode);
-                buckets[k] = (buckets[k] || 0) + 1;
+                buckets[k] = (buckets[k] || 0) + (a.instances?.length || 1);
               }
             }
             const out = {
-              info: buckets[0] || 0,
-              low: buckets[1] || 0,
-              medium: buckets[2] || 0,
-              high: buckets[3] || 0,
+              info:    buckets[0] || 0,
+              low:     buckets[1] || 0,
+              medium:  buckets[2] || 0,
+              high:    buckets[3] || 0,
+              ignored: ignoredCount,
             };
             out.total = out.info + out.low + out.medium + out.high;
-            for (const [k, v] of Object.entries(out)) {
-              console.log(`${k}=${v}`);
-            }
-            const append = Object.entries(out).map(([k, v]) => `${k}=${v}`).join("\n");
+            for (const [k, v] of Object.entries(out)) console.log(`${k}=${v}`);
+            const append = Object.entries(out)
+              .map(([k, v]) => `${k}=${v}`).join("\n");
             fs.appendFileSync(process.env.GITHUB_OUTPUT, append + "\n");
           '
 
@@ -138,6 +170,7 @@ jobs:
           M: ${{ steps.parse.outputs.medium }}
           L: ${{ steps.parse.outputs.low }}
           I: ${{ steps.parse.outputs.info }}
+          IG: ${{ steps.parse.outputs.ignored }}
           URL: ${{ steps.target.outputs.url }}
         run: |
           {
@@ -151,11 +184,13 @@ jobs:
             echo "| Medium   | $M |"
             echo "| Low      | $L |"
             echo "| Info     | $I |"
-            echo "| **Total**| **$T** |"
+            echo "| **Total (gated)** | **$T** |"
+            echo "| _Ignored (rules.tsv)_ | _$IG_ |"
             echo
             echo "_Gate: Medium+ findings open/update GitHub issue. Low/Info informational._"
+            echo "_Ignored counts are alerts suppressed by \`.zap/rules.tsv\` with written rationale._"
             echo
-            echo "Full HTML + JSON + MD reports attached as artifact \`zap-baseline-report\` (90-day retention)."
+            echo "Full HTML + JSON + MD reports attached as artifact \`zap-baseline-report-90d\` (90-day retention)."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Re-upload reports with longer retention
