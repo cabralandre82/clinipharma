@@ -24,6 +24,7 @@ VERIFIERS=(
   "check-skill-trigger-overlap.mjs"
   "check-rls-policy-coverage.mjs"
   "check-env-documented.mjs"
+  "check-retention-policies.mjs"
 )
 
 EXIT_CODE=0

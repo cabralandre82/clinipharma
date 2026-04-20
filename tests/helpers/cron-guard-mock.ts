@@ -39,6 +39,13 @@ export interface GuardStubOptions {
    * envelope (`{ data, error }`).
    */
   rpcHandlers?: Record<string, (args: unknown) => Promise<{ data: unknown; error: unknown }>>
+  /**
+   * Optional override for `from('cron_runs').delete().lt(...).select(...)`.
+   * Consumed by `purge-server-logs`, which now deletes stale `cron_runs`
+   * rows as part of RP-14 enforcement. Defaulting to `{ data: [], error: null }`
+   * keeps all existing tests that don't invoke delete on cron_runs green.
+   */
+  cronRunsDelete?: { data?: Array<{ id: number }> | null; error?: { message: string } | null }
 }
 
 export interface GuardStubHandle {
@@ -67,6 +74,11 @@ export function attachCronGuard(opts: GuardStubOptions): GuardStubHandle {
     return Promise.resolve({ data: null, error: { message: `unexpected rpc: ${name}` } })
   })
 
+  const deleteResult = {
+    data: opts.cronRunsDelete?.data ?? [],
+    error: opts.cronRunsDelete?.error ?? null,
+  }
+
   const cronRunsFrom = () => ({
     insert: (row: unknown) => {
       cronRunsInsert(row)
@@ -81,6 +93,11 @@ export function attachCronGuard(opts: GuardStubOptions): GuardStubHandle {
         cronRunsUpdateEq(row, col, val)
         return Promise.resolve({ error: null })
       },
+    }),
+    delete: () => ({
+      lt: () => ({
+        select: () => Promise.resolve(deleteResult),
+      }),
     }),
   })
 

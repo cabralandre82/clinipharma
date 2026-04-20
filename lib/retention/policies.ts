@@ -68,14 +68,18 @@ export interface RetentionPolicy {
   notes?: string
 }
 
-/** Tables that intentionally have NO retention policy entry — must justify. */
+/** Tables that intentionally have NO retention policy entry — must justify.
+ *  The names below MUST match a `CREATE TABLE public.<name>` in
+ *  `supabase/migrations/` or the claims-audit verifier
+ *  (`check-retention-policies`) will fail — phantom exclusions are
+ *  worse than no exclusions. */
 export const RETENTION_EXCLUDED_TABLES: Record<string, string> = {
-  schema_migrations: 'Sistema interno do Supabase, sem dados pessoais.',
   feature_flags: 'Configuração da aplicação, sem dado pessoal.',
-  rls_canary_results: 'Telemetria interna de canário, sem dado pessoal.',
-  rate_limit_violations: 'Telemetria de segurança (90d) — coberta por purge-server-logs.',
-  webhook_deliveries: 'Idempotência de webhook (30d) — TTL no próprio job.',
-  prescription_advances: 'Tabela operacional já coberta por orders (mesma RDC 67/2007).',
+  rls_canary_log: 'Telemetria interna de canário (service_role-only, sem dado pessoal).',
+  rate_limit_violations:
+    'Telemetria de segurança (service_role-only, auto-bounded pelo purge-server-logs via RP-15).',
+  webhook_events:
+    'Idempotência de webhook (TTL no próprio job; sem dado pessoal além do payload trafegado).',
 }
 
 /* ------------------------------------------------------------------ */
@@ -180,10 +184,10 @@ export const RETENTION_CATALOG: RetentionPolicy[] = [
   },
   {
     id: 'RP-06',
-    table: 'prescriptions',
+    table: 'order_item_prescriptions',
     category: 'Receitas médicas (imagens/PDF)',
     description:
-      'Imagem ou PDF da receita anexada ao pedido. Dado pessoal sensível (saúde) e por vezes controlado (Portaria 344/98).',
+      'Imagem ou PDF da receita anexada a cada item do pedido. Dado pessoal sensível (saúde) e por vezes controlado (Portaria 344/98). Armazenamento físico no bucket `prescriptions` (RP-20); esta tabela guarda o metadado + storage_path.',
     dataClass: 'restricted',
     retentionDays: 10 * 365,
     retentionLabel: '10 anos para receitas controladas (Portaria 344/98) e demais (RDC 67/2007)',
@@ -274,10 +278,10 @@ export const RETENTION_CATALOG: RetentionPolicy[] = [
   },
   {
     id: 'RP-12',
-    table: 'notification_outbox / provider logs',
+    table: 'server_logs (provider delivery trail)',
     category: 'Logs de envio (Resend, Zenvia, FCM)',
     description:
-      'Trilhas de entrega/erro de e-mail, SMS, WhatsApp e push. Conteúdo da mensagem não é armazenado em texto pleno após envio.',
+      'Trilhas de entrega/erro de e-mail, SMS, WhatsApp e push — registradas via `logger.info` e persistidas na mesma tabela `server_logs` de RP-15, em entradas com `kind="notification"`. Conteúdo da mensagem nunca é armazenado em texto pleno após envio; guardamos só destinatário hasheado + status + provider id.',
     dataClass: 'internal',
     retentionDays: 90,
     retentionLabel: '90 dias',
@@ -290,6 +294,8 @@ export const RETENTION_CATALOG: RetentionPolicy[] = [
       action: 'delete',
     },
     honorsLegalHold: false,
+    notes:
+      'A trilha externa completa fica no dashboard de cada provedor (Resend ~30d, Zenvia ~60d, FCM ~30d) sob seus DPAs e é coberta pelo `docs/compliance/subprocessors.md`.',
   },
 
   /* ---------- AUDITORIA ---------- */
@@ -409,9 +415,10 @@ export const RETENTION_CATALOG: RetentionPolicy[] = [
   },
   {
     id: 'RP-19',
-    table: 'document_reviews',
+    table: 'registration_requests',
     category: 'Revisão de documentos de cadastro (CRM, alvará, contrato social)',
-    description: 'Decisões de aprovação/rejeição de documentos enviados na adesão.',
+    description:
+      'Decisões de aprovação/rejeição de documentos enviados na adesão. A tabela `registration_requests` guarda status + motivo; os arquivos em si vivem em `registration_documents` (metadado) + bucket `registration-docs` (RP-21).',
     dataClass: 'confidential',
     retentionDays: 5 * 365,
     retentionLabel: '5 anos após o término do contrato',

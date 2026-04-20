@@ -61,11 +61,11 @@ contratos, DPAs e respostas a titulares.
 
 ### 3.2 Pedidos e receitas
 
-| ID        | Tabela          | Categoria              | Prazo       | Base legal                          | Mecanismo               |
-| --------- | --------------- | ---------------------- | ----------- | ----------------------------------- | ----------------------- |
-| **RP-04** | `orders`        | Pedidos de manipulação | **10 anos** | RDC ANVISA 67/2007; CTN art. 195    | Preservação obrigatória |
-| **RP-05** | `order_items`   | Itens dos pedidos      | 10 anos     | RDC ANVISA 67/2007                  | Preservação obrigatória |
-| **RP-06** | `prescriptions` | Receitas (imagem/PDF)  | **10 anos** | Portaria SVS/MS 344/98; RDC 67/2007 | Imutável após upload    |
+| ID        | Tabela                     | Categoria              | Prazo       | Base legal                          | Mecanismo               |
+| --------- | -------------------------- | ---------------------- | ----------- | ----------------------------------- | ----------------------- |
+| **RP-04** | `orders`                   | Pedidos de manipulação | **10 anos** | RDC ANVISA 67/2007; CTN art. 195    | Preservação obrigatória |
+| **RP-05** | `order_items`              | Itens dos pedidos      | 10 anos     | RDC ANVISA 67/2007                  | Preservação obrigatória |
+| **RP-06** | `order_item_prescriptions` | Receitas (imagem/PDF)  | **10 anos** | Portaria SVS/MS 344/98; RDC 67/2007 | Imutável após upload    |
 
 ### 3.3 Financeiro
 
@@ -78,10 +78,10 @@ contratos, DPAs e respostas a titulares.
 
 ### 3.4 Comunicações e notificações
 
-| ID        | Tabela                                   | Categoria           | Prazo       | Base legal       | Mecanismo                        |
-| --------- | ---------------------------------------- | ------------------- | ----------- | ---------------- | -------------------------------- |
-| **RP-11** | `notifications`                          | Notificações in-app | 5 anos      | LGPD art. 7º, V  | Cron mensal `enforce-retention`  |
-| **RP-12** | logs de provedor (Resend / Zenvia / FCM) | Trilha de envio     | **90 dias** | LGPD art. 7º, IX | Cron semanal `purge-server-logs` |
+| ID        | Tabela                                  | Categoria           | Prazo       | Base legal       | Mecanismo                        |
+| --------- | --------------------------------------- | ------------------- | ----------- | ---------------- | -------------------------------- |
+| **RP-11** | `notifications`                         | Notificações in-app | 5 anos      | LGPD art. 7º, V  | Cron mensal `enforce-retention`  |
+| **RP-12** | `server_logs` (provider delivery trail) | Trilha de envio     | **90 dias** | LGPD art. 7º, IX | Cron semanal `purge-server-logs` |
 
 ### 3.5 Auditoria
 
@@ -100,10 +100,10 @@ contratos, DPAs e respostas a titulares.
 
 ### 3.7 Cadastro e documentos
 
-| ID        | Tabela                | Categoria                              | Prazo                    | Base legal        | Mecanismo                  |
-| --------- | --------------------- | -------------------------------------- | ------------------------ | ----------------- | -------------------------- |
-| **RP-18** | `registration_drafts` | Rascunhos de cadastro (anônimos)       | 7 dias após `expires_at` | LGPD art. 6º, III | Cron diário `purge-drafts` |
-| **RP-19** | `document_reviews`    | Revisão de docs de adesão (CRM/alvará) | 5 anos pós-contrato      | CFM 2.314/2022    | Acompanha o contrato       |
+| ID        | Tabela                  | Categoria                              | Prazo                    | Base legal        | Mecanismo                  |
+| --------- | ----------------------- | -------------------------------------- | ------------------------ | ----------------- | -------------------------- |
+| **RP-18** | `registration_drafts`   | Rascunhos de cadastro (anônimos)       | 7 dias após `expires_at` | LGPD art. 6º, III | Cron diário `purge-drafts` |
+| **RP-19** | `registration_requests` | Revisão de docs de adesão (CRM/alvará) | 5 anos pós-contrato      | CFM 2.314/2022    | Acompanha o contrato       |
 
 ### 3.8 Object storage
 
@@ -245,11 +245,13 @@ catálogo) **não estão sujeitas a esta política** porque (a) não contêm
 dado pessoal, ou (b) são cobertas por outra política igualmente
 formal:
 
-- `schema_migrations` — controle do Supabase, sem dado pessoal;
-- `feature_flags`, `rls_canary_results` — configuração e telemetria;
-- `rate_limit_violations`, `webhook_deliveries` — telemetria de
-  segurança coberta por `purge-server-logs`;
-- `prescription_advances` — operacional, segue o pedido (RP-04).
+- `feature_flags` — configuração da aplicação, sem dado pessoal;
+- `rls_canary_log` — telemetria interna do canário RLS
+  (service-role-only, sem dado pessoal);
+- `rate_limit_violations` — telemetria de segurança
+  (service-role-only; volume bounded pelo purge que roda em RP-15);
+- `webhook_events` — idempotência de webhook (TTL no próprio job;
+  payload transitório).
 
 Toda nova tabela com dado pessoal **DEVE** ser adicionada ao catálogo
 ou justificada nessa lista. O teste de invariantes bloqueia merge em

@@ -128,7 +128,7 @@ Não-exemplos (proibidos):
 
 | Métrica                   | Tipo    | Labels                | Descrição                                        |
 | ------------------------- | ------- | --------------------- | ------------------------------------------------ |
-| `webhook_claim_total`     | counter | `provider`, `outcome` | Claim do dedup-key no `webhook_deliveries`       |
+| `webhook_claim_total`     | counter | `provider`, `outcome` | Claim do dedup-key na tabela `webhook_events`    |
 | `webhook_duplicate_total` | counter | `provider`            | Duplicates detectados (idempotência funcionando) |
 
 ### 3.7 Conciliação financeira
