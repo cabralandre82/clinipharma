@@ -22,16 +22,17 @@ the actual codebase and fails loud when a claim becomes a lie.
 
 ## What it verifies (today)
 
-Six verifiers under `scripts/claims/`:
+Seven verifiers under `scripts/claims/`:
 
-| Verifier                | Claim being verified                                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------------------------------- |
-| `check-skill-structure` | Every `.cursor/skills/*/SKILL.md` has valid frontmatter + trigger phrase.                               |
-| `check-cross-links`     | Every link from skills/rules/runbooks/AGENTS.md resolves to a real file.                                |
-| `check-cron-claims`     | Every `/api/cron/X` mentioned in docs exists in `vercel.json` + as route.                               |
-| `check-feature-flags`   | Every `feature_flags` key referenced in docs has a migration defining it.                               |
-| `check-invariants`      | AGENTS.md invariants hold — see expanded matrix below.                                                  |
-| `check-metric-emission` | Every metric name backtick-cited in a runbook/skill/rule/AGENTS.md is actually emitted by the codebase. |
+| Verifier                      | Claim being verified                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `check-skill-structure`       | Every `.cursor/skills/*/SKILL.md` has valid frontmatter + trigger phrase.                               |
+| `check-cross-links`           | Every link from skills/rules/runbooks/AGENTS.md resolves to a real file.                                |
+| `check-cron-claims`           | Every `/api/cron/X` mentioned in docs exists in `vercel.json` + as route.                               |
+| `check-feature-flags`         | Every `feature_flags` key referenced in docs has a migration defining it.                               |
+| `check-invariants`            | AGENTS.md invariants hold — see expanded matrix below.                                                  |
+| `check-metric-emission`       | Every metric name backtick-cited in a runbook/skill/rule/AGENTS.md is actually emitted by the codebase. |
+| `check-skill-trigger-overlap` | No two skills' descriptions share a normalized trigger phrase — dispatch must be a disjoint partition.  |
 
 Each verifier emits JSON to `scripts/claims/.results/<name>.json`:
 
@@ -107,12 +108,13 @@ Failing the job outright on any warning would create alert fatigue — you'd sil
 Run any single verifier:
 
 ```bash
-./scripts/claims/check-skill-structure.sh  | jq
-./scripts/claims/check-cross-links.sh      | jq
-./scripts/claims/check-cron-claims.mjs     | jq
-./scripts/claims/check-feature-flags.mjs   | jq
-./scripts/claims/check-invariants.sh       | jq
-./scripts/claims/check-metric-emission.mjs | jq
+./scripts/claims/check-skill-structure.sh       | jq
+./scripts/claims/check-cross-links.sh           | jq
+./scripts/claims/check-cron-claims.mjs          | jq
+./scripts/claims/check-feature-flags.mjs        | jq
+./scripts/claims/check-invariants.sh            | jq
+./scripts/claims/check-metric-emission.mjs      | jq
+./scripts/claims/check-skill-trigger-overlap.mjs | jq
 ```
 
 Run all + print the markdown summary:
@@ -154,9 +156,9 @@ count still exits `0`.
 Low-hanging extensions, ranked by effort × value:
 
 - **`check-rls-policy-coverage`** — every table in `supabase/migrations/` has at least one `CREATE POLICY` (complements Wave 16.2's event-trigger invariant, which only guarantees RLS _enabled_, not that a policy exists beyond the deny-all default).
-- **`check-skill-trigger-overlap`** — no two skills' descriptions claim the same trigger phrase; reduces agent dispatch ambiguity.
 - **`check-retention-policies`** — every entry in `lib/retention/policies.ts` corresponds to a real table + column pair; every destructive cron references a retention policy.
 - **`check-anti-patterns`** — each `.cursor/rules/*.mdc` has an "Anti-patterns" section (keeps the rule a two-sided invariant, not one-sided advice).
+- **`check-env-documented`** — every env var used in the codebase has an entry in `.env.example` with a description (ensures operator can bootstrap a fresh env without archeology).
 
 ## Relationship to existing loops
 
@@ -189,3 +191,5 @@ questions correctly-but-wrongly.
 | 2026-04-20 | Initial implementation — 5 verifiers (skill-structure, cross-links, cron-claims, feature-flags, invariants).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 2026-04-20 | Wave 16 — 6 new invariants: API rate-limit/auth gate, RLS event-trigger, migration numbering, `.env.example` secret scan, `/(private)` layout gate, compliance-cron documentation. Surfaced a real defect in `/api/tracking` (no rate-limit on public token endpoint) — now fixed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | 2026-04-20 | `check-metric-emission` verifier added. Reads emission catalog from `lib/metrics.ts` registry + direct `incCounter`/`observeHistogram`/`setGauge` literals; flags any metric backtick-cited in docs that isn't emitted. Severity promoted to `fail` when the citing doc is compliance-critical (audit-chain, money, DSAR, RLS canary, backup, legal-hold, secret-rotation). Historical docs (`execution-log.md`, `PENDING.md`, `implementation-plan.md`, `performance-baseline.md`, `REVIEW-*.md`) are skipped. Surfaced 4 real doc drifts: `legal_hold_purge_blocked_total` (wrong word order in `retention-policy.md`), `duration_ms`/`age_seconds` (ambiguous column refs, now qualified as `table.column`), `runs_total` shorthand (expanded to `rls_canary_runs_total`), and two fake example metrics in `observability.mdc` replaced with real ones. |
+| 2026-04-20 | Cross-link drift closed from 22 warnings to 0. Wrote 9 new docs (runbooks: `emergency-restore`, `security-incident`, `region-failure`; compliance: `anpd-art-48-notification`, `subprocessors`; templates: `anpd-incident-notice`, `breach-notice-holder`, `incident-comms`; security: `rls-matrix`; operations: `budget`) + fixed 3 path typos + corrected 1 aspirational reference (`ops/maintenance-mode.ts` doesn't exist; skill now directs operator to Vercel Pause Deployments).                                                                                                                                                                                                                                                                                                                                                                    |
+| 2026-04-20 | `check-skill-trigger-overlap` verifier added. Enforces that the 11 skill descriptions form a **disjoint partition of the trigger phrase space** — no two skills can claim the same normalized trigger. Without this, agent dispatch becomes a coin-flip whenever triggers overlap. Extracts quoted phrases from each `description:` frontmatter field, normalizes (lowercase, collapse whitespace, unify `-_` to space), and fails on any key claimed by ≥ 2 skills. Short phrases (< 3 chars) are excluded to avoid flagging severity markers like `"P1"`.                                                                                                                                                                                                                                                                                                |

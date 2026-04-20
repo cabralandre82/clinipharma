@@ -21,6 +21,7 @@ VERIFIERS=(
   "check-feature-flags.mjs"
   "check-invariants.sh"
   "check-metric-emission.mjs"
+  "check-skill-trigger-overlap.mjs"
 )
 
 EXIT_CODE=0
