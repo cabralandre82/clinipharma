@@ -72,9 +72,9 @@ Se um pedido do usuário implicar em violar qualquer coisa abaixo,
 ### Compliance (LGPD)
 
 10. **DSAR tem SLA legal de 15 dias**. Automação em
-    `migrations/051_dsar_sla.sql` + cron `expire-doc-deadlines`.
+    `supabase/migrations/051_dsar_sla.sql` + cron `expire-doc-deadlines`.
 11. **Legal hold vence RLS**. Se `legal_holds` aponta para uma linha,
-    policies de retenção ignoram aquela linha (`migrations/054_legal_holds.sql`).
+    policies de retenção ignoram aquela linha (`supabase/migrations/054_legal_holds.sql`).
 12. **Incidentes de dados pessoais** disparam notificação ANPD em
     72h. Runbook: `docs/runbooks/data-breach-72h.md`.
 

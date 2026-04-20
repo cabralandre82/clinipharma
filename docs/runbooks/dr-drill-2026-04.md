@@ -167,7 +167,7 @@ Cada cenário é **independente**. Em cada cenário:
 - 100% das requisições falhando
 - DNS health check externo falhando
 
-**Runbook (a criar se não existir):** `docs/runbooks/region-failure.md`
+**Runbook:** [`docs/runbooks/region-failure.md`](region-failure.md)
 
 **Ações esperadas:**
 
@@ -254,14 +254,14 @@ DR_EVIDENCE_DIR=docs/security/dr-evidence/$(date +%Y-%m-%d) \
 
 ## PÓS-DRILL
 
-1. **Pós-mortem consolidado** (em `docs/security/dr-evidence/2026-04-30/postmortem.md`):
+1. **Pós-mortem consolidado** (gerado após o drill em `docs/security/dr-evidence/YYYY-MM-DD/postmortem.md`):
    - Cronologia minuto-a-minuto.
    - RTO/RPO medidos vs alvos.
    - Gaps identificados.
    - Action items com owner e prazo.
 2. **Atualização de runbooks** com aprendizados.
 3. **Apresentação ao Comitê de Risco** em até 7 dias.
-4. **Próximo drill** agendado em 6 meses (`docs/runbooks/dr-drill-2026-10.md`).
+4. **Próximo drill** agendado em 6 meses (criar novo arquivo `docs/runbooks/dr-drill-YYYY-MM.md` quando a data for confirmada).
 
 ---
 

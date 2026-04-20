@@ -97,7 +97,7 @@ Rotating `ENCRYPTION_KEY` naively **inutilises all PII in the database**. The co
 
 **P0 protocol** when this key is confirmed leaked:
 
-1. **Pause the platform** immediately — put Vercel into maintenance mode (`ops/maintenance-mode.ts`).
+1. **Pause the platform** immediately — Vercel project → Settings → **Pause Deployments**. (A feature-flag-driven maintenance mode is backlog; see `docs/runbooks/database-unavailable.md` §3.3 for the current state.)
 2. **Open emergency war room** — eng lead + DPO + legal.
 3. **Generate `KEY_V<N+1>`** but do NOT remove `KEY_V<N>`.
 4. **Deploy the new version as additional key** — the codebase already supports multi-version envelope encryption.

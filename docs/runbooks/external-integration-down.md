@@ -250,7 +250,7 @@ Template: [`.github/ISSUE_TEMPLATE/postmortem.md`](../../.github/ISSUE_TEMPLATE/
 ## Links
 
 - `lib/circuit-breaker.ts` — implementação do breaker
-- `lib/asaas.ts`, `lib/clicksign.ts`, `lib/resend.ts` — clients com breaker embutido
+- `lib/asaas.ts`, `lib/clicksign.ts`, `lib/email/index.ts` — clients com breaker embutido
 - `lib/alerts.ts` — roteamento de alertas P0/P1 para PagerDuty e-mail
 - Migrations relacionadas:
   - `supabase/migrations/045_webhook_cron_hardening.sql` — tabela `webhook_events`
