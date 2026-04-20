@@ -15,6 +15,8 @@
  *   - Public, unauthenticated. No PII is ever in the response.
  *   - HEAD returns headers only (used by some uptime probes).
  *
+ * @auth: public — status page feed. No PII; edge-cached 60s.
+ *
  * @module app/api/status/summary/route
  */
 

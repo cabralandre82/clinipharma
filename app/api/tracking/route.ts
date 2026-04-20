@@ -1,6 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * Public order-tracking endpoint.
+ *
+ * @auth: public — token-as-credential (opaque random string from
+ *        `order_tracking_tokens`). Rate-limited to frustrate
+ *        brute-force enumeration of the token space.
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/db/admin'
+import { apiLimiter, guard } from '@/lib/rate-limit'
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Rascunho',
@@ -40,6 +48,12 @@ const STATUS_ORDER = [
 ]
 
 export async function GET(req: NextRequest) {
+  // Rate-limit before touching the token table. 60 req/min/IP is generous
+  // enough for real tracking (a user reloads the page a few times) and
+  // tight enough to frustrate token-space enumeration.
+  const rl = await guard(req, apiLimiter, { bucket: 'tracking.public' })
+  if (rl) return rl
+
   const { searchParams } = req.nextUrl
   const token = searchParams.get('token')
   if (!token) return NextResponse.json({ error: 'token required' }, { status: 400 })

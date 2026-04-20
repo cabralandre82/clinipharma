@@ -30,7 +30,7 @@ Five verifiers under `scripts/claims/`:
 | `check-cross-links`     | Every link from skills/rules/runbooks/AGENTS.md resolves to a real file.  |
 | `check-cron-claims`     | Every `/api/cron/X` mentioned in docs exists in `vercel.json` + as route. |
 | `check-feature-flags`   | Every `feature_flags` key referenced in docs has a migration defining it. |
-| `check-invariants`      | AGENTS.md invariants hold (AES-GCM, no `unsafe-inline`, money is cents…). |
+| `check-invariants`      | AGENTS.md invariants hold — see expanded matrix below.                    |
 
 Each verifier emits JSON to `scripts/claims/.results/<name>.json`:
 
@@ -53,6 +53,33 @@ Each verifier emits JSON to `scripts/claims/.results/<name>.json`:
 
 `run-all.sh` aggregates them into a Markdown summary published to the
 GitHub Actions step summary + attached as artifact (90-day retention).
+
+### Invariants matrix (what `check-invariants.sh` enforces)
+
+The invariants verifier encodes every AGENTS.md rule we can falsify in
+code. Each check below is **"claim broken → this script flags it"**.
+
+| Invariant                                               | Severity on break | How it's detected                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Crypto uses AES-256-GCM**                             | fail              | `lib/crypto.ts` contains the `aes-256-gcm` algorithm string.                                                                                                                                                                                                                        |
+| **Crypto reads ENCRYPTION_KEY**                         | fail              | `lib/crypto.ts` references `process.env.ENCRYPTION_KEY`.                                                                                                                                                                                                                            |
+| **CSP has no `'unsafe-inline'` in `script-src`**        | fail              | `lib/security/csp.ts`'s `script-src` directive is strict.                                                                                                                                                                                                                           |
+| **CSP uses a per-request nonce**                        | warn              | `lib/security/csp.ts` mentions `nonce`.                                                                                                                                                                                                                                             |
+| **`audit_logs` is append-only**                         | fail              | No raw `DELETE FROM` / `UPDATE` against `audit_logs` outside `lib/audit/**` and tests.                                                                                                                                                                                              |
+| **CSRF uses `__Host-csrf`**                             | warn              | `lib/security/csrf.ts` references `__Host-csrf`.                                                                                                                                                                                                                                    |
+| **Money vocabulary is cents/bigint**                    | warn              | `lib/money.ts` mentions `cents` or `bigint`.                                                                                                                                                                                                                                        |
+| **`X-Powered-By` stripped**                             | fail              | `next.config.ts` has `poweredByHeader: false`.                                                                                                                                                                                                                                      |
+| **Stryker threshold ≥ 84%**                             | fail              | `stryker.config.mjs` has `break >= 84`.                                                                                                                                                                                                                                             |
+| **Cron count in `vercel.json`**                         | fail/warn         | At least 15 crons declared.                                                                                                                                                                                                                                                         |
+| **Required workflows present**                          | fail              | `ci.yml`, `cost-guard.yml`, `external-probe.yml`, `mutation-test.yml`, `offsite-backup.yml`, `restore-drill.yml`, `schema-drift.yml`, `zap-baseline.yml` all exist.                                                                                                                 |
+| **Every skill has `SKILL.md`**                          | fail              | Each dir under `.cursor/skills/` has a `SKILL.md`.                                                                                                                                                                                                                                  |
+| **Every rule has frontmatter + description**            | fail/warn         | Each `.cursor/rules/*.mdc` starts with `---` and declares `description:`.                                                                                                                                                                                                           |
+| **API route has rate-limit or auth gate** (Wave 16.1)   | warn              | Every `app/api/*/route.ts` imports rate-limit OR rbac OR session client OR uses secret-based auth (CRON_SECRET, METRICS_SECRET, HMAC); routes under `/api/cron` and `/api/health` are blanket-exempt. Explicit opt-out: `// @auth: public` or `// @rate-limit: skipped — <reason>`. |
+| **RLS auto-enable event trigger installed** (Wave 16.2) | fail              | `supabase/migrations/057_rls_auto_enable_safety_net.sql` defines `public.rls_auto_enable()` + `CREATE EVENT TRIGGER ensure_rls`.                                                                                                                                                    |
+| **Migrations numbered sequentially** (Wave 16.3)        | fail              | `supabase/migrations/NNN_*.sql` from `001` to `MAX` with no gaps and no duplicates.                                                                                                                                                                                                 |
+| **`.env.example` has no real secrets** (Wave 16.4)      | fail              | No matches for Resend `re_*`, Vercel `vcp_*`/`vrc_*`, OpenAI `sk-*`, GitHub `ghp_*`/`github_pat_*`, JWTs, or AWS `AKIA*`.                                                                                                                                                           |
+| **`/(private)` layout gates auth** (Wave 16.5)          | fail              | `app/(private)/layout.tsx` reads session (`getCurrentUser`/`requireRole`) AND imports + calls `redirect()` from `next/navigation` targeting `/login`/`/unauthorized`/`/sign-in`.                                                                                                    |
+| **Compliance crons documented** (Wave 16.6)             | fail              | Every cron in the compliance set — `verify-audit-chain`, `backup-freshness`, `rls-canary`, `dsar-sla-check`, `rotate-secrets`, `enforce-retention` — is referenced in at least one doc/skill/rule.                                                                                  |
 
 ## Severity philosophy
 
@@ -125,7 +152,7 @@ count still exits `0`.
 Low-hanging extensions, ranked by effort × value:
 
 - **`check-metric-emission`** — every metric name referenced in runbooks (`money_drift_total`, `rls_canary_violations_total`, `rate_limit_suspicious_ips_total`, `csrf_blocked_total`, …) has a matching emission in `lib/metrics.ts` or an `app/api/**` route.
-- **`check-rls-coverage`** — every table in `supabase/migrations/` that stores tenant data has an explicit `enable row level security` AND at least one policy (catches migrations that add a table but forget RLS).
+- **`check-rls-policy-coverage`** — every table in `supabase/migrations/` has at least one `CREATE POLICY` (complements Wave 16.2's event-trigger invariant, which only guarantees RLS _enabled_, not that a policy exists beyond the deny-all default).
 - **`check-skill-trigger-overlap`** — no two skills' descriptions claim the same trigger phrase; reduces agent dispatch ambiguity.
 - **`check-retention-policies`** — every entry in `lib/retention/policies.ts` corresponds to a real table + column pair; every destructive cron references a retention policy.
 - **`check-anti-patterns`** — each `.cursor/rules/*.mdc` has an "Anti-patterns" section (keeps the rule a two-sided invariant, not one-sided advice).
@@ -156,6 +183,7 @@ questions correctly-but-wrongly.
 
 ## Change log
 
-| Date       | Change                                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------------------------ |
-| 2026-04-20 | Initial implementation — 5 verifiers (skill-structure, cross-links, cron-claims, feature-flags, invariants). |
+| Date       | Change                                                                                                                                                                                                                                                                             |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-04-20 | Initial implementation — 5 verifiers (skill-structure, cross-links, cron-claims, feature-flags, invariants).                                                                                                                                                                       |
+| 2026-04-20 | Wave 16 — 6 new invariants: API rate-limit/auth gate, RLS event-trigger, migration numbering, `.env.example` secret scan, `/(private)` layout gate, compliance-cron documentation. Surfaced a real defect in `/api/tracking` (no rate-limit on public token endpoint) — now fixed. |

@@ -203,6 +203,229 @@ if (exists('.cursor/rules')) {
   }
 }
 
+// ============================================================================
+//  Expansion — Wave 16 ("invariants as flywheel")
+//  Added 2026-04-20. Each section below codifies an AGENTS.md rule that
+//  previously relied on operator memory. Broken invariant here = real bug.
+// ============================================================================
+
+const path = require('path');
+
+function walkFiles(root, extRe = /\.(ts|tsx)$/) {
+  const out = [];
+  function visit(p) {
+    if (!fs.existsSync(p)) return;
+    const st = fs.statSync(p);
+    if (st.isFile()) {
+      if (extRe.test(p)) out.push(p);
+      return;
+    }
+    if (st.isDirectory()) {
+      for (const e of fs.readdirSync(p)) visit(path.join(p, e));
+    }
+  }
+  visit(root);
+  return out;
+}
+
+// --- Invariant 16.1: every /api/*/route.ts has rate-limit OR auth gate ---
+//
+// Routes that reach production without either:
+//   (a) rate-limit (via lib/rate-limit) — bounded abuse surface
+//   (b) auth gate (requireRole / requireUser / getCurrentUser / session client)
+//   (c) secret-based auth (CRON_SECRET, METRICS_SECRET, BACKUP_LEDGER_SECRET, HMAC webhook signature)
+//   (d) explicit public marker (// @auth: public, // @rate-limit: skipped — <reason>)
+// are bots' best friend: unauthenticated + unbounded = DoS / scraping.
+//
+// Framework-blanket exemptions: /api/cron (CRON_SECRET by convention),
+// /api/health (platform-pinged, 0 side effects), /api/inngest (self-signed).
+const apiRoutes = walkFiles('app/api').filter(p => /\/route\.(ts|tsx)$/.test(p));
+
+const BLANKET_EXEMPT = [
+  /^app\/api\/cron\//,
+  /^app\/api\/health\//,
+];
+
+const PROTECTIVE_PATTERNS = [
+  /from\s+['"]@\/lib\/rate-limit['"]/,
+  /from\s+['"]@\/lib\/rbac['"]/,
+  /from\s+['"]@\/lib\/auth\/session['"]/,
+  /from\s+['"]@\/lib\/db\/server['"]/,          // SSR Supabase = session-aware
+  /from\s+['"]@\/lib\/security\/hmac['"]/,
+  /from\s+['"]inngest\/next['"]/,
+  /\bCRON_SECRET\b/,
+  /\bMETRICS_SECRET\b/,
+  /\bBACKUP_LEDGER_SECRET\b/,
+  /\bverifyWebhookSignature\b/,
+  /\bsafeEqualString\b/,
+  /\brequireRole\b/,
+  /\brequireUser\b/,
+  /\brequireSuperAdmin\b/,
+  /\bgetCurrentUser\b/,
+  /\bgetSession\b/,
+  /@rate-limit:\s*skipped/i,
+  /@auth:\s*public/i,
+];
+
+for (const route of apiRoutes) {
+  const rel = route.replace(/^\.\//, '');
+  if (BLANKET_EXEMPT.some(rx => rx.test(rel))) { pass(); continue; }
+  const src = read(route);
+  const protectedRoute = PROTECTIVE_PATTERNS.some(rx => rx.test(src));
+  if (protectedRoute) { pass(); continue; }
+  warn(
+    'API route has rate-limit or auth gate',
+    "no protective pattern matched — add lib/rate-limit, lib/rbac, lib/auth/session, or '// @auth: public' with rationale",
+    rel
+  );
+}
+
+// --- Invariant 16.2: RLS auto-enable event-trigger is installed ---
+//
+// Migration 057 installs a Postgres event trigger that ENABLEs RLS after
+// every CREATE TABLE in `public`. This is the safety net: any future
+// table shipped without explicit RLS boilerplate is still protected.
+// If the trigger ever gets removed, a forgetful migration can ship an
+// open table to prod. This check makes that regression impossible.
+if (exists('supabase/migrations/057_rls_auto_enable_safety_net.sql')) {
+  const src = read('supabase/migrations/057_rls_auto_enable_safety_net.sql');
+  const hasFn = /CREATE\s+(OR\s+REPLACE\s+)?FUNCTION\s+public\.rls_auto_enable/i.test(src);
+  const hasTrigger = /CREATE\s+EVENT\s+TRIGGER\s+ensure_rls/i.test(src);
+  if (!hasFn) {
+    fail('RLS auto-enable function exists', 'public.rls_auto_enable() not declared in 057', 'supabase/migrations/057_rls_auto_enable_safety_net.sql');
+  } else pass();
+  if (!hasTrigger) {
+    fail('RLS ensure_rls event trigger exists', 'CREATE EVENT TRIGGER ensure_rls missing in 057', 'supabase/migrations/057_rls_auto_enable_safety_net.sql');
+  } else pass();
+} else {
+  fail('RLS safety net migration exists', '057_rls_auto_enable_safety_net.sql missing', 'supabase/migrations/');
+}
+
+// --- Invariant 16.3: migrations numbered sequentially with no gaps ---
+//
+// Gaps signal: (a) a file was deleted (migrations are append-only), or
+// (b) two developers raced on numbering. Both indicate the CI pipeline
+// missed a blocker upstream.
+if (exists('supabase/migrations')) {
+  const nums = fs.readdirSync('supabase/migrations')
+    .filter(f => /^\d{3}_.+\.sql$/.test(f))
+    .map(f => parseInt(f.slice(0, 3), 10))
+    .sort((a, b) => a - b);
+  let gapFound = false;
+  for (let i = 0; i < nums.length; i++) {
+    const expected = i + 1;
+    if (nums[i] !== expected) {
+      fail(
+        'migrations numbered sequentially',
+        `gap: expected ${String(expected).padStart(3, '0')}, found ${String(nums[i]).padStart(3, '0')}`,
+        'supabase/migrations/'
+      );
+      gapFound = true;
+      break;
+    }
+  }
+  if (!gapFound && nums.length > 0) pass();
+}
+
+// --- Invariant 16.4: .env.example contains no real secrets ---
+//
+// .env.example is commit-ed. A real secret here = instant leak on the
+// next `git clone`. Guard against patterns of known credential shapes.
+if (exists('.env.example')) {
+  const src = read('.env.example');
+  const SECRET_PATTERNS = [
+    // Resend keys: re_ + base62 (20+ chars)
+    { re: /\bre_[A-Za-z0-9]{20,}/,             name: 'Resend API key' },
+    // Vercel personal tokens: vcp_ / vrc_ / tok_ + base62
+    { re: /\b(vcp|vrc|tok)_[A-Za-z0-9]{20,}/,  name: 'Vercel token' },
+    // OpenAI keys: sk-[A-Za-z0-9]{20+}
+    { re: /\bsk-[A-Za-z0-9]{20,}/,             name: 'OpenAI-style secret key' },
+    // GitHub PATs: ghp_ / ghs_ / github_pat_
+    { re: /\b(ghp|ghs|ghu)_[A-Za-z0-9]{20,}/,  name: 'GitHub PAT' },
+    { re: /\bgithub_pat_[A-Za-z0-9_]{20,}/,    name: 'GitHub fine-grained PAT' },
+    // JWT (header.payload.signature, base64url, 3 parts)
+    { re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, name: 'JWT' },
+    // AWS access keys
+    { re: /\bAKIA[0-9A-Z]{16}\b/,              name: 'AWS access key ID' },
+    // Supabase service role key pattern (we can't detect generically, but
+    // the sr key is long base64; placeholders like "your_...", "<foo>",
+    // and "xxx" wouldn't match this).
+    // NOTE: kept loose on purpose to avoid false positives on placeholders.
+  ];
+  let hit = false;
+  for (const { re, name } of SECRET_PATTERNS) {
+    const m = src.match(re);
+    if (m) {
+      fail(
+        '.env.example contains no real secrets',
+        `matched pattern for "${name}" — revoke immediately and replace with placeholder`,
+        '.env.example'
+      );
+      hit = true;
+    }
+  }
+  if (!hit) pass();
+} else {
+  warn('.env.example present', 'file missing — new contributors have no template', '.env.example');
+}
+
+// --- Invariant 16.5: /(private) layout redirects unauthenticated users ---
+//
+// Next.js App Router: auth for a whole subtree is enforced by the subtree's
+// layout.tsx. If someone forgets this, every private page leaks. We look for
+// three signals in app/(private)/layout.tsx:
+//   1. imports getCurrentUser or requireRole / requireUser
+//   2. imports `redirect` from 'next/navigation'
+//   3. redirects to /login (or /unauthorized)
+const privLayout = 'app/(private)/layout.tsx';
+if (exists(privLayout)) {
+  const src = read(privLayout);
+  const hasAuthRead = /\b(getCurrentUser|requireRole|requireUser|requireSuperAdmin|getSession)\b/.test(src);
+  const hasRedirect = /from\s+['"]next\/navigation['"]/.test(src) && /\bredirect\s*\(/.test(src);
+  const goesToLogin = /redirect\(['"`]\/(login|unauthorized|sign-in)/i.test(src);
+  if (!hasAuthRead)  fail('private layout reads session', "no getCurrentUser/requireRole/requireUser in app/(private)/layout.tsx", privLayout);
+  else pass();
+  if (!hasRedirect)  fail('private layout uses redirect()', "no import+call of next/navigation redirect()", privLayout);
+  else pass();
+  if (!goesToLogin)  fail('private layout redirects to /login', "no redirect('/login' | '/unauthorized' | '/sign-in') call found", privLayout);
+  else pass();
+} else {
+  fail('app/(private)/layout.tsx exists', 'file missing — every private page is unguarded', privLayout);
+}
+
+// --- Invariant 16.6: compliance crons are documented somewhere ---
+//
+// A separate verifier (check-cron-claims.mjs) already warns on undocumented
+// crons. This invariant promotes the **compliance-critical** ones to fail,
+// because an undocumented compliance cron means operator gets paged with no
+// runbook. Upstream regulators (LGPD, ANPD) expect these crons; losing the
+// reference is a real drift risk.
+const COMPLIANCE_CRONS = [
+  '/api/cron/verify-audit-chain',
+  '/api/cron/backup-freshness',
+  '/api/cron/rls-canary',
+  '/api/cron/dsar-sla-check',
+  '/api/cron/rotate-secrets',
+  '/api/cron/enforce-retention',
+];
+const docRoots = ['docs', '.cursor/skills', '.cursor/rules', 'AGENTS.md'];
+const docFiles = [];
+for (const r of docRoots) {
+  if (!fs.existsSync(r)) continue;
+  const st = fs.statSync(r);
+  if (st.isFile()) { docFiles.push(r); continue; }
+  for (const f of walkFiles(r, /\.(md|mdc)$/)) docFiles.push(f);
+}
+const docCorpus = docFiles.map(f => read(f)).join('\n');
+for (const cron of COMPLIANCE_CRONS) {
+  if (docCorpus.includes(cron)) pass();
+  else fail(
+    `compliance cron ${cron} is documented`,
+    'operator would get paged with no runbook — add reference in a skill or runbook',
+    'docs/ + .cursor/'
+  );
+}
+
 const warnings = findings.filter(f => f.severity === 'warn').length;
 const failed = findings.filter(f => f.severity === 'fail').length;
 
