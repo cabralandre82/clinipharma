@@ -4,6 +4,11 @@
 
 **Responsáveis:** on-call engineer primeiro; escalar conforme `docs/on-call.md`.
 
+> **Companion skills:** para os runbooks mais críticos e recorrentes,
+> existem skills executáveis (compactas, com checklist + SQL pronto
+> para copiar) em [`.cursor/skills/`](../../.cursor/skills/README.md).
+> Use o skill na emergência; leia o runbook para entender o "por quê".
+
 ---
 
 ## Índice de runbooks
@@ -47,6 +52,29 @@
 | ---------------------- | ---------------------------------------------------------------------------------------------------- |
 | `ticket-sla-breach.md` | Tickets de suporte sem resposta > SLA                                                                |
 | `vercel-cron-quota.md` | Deploys silenciosamente rejeitados por `cron_jobs_limits_reached` (Hobby plan ↔ sub-daily schedules) |
+
+---
+
+## Runbooks com skill dedicado (fast-path para agentes)
+
+| Runbook                   | Skill dedicado                                                               | Quando usar                                                |
+| ------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| _Qualquer P1/P2_          | [`incident-open`](../../.cursor/skills/incident-open/SKILL.md)               | **Ponto de entrada** — use ANTES do runbook específico     |
+| `dsar-sla-missed.md`      | [`dsar-fulfill`](../../.cursor/skills/dsar-fulfill/SKILL.md)                 | Processar DSAR EXPORT / ERASURE / CORRECTION / PORTABILITY |
+| `legal-hold-received.md`  | [`legal-hold-apply`](../../.cursor/skills/legal-hold-apply/SKILL.md)         | Ordem ANPD / PROCON / judicial recebida                    |
+| `audit-chain-tampered.md` | [`audit-chain-verify`](../../.cursor/skills/audit-chain-verify/SKILL.md)     | Cron `verify-audit-chain` falhou                           |
+| `secret-compromise.md`    | [`secret-compromise`](../../.cursor/skills/secret-compromise/SKILL.md)       | Leak confirmado ou suspeito                                |
+| `secret-rotation.md`      | [`secret-rotate`](../../.cursor/skills/secret-rotate/SKILL.md)               | Rotação programada 90d / 180d                              |
+| `rls-violation.md`        | [`rls-violation-triage`](../../.cursor/skills/rls-violation-triage/SKILL.md) | Canário RLS violation                                      |
+| `backup-missing.md`       | [`backup-verify`](../../.cursor/skills/backup-verify/SKILL.md)               | Freshness / restore drill / chain break                    |
+
+Os skills são lidos automaticamente pelo agente quando o trigger da
+descrição bate com a solicitação do operador (`"processar DSAR"`,
+`"secret vazou"`, `"backup stale"`, etc.). Eles contêm checklist +
+comandos prontos; para o contexto completo (regulatório, histórico,
+decisões passadas), o runbook é a fonte canônica.
+
+Skills novos seguem o guia em `.cursor/skills/README.md` §"Writing a new skill".
 
 ---
 

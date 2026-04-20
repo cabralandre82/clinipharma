@@ -93,7 +93,8 @@ mutation-test**. Threshold: 84% mínimo. Ver`stryker.config.mjs`.
 | ---------------------------------------------- | --------------------------------------------------------------------- |
 | Postura de segurança completa                  | `docs/security/threat-model.md` + `docs/security/dynamic-scanning.md` |
 | Modelo de operação humano vs agente            | `docs/SOLO_OPERATOR.md`                                               |
-| Como responder a um alerta                     | `docs/runbooks/README.md` → runbook específico                        |
+| Como responder a um alerta (fast-path)         | `.cursor/skills/README.md` → skill específico                         |
+| Como responder a um alerta (contexto completo) | `docs/runbooks/README.md` → runbook específico                        |
 | Estratégia de testes (pirâmide + mutation)     | `docs/testing/strategy.md` + `docs/testing/mutation-testing.md`       |
 | Matriz RLS por tabela                          | `docs/rls-matrix.md`                                                  |
 | SLOs e burn-rate                               | `docs/observability/slos.md` + `docs/observability/burn-rate.md`      |
@@ -144,8 +145,21 @@ Para qualquer tarefa não-trivial, priorize leitura nesta sequência:
 1. Este arquivo (AGENTS.md) — invariantes
 2. `docs/SOLO_OPERATOR.md` — quem faz o quê
 3. `.cursor/rules/*.mdc` — convenções por domínio (auto-carregadas)
-4. Runbook específico se a tarefa espelha um incident pattern
+4. **Se for resposta a incidente**: `.cursor/skills/<nome>/SKILL.md` (fast-path) → depois o runbook em `docs/runbooks/` (contexto completo)
 5. ADR relevante em `docs/decisions/` se tocar arquitetura
+
+### Taxonomia rule / skill / runbook
+
+Três artefatos diferentes para três papéis diferentes:
+
+- **`.cursor/rules/*.mdc`** → **previne**. Invariantes que o agente não
+  pode violar ao editar código. Auto-carregadas por globs.
+- **`.cursor/skills/*/SKILL.md`** → **executa**. Checklist + SQL pronto
+  para incidentes recorrentes. Auto-descobertas pela descrição.
+- **`docs/runbooks/*.md`** → **explica**. Contexto regulatório, decisão
+  histórica, rationale. Lidas sob demanda.
+
+Rule previne acidente. Skill guia procedimento. Runbook é fonte da verdade.
 
 Quando em dúvida entre "fazer do jeito antigo" vs "jeito novo": faça
 do jeito antigo e abra issue. Solo-ops não tem orçamento para refactor
