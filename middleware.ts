@@ -24,6 +24,9 @@ const PUBLIC_ROUTES = [
   // Webhook endpoints — verified by their own secrets, no session needed
   '/api/payments/asaas/webhook',
   '/api/contracts/webhook',
+  // Zenvia delivery-status webhook — gated by ZENVIA_WEBHOOK_SECRET
+  // in the handler, so the session middleware must not intercept.
+  '/api/notifications/zenvia',
   '/api/cron/',
   // Inngest serve handler — authenticated by INNGEST_SIGNING_KEY, not user session
   '/api/inngest',
