@@ -43,6 +43,7 @@ describe('checkCsrf — exempt paths', () => {
   const cases = [
     '/api/payments/asaas/webhook',
     '/api/contracts/webhook',
+    '/api/notifications/zenvia',
     '/api/inngest/foo',
     '/api/cron/scheduler',
     '/api/tracking',

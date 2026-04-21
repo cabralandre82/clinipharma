@@ -63,6 +63,12 @@ const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 const CSRF_EXEMPT_PREFIXES = [
   '/api/payments/asaas/webhook',
   '/api/contracts/webhook',
+  // Zenvia delivery-status webhook authenticates via the shared
+  // secret in X-Clinipharma-Zenvia-Secret (see the route handler
+  // and docs/infra/vercel-projects-topology.md). Zenvia's servers
+  // do not — cannot — send a same-origin cookie, so CSRF would
+  // always block them.
+  '/api/notifications/zenvia',
   '/api/inngest',
   // Cron routes call from Vercel with CRON_SECRET, no cookie session.
   '/api/cron/',
