@@ -1,9 +1,14 @@
 # Topologia dos projetos Vercel
 
-> **Status:** Vivo. Última mudança: **2026-04-18** — rotação do
-> `ZENVIA_API_TOKEN` em produção (SMS-only) e limpeza dos secrets Zenvia
-> remanescentes no projeto em quarentena. Consolidação anterior em 2026-04-19
-> (ver histórico abaixo).
+> **Status:** Vivo. Última mudança: **2026-04-18** — troca provisória do
+> `ZENVIA_SMS_FROM` de `Clinipharma` para `cabralandre` após ticket Zenvia
+> confirmar que o plano **Starter + Channel 1** não permite sender
+> alfanumérico customizado (o `from` precisa ser o username da conta).
+> Primeiro smoke test real de SMS entregue após a troca — antes desse
+> passo, `from=Clinipharma` estava sendo rejeitado pelo Zenvia com
+> `MESSAGE_STATUS=REJECTED` / "The message was rejected by Zenvia".
+> Histórico completo abaixo, incluindo a rotação de `ZENVIA_API_TOKEN`,
+> o kill-switch de WhatsApp e o webhook de delivery-status.
 > **Owner:** Plataforma + DPO.
 
 ## TL;DR (estado atual)
@@ -110,6 +115,39 @@ Existe **um único projeto Vercel ativo**: `clinipharma`. Ele serve:
      `ZENVIA_WEBHOOK_SECRET` no manifest de rotação
      (migration 056 + `lib/secrets/manifest.ts`) — adiado para PR
      dedicado de rotação para não misturar diff de migração aqui.
+8. **2026-04-18 (madrugada, BRT):** **sender SMS corrigido — de
+   `Clinipharma` para `cabralandre` (provisório).** Segundo e terceiro
+   smoke tests de SMS com `from=Clinipharma` chegaram no webhook com
+   `MESSAGE_STATUS=REJECTED` e `description="The message was rejected by
+Zenvia"`. Causa diagnosticada via ticket Zenvia: o plano contratado
+   (`Starter + Channel 1` / contrato `ZS_7XXGRYB`, aderência
+   2026-04-17) **não tem sender alfanumérico customizado** — o `from`
+   da API `/v2/channels/sms/messages` precisa ser o username da conta
+   (`cabralandre`). O painel Zenvia (Customer Cloud) não expõe menu de
+   senders pra esse plano, o que explica o porquê de não existir
+   `Clinipharma` registrado mesmo com o canal SMS `ACTIVE`. Ações:
+   - Vercel `clinipharma`: `ZENVIA_SMS_FROM` PATCHED de `Clinipharma`
+     → `cabralandre` em `production` + `preview` (env id
+     `v5LYzIuiIE0eNZfX`, permanece `type=plain` — sender não é secret).
+     Redeploy disparado pelo push seguinte (commit deste doc + `.env.example`).
+   - Código: **nenhuma mudança.** `lib/zenvia.ts` já lê
+     `process.env.ZENVIA_SMS_FROM` em runtime — a troca é só de env.
+   - Impacto no usuário final: SMS chegam identificados como
+     `cabralandre` no campo "De". O **corpo** da mensagem continua
+     assinado "Clinipharma" via templates de `SMS.*` — a marca ainda
+     aparece pro cliente. É imperfeito (branding), não quebrado.
+   - Follow-up pra quando fizer sentido (crescimento de volume ou
+     feedback negativo de clientes): upgrade do plano Zenvia para tier
+     com Messaging API + registro de sender alfanumérico "Clinipharma".
+     Operação é: (1) ligar pra comercial Zenvia pedir o upgrade;
+     (2) registrar "Clinipharma" como sender alfanumérico no portal;
+     (3) PATCH de volta `ZENVIA_SMS_FROM=Clinipharma`. Sem mudança
+     de código. Custo estimado: ~R$ 200–500/mês acima do Starter
+     (confirmar com Zenvia na hora).
+   - Custo de **não** fazer o upgrade agora: cliente ve `cabralandre`
+     no "De" do SMS e pode achar estranho ou marcar como spam.
+     Mitigação: primeira linha de todo template SMS começa com
+     "[Clinipharma]" para ancorar a identidade da marca.
 
 ## Por que `b2b-med-platform` ficou em quarentena (não deletado)
 

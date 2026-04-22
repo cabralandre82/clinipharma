@@ -42,7 +42,7 @@
 - [x] `ASAAS_API_URL` = `https://api.asaas.com/v3` — ✅ **produção** configurada no Vercel (id: `Ha59rt0jVTvFFY64`) e `.env.local` em 2026-04-14.
 - [x] `ASAAS_WEBHOOK_SECRET` — ✅ **produção** configurada no Vercel (id: `59YdW0ce1NcycTwx`) e `.env.local` em 2026-04-14. URL do webhook no Asaas: `https://clinipharma.com.br/api/payments/asaas/webhook?accessToken=whsec_8AzQE_w7P99SIDhRCLktw3Pq4G6IcYtI7jxD3bUCbjs`
 - [x] `ZENVIA_API_TOKEN` — ✅ **CONCLUÍDO (2026-04-17)** — token `AFOTY18T...` configurado. Vercel id: `WCWL1B4O5e9guOOZ`
-- [x] `ZENVIA_SMS_FROM` — ✅ **CONCLUÍDO (2026-04-17)** — sender `Clinipharma` ativo. Vercel id: `fYrN1vRC0mPF93Ne`
+- [x] `ZENVIA_SMS_FROM` — ✅ **PROVISÓRIO (2026-04-18)** — sender `cabralandre` (username da conta). O plano `Starter + Channel 1` não permite sender alfanumérico customizado; ticket Zenvia confirmou que o `from` precisa ser o username até upgrade de plano. Corpo do SMS continua assinado "Clinipharma". Detalhes + plano de upgrade: `docs/infra/vercel-projects-topology.md` §8. Vercel id: `v5LYzIuiIE0eNZfX` (anterior: `fYrN1vRC0mPF93Ne`)
 - [ ] `ZENVIA_WHATSAPP_FROM` — ⏳ **ADIADO** — conectar WABA quando a plataforma estiver em operação real. WhatsApp Business existente disponível para iniciar o processo. Vercel id: `qN5b0EH8Y0bouNYp`
 - [x] `CLICKSIGN_ACCESS_TOKEN` — ✅ **produção** configurada no Vercel (id: `eYo5lbCljCz6oKFu`) e `.env.local` em 2026-04-16
 - [x] `CLICKSIGN_API_URL` = `https://app.clicksign.com/api/v1` — ✅ **produção** configurada no Vercel (id: `9HsdfN0FtO7WGa6o`) em 2026-04-16
@@ -173,19 +173,19 @@
 
 ### 📱 3. Zenvia — SMS (WhatsApp intencionalmente desligado no lançamento)
 
-**Status:** onboarding Zenvia concluído (email do time CS em 2026-04-18). Falta só configurar o token e o sender ID no Vercel.  
+**Status:** SMS operacional em produção (2026-04-18) com sender provisório `cabralandre`. Webhook de delivery-status ativo (`app/api/notifications/zenvia/route.ts`, subscription `c2a89116-9c2c-424d-81fd-8e94664924d9`).  
 **Escopo de lançamento:** **SMS apenas**. WhatsApp fica gated pelo kill-switch `WHATSAPP_ENABLED=false` — `lib/zenvia.ts::sendWhatsApp()` é no-op silencioso em todos os paths (pedido/pagamento/registro). Para ligar depois: verificar CNPJ no Meta Business Manager, registrar número dedicado, flipar `WHATSAPP_ENABLED=true`, preencher `ZENVIA_WHATSAPP_FROM`. Zero mudança de código.
 
-**O que fazer (SMS-only):**
+**Restrição do plano contratado (`Starter + Channel 1`):** o `from` da API precisa ser o username da conta Zenvia (`cabralandre`). Sender alfanumérico customizado (ex.: `Clinipharma`) é feature de plano superior (Messaging API). Para mudar depois: upgrade do plano → registrar `Clinipharma` como sender no portal → PATCH `ZENVIA_SMS_FROM=Clinipharma` no Vercel. Sem mudança de código.
 
-1. [app.zenvia.com](https://app.zenvia.com) → **Developers → Tokens & Webhooks** → copiar token.
-2. **Canais → SMS** → conferir sender ID aprovado (alfanumérico `Clinipharma` ou numérico).
-3. Vercel → atualizar 2 placeholders:
-   - `ZENVIA_API_TOKEN` (id: `WCWL1B4O5e9guOOZ`) → token do passo 1
-   - `ZENVIA_SMS_FROM` (id: `fYrN1vRC0mPF93Ne`) → sender ID do passo 2
-4. Garantir `WHATSAPP_ENABLED=false` no Vercel (default do `.env.example`).
-5. Espelhar no `.env.local` para dev local.
-6. Smoke test: confirmar um pedido de teste e verificar em Zenvia → Monitoria se o SMS sai com status `delivered`.
+**Config já aplicada no Vercel (2026-04-18):**
+
+- `ZENVIA_API_TOKEN` — `type=sensitive` em production + preview (id `WCWL1B4O5e9guOOZ`).
+- `ZENVIA_SMS_FROM=cabralandre` — production + preview (id `v5LYzIuiIE0eNZfX`).
+- `WHATSAPP_ENABLED=false` — production + preview + development.
+- `ZENVIA_WEBHOOK_SECRET` — `type=sensitive` em production + preview.
+
+**Validação em produção:** primeiro SMS entregue para `+55 21 99885-1851` (smoke test do PO). Webhook recebeu `MESSAGE_STATUS=DELIVERED`; linha em `webhook_events`. Antes da troca de sender, tentativas com `from=Clinipharma` retornavam `MESSAGE_STATUS=REJECTED`.
 
 ---
 
