@@ -126,10 +126,11 @@ Não-exemplos (proibidos):
 
 ### 3.6 Webhooks e idempotência
 
-| Métrica                   | Tipo    | Labels                | Descrição                                        |
-| ------------------------- | ------- | --------------------- | ------------------------------------------------ |
-| `webhook_claim_total`     | counter | `provider`, `outcome` | Claim do dedup-key na tabela `webhook_events`    |
-| `webhook_duplicate_total` | counter | `provider`            | Duplicates detectados (idempotência funcionando) |
+| Métrica                   | Tipo    | Labels                | Descrição                                                                                                                                                                                          |
+| ------------------------- | ------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `webhook_claim_total`     | counter | `provider`, `outcome` | Claim do dedup-key na tabela `webhook_events`                                                                                                                                                      |
+| `webhook_duplicate_total` | counter | `provider`            | Duplicates detectados (idempotência funcionando)                                                                                                                                                   |
+| `sms_status_event_total`  | counter | `channel`, `status`   | Evento de delivery-status recebido no webhook Zenvia (`app/api/notifications/zenvia`). `channel=sms`, `status` ∈ `SENT\|DELIVERED\|NOT_DELIVERED\|REJECTED\|...`. Base para SLO de entrega de SMS. |
 
 ### 3.7 Conciliação financeira
 
