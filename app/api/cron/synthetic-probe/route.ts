@@ -36,6 +36,7 @@ import { NextResponse } from 'next/server'
 import { withCronGuard } from '@/lib/cron/guarded'
 import { logger } from '@/lib/logger'
 import { incCounter, observeHistogram, Metrics } from '@/lib/metrics'
+import { pingRedis } from '@/lib/redis'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -108,6 +109,36 @@ export const GET = withCronGuard('synthetic-probe', async () => {
   for (const target of TARGETS) {
     results.push(await probe(baseUrl, target))
   }
+
+  // ── Upstash Redis keep-alive + reachability ────────────────────────────
+  // One PING every 5 min serves two purposes at once:
+  //   1. Stops Upstash's free-tier archival clock. Inactive
+  //      databases get archived after ~1 week without traffic; a
+  //      single successful command resets the timer.
+  //   2. Gives us an end-to-end health signal for the rate-limit
+  //      backend. A non-PONG here means distributed rate limiting
+  //      is silently degraded (the limiter falls back to in-memory
+  //      which is not safe across Vercel function instances).
+  // Gated by env so local/dev runs don't pollute cron_runs with
+  // rows for a backend that's not even configured.
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const ping = await pingRedis()
+    observeHistogram(Metrics.HEALTH_CHECK_DURATION_MS, ping.latencyMs, {
+      endpoint: 'synthetic-upstash-redis',
+    })
+    incCounter('synthetic_probe_total', {
+      target: 'upstash-redis',
+      status: ping.ok ? 'ok' : 'fail',
+    })
+    results.push({
+      path: '/upstash/ping',
+      status: ping.ok ? 200 : 0,
+      ok: ping.ok,
+      latencyMs: ping.latencyMs,
+      ...(ping.error ? { error: ping.error } : {}),
+    })
+  }
+
   const failed = results.filter((r) => !r.ok)
   if (failed.length > 0) {
     logger.warn('[cron/synthetic-probe] one or more targets failed', {

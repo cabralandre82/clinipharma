@@ -286,6 +286,25 @@ export async function GET(req: NextRequest) {
     checks.rlsCanary = { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
 
+  // ── Upstash Redis reachability ────────────────────────────────────────
+  // Only surfaces if the env vars are set (production). Uses the
+  // REST /ping endpoint directly — see lib/redis.ts for rationale.
+  // Fails the deep check only if the PING times out / auth errors,
+  // not if Redis is simply disabled for this environment.
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    try {
+      const { pingRedis } = await import('@/lib/redis')
+      const ping = await pingRedis()
+      checks.upstashRedis = {
+        ok: ping.ok,
+        details: { latencyMs: ping.latencyMs, result: ping.result },
+        ...(ping.ok ? {} : { error: ping.error ?? 'PING did not return PONG' }),
+      }
+    } catch (err) {
+      checks.upstashRedis = { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
   // ── Secret rotation freshness (Wave 15) ───────────────────────────────
   // Reads the secret_inventory view and reports the oldest secret +
   // overdue counts. Two ways this turns red:
