@@ -9,7 +9,14 @@
 
 ## Sumário executivo
 
-Catorze itens. Não é uma única regressão — é o subproduto da auditoria
+Catorze itens originais + 3 follow-ups (multi-receita, hydration, FB SDK)
+
+- épico do consultor (issues #16/#17 → #30). **Todos fechados em
+  2026-04-28** com guardrails permanentes (verifier RBAC view-leak, ESLint
+  `no-raw-status-render`, trigger Supabase `auth → profiles` mirror,
+  suite de testes pinando os contratos de view-mode/onboarding/email).
+
+Não foi uma única regressão — é o subproduto da auditoria
 WCAG ter passado por dezenas de componentes e ter exposto problemas
 **latentes** que estavam invisíveis antes. Eles agrupam em 5 famílias:
 
@@ -160,7 +167,22 @@ Após Onda 1 + 2 implementadas:
   - [x] `npx vitest run` ✓ **1966/1966 passing** (+6)
   - [x] `npx eslint .` ✓ zero erros
   - [x] `./scripts/claims/run-all.sh` ✓ 16/16 verifiers verde
-- [ ] Épico — Consultor como usuário (login + dashboard + emails) — **issue #30** aberta.
+- [x] **Épico — Consultor como usuário (login + dashboard + emails) — concluído em 2026-04-28** (issue #30)
+  - [x] **Descoberta**: schema `sales_consultants` já tinha `user_id` + RLS keyed por `auth.uid()` (migration 004). Role `SALES_CONSULTANT` já existia em `types/index.ts`. `ConsultantDashboard` já estava pronto em `components/dashboard/consultant-dashboard.tsx` (KPIs A receber / Total recebido / Total gerado + lista de clínicas + histórico de comissões). **O gap era runtime, não schema**: nada criava o `auth.users` row + `user_roles` row no fluxo de cadastro.
+  - [x] `lib/email/templates.ts` — 3 templates novos: `consultantWelcomeEmail` (link de definir senha + taxa), `consultantSaleConfirmedEmail` (comissão pendente após confirmPayment), `consultantClinicLinkedEmail` (clínica vinculada).
+  - [x] `services/consultants.ts#createConsultant` — fluxo unificado: insere `sales_consultants` → cria `auth.users` (idempotente: se email já existir, reusa o usuário existente em vez de erro) → upsert `profiles` mirror (defensivo) → upsert `user_roles { user_id, SALES_CONSULTANT }` com `onConflict 'user_id,role'` → linka `sales_consultants.user_id` → gera `auth.admin.generateLink({ type: 'recovery' })` → envia welcome email. Email é fire-and-forget (nunca bloqueia o cadastro). Roll-back de auth user se role falhar.
+  - [x] `services/consultants.ts#assignConsultantToClinic` — quando `consultantId` não-nulo, dispara `consultantClinicLinkedEmail`. Falha de email não bloqueia o write.
+  - [x] `services/payments.ts#confirmPayment` — após insert de `consultant_commissions`, dispara `consultantSaleConfirmedEmail` para o consultor da clínica. Best-effort (try/catch + warn). Não roda se o insert da comissão falhou.
+  - [x] `lib/orders/view-mode.ts` — adicionado mode `'consultant'` defensivo: força 0 em `visibleUnitAmount`/`visibleLineTotal`/`visibleOrderTotal` (consultor nunca vê preço de venda nem repasse — só comissão, que vem de `consultant_commissions.commission_amount` direto). Labels de coluna ganham "Comissão" / "Comissão/un.". `resolveViewMode` ranqueia consultant ABOVE buyer/admin (least-privilege).
+  - [x] `components/users/users-table.tsx` — `ROLE_LABELS` + `ROLE_COLORS` ganham `SALES_CONSULTANT` ('Consultor', teal). Como `/users` já consulta `profiles.user_roles(role)`, novos consultores aparecem automaticamente assim que `createConsultant` semeia o `user_roles` row.
+  - [x] `tests/setup.ts` — global mock de `@/lib/email/templates` ganhou `consultantWelcomeEmail`, `consultantSaleConfirmedEmail`, `consultantClinicLinkedEmail` para evitar `TypeError: not a function` em qualquer suite que toque os services novos.
+  - [x] `tests/unit/services/consultants.test.ts` — bloco "full onboarding (auth provisioning)" pinando 4 invariantes: createUser chamado, user_roles upsertado com `SALES_CONSULTANT` e `onConflict 'user_id,role'`, generateLink chamado com `type: 'recovery'`, sendEmail chamado com link (`tok-abc`) embutido. Segundo teste: idempotência por email já existente — listUsers reusa user pré-existente em vez de erro 23505. Bloco "assignConsultantToClinic — clinic-linked email" pinando que email é enviado em link mas NÃO em unlink.
+  - [x] `tests/unit/lib/orders/view-mode.test.ts` — bloco "consultant view-mode never leaks sales price or repasse" + casos de ranking (PHARMACY_ADMIN > consultant > admin/buyer).
+  - [x] **Limitação conhecida — backfill**: consultores **antigos** que já existiam em `sales_consultants` antes deste commit (com `user_id IS NULL`) continuam sem login. Não há migration que re-execute `auth.admin.createUser` (é runtime API). Caminho ops: re-criar via `/consultants/new` ou abrir um one-shot script `scripts/backfill-consultant-users.ts` quando necessário. Documento aqui para rastreio futuro.
+  - [x] `npx tsc --noEmit` ✓
+  - [x] `npx vitest run` ✓ **1978/1978 passing** (+12 vs Onda 4)
+  - [x] `npx eslint` ✓ zero erros
+  - [x] `./scripts/claims/run-all.sh` ✓ 16/16 verifiers verde, zero findings
 - [x] **Guardrails permanentes — concluídos em 2026-04-28**
   - [x] `scripts/claims/check-rbac-view-leak.sh` — varre superfícies pharmacy-facing por `price_current`/`unit_price`/`total_price`; aceita gates explícitos (import de `lib/orders/view-mode`, `isPharmacyAdmin`, `viewMode`, `// @rbac-view: ok`). 29 arquivos no scope, 0 leaks.
   - [x] `scripts/claims/run-all.sh` — verifier integrado ao run weekly.
@@ -183,7 +205,7 @@ Após Onda 1 + 2 implementadas:
 
 ### Próximos itens (não nesta janela)
 
-- **Issue #30** (épico): Consultor como `profile`/usuário (login, dashboard próprio, emails de cadastro/venda/vínculo de clínica). Cobre os itens #16 e #17 da auditoria original. Estimativa 2–4 dias.
 - **Sentry SDK upgrade**: Resolve os 5 DEPRECATION warnings cosméticos do build (`sentry.client.config.ts` → `instrumentation-client.ts`, `autoInstrumentMiddleware` → `webpack.autoInstrumentMiddleware`, etc). Housekeeping; não bloqueia produção.
+- **Backfill de consultores antigos** (opcional): para os consultores em `sales_consultants` com `user_id IS NULL` cadastrados antes do commit do épico #30, criar `scripts/backfill-consultant-users.ts` que itere e dispare a mesma lógica de auth provisioning. Não é regressão — é one-shot ops.
 
 Será atualizado on-the-fly conforme commits aterrissam.

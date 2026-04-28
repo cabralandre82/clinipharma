@@ -225,3 +225,84 @@ export function consultantTransferEmail(data: ConsultantTransferEmailData): {
   `
   return { subject, html: layout(subject, body) }
 }
+
+// ─── Consultant onboarding & lifecycle ────────────────────────
+
+export interface ConsultantWelcomeEmailData {
+  consultantName: string
+  /** Magic-link URL produced by `auth.admin.generateLink` (action_link). */
+  inviteUrl: string
+  commissionRate: string
+}
+
+export function consultantWelcomeEmail(data: ConsultantWelcomeEmailData): {
+  subject: string
+  html: string
+} {
+  const subject = 'Bem-vindo(a) à Clinipharma — defina sua senha'
+  const body = `
+    ${heading('Sua conta de consultor(a) foi criada')}
+    ${badge('Acesso liberado', '#2563eb')}
+    ${paragraph(`Olá, <strong>${data.consultantName}</strong>! O time da Clinipharma criou sua conta de consultor(a) de vendas. Para começar a acompanhar suas clínicas e comissões, defina uma senha clicando no botão abaixo.`)}
+    ${infoTable([
+      ['Taxa de comissão', `${data.commissionRate}% sobre cada pedido pago`],
+      ['Onde acompanhar', 'Área "Dashboard" depois do login'],
+    ])}
+    ${ctaButton('Definir minha senha', data.inviteUrl)}
+    ${paragraph(`Se o botão não funcionar, copie e cole este link no navegador:<br /><span style="word-break:break-all;color:#64748b;font-size:12px;">${data.inviteUrl}</span>`)}
+  `
+  return { subject, html: layout(subject, body) }
+}
+
+export interface ConsultantSaleConfirmedEmailData {
+  consultantName: string
+  orderCode: string
+  orderId: string
+  clinicName: string
+  commissionAmount: string
+  commissionRate: string
+}
+
+export function consultantSaleConfirmedEmail(data: ConsultantSaleConfirmedEmailData): {
+  subject: string
+  html: string
+} {
+  const subject = `Nova comissão a receber — Pedido ${data.orderCode}`
+  const body = `
+    ${heading('Você tem uma nova comissão')}
+    ${badge('Pendente de repasse', '#d97706')}
+    ${paragraph(`Olá, <strong>${data.consultantName}</strong>! Um pedido de uma de suas clínicas foi pago e gerou comissão para você.`)}
+    ${infoTable([
+      ['Pedido', data.orderCode],
+      ['Clínica', data.clinicName],
+      ['Comissão', data.commissionAmount],
+      ['Taxa aplicada', `${data.commissionRate}%`],
+    ])}
+    ${ctaButton('Ver no dashboard', `${APP_URL}/dashboard`)}
+  `
+  return { subject, html: layout(subject, body) }
+}
+
+export interface ConsultantClinicLinkedEmailData {
+  consultantName: string
+  clinicName: string
+  commissionRate: string
+}
+
+export function consultantClinicLinkedEmail(data: ConsultantClinicLinkedEmailData): {
+  subject: string
+  html: string
+} {
+  const subject = `Nova clínica vinculada — ${data.clinicName}`
+  const body = `
+    ${heading('Uma clínica foi vinculada a você')}
+    ${badge('Vínculo ativo', '#16a34a')}
+    ${paragraph(`Olá, <strong>${data.consultantName}</strong>! A clínica abaixo foi associada a você. A partir de agora, todos os pedidos pagos por essa clínica gerarão comissão na sua conta.`)}
+    ${infoTable([
+      ['Clínica', data.clinicName],
+      ['Sua taxa', `${data.commissionRate}%`],
+    ])}
+    ${ctaButton('Ver minhas clínicas', `${APP_URL}/dashboard`)}
+  `
+  return { subject, html: layout(subject, body) }
+}

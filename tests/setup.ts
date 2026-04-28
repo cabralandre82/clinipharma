@@ -131,6 +131,24 @@ vi.mock('@/lib/email/templates', () => ({
   paymentConfirmedEmail: vi.fn().mockReturnValue({ subject: 'test', html: '<p>test</p>' }),
   transferRegisteredEmail: vi.fn().mockReturnValue({ subject: 'test', html: '<p>test</p>' }),
   consultantTransferEmail: vi.fn().mockReturnValue({ subject: 'test', html: '<p>test</p>' }),
+  // ── consultant lifecycle (issue #30 / #16 / #17) ──────────────
+  // Returning the data inline lets tests assert on the rendered
+  // payload (e.g. `expect(html).toContain('tok-abc')`) without
+  // having to also mock the template factory at the test level.
+  consultantWelcomeEmail: vi.fn().mockImplementation((data: { inviteUrl?: string }) => ({
+    subject: 'Bem-vindo(a) à Clinipharma — defina sua senha',
+    html: `<p>welcome ${data?.inviteUrl ?? ''}</p>`,
+  })),
+  consultantSaleConfirmedEmail: vi
+    .fn()
+    .mockImplementation((data: { orderCode?: string; clinicName?: string }) => ({
+      subject: `Nova comissão a receber — Pedido ${data?.orderCode ?? ''}`,
+      html: `<p>sale ${data?.clinicName ?? ''}</p>`,
+    })),
+  consultantClinicLinkedEmail: vi.fn().mockImplementation((data: { clinicName?: string }) => ({
+    subject: `Nova clínica vinculada — ${data?.clinicName ?? ''}`,
+    html: `<p>linked ${data?.clinicName ?? ''}</p>`,
+  })),
 }))
 
 // ── lib/audit ────────────────────────────────────────────────────────────────

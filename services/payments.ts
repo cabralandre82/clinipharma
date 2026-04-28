@@ -6,7 +6,11 @@ import { createAuditLog, AuditAction, AuditEntity } from '@/lib/audit'
 import { requireRole } from '@/lib/rbac'
 import { revalidateTag } from 'next/cache'
 import { sendEmail } from '@/lib/email'
-import { paymentConfirmedEmail, transferRegisteredEmail } from '@/lib/email/templates'
+import {
+  paymentConfirmedEmail,
+  transferRegisteredEmail,
+  consultantSaleConfirmedEmail,
+} from '@/lib/email/templates'
 import { createNotification } from '@/lib/notifications'
 import { formatCurrency } from '@/lib/utils'
 import { emitirNFSeParaTransferencia } from '@/services/nfse'
@@ -176,6 +180,46 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ erro
             error: consultantCommErr,
             orderId: payment.order_id,
           })
+
+        // Notify consultant (best-effort, never blocks payment confirmation).
+        // The dashboard will surface it regardless; this email is the
+        // realtime ping requested in the regression audit (issue #16).
+        if (!consultantCommErr) {
+          try {
+            const [{ data: consultant }, { data: clinicForEmail }, { data: orderForEmail }] =
+              await Promise.all([
+                adminClient
+                  .from('sales_consultants')
+                  .select('email, full_name')
+                  .eq('id', clinic.consultant_id)
+                  .single(),
+                adminClient
+                  .from('clinics')
+                  .select('trade_name')
+                  .eq('id', orderData.clinic_id)
+                  .single(),
+                adminClient.from('orders').select('code').eq('id', payment.order_id).single(),
+              ])
+
+            if (consultant?.email) {
+              const tmpl = consultantSaleConfirmedEmail({
+                consultantName: consultant.full_name,
+                orderCode: orderForEmail?.code ?? payment.order_id.slice(0, 8),
+                orderId: payment.order_id,
+                clinicName: clinicForEmail?.trade_name ?? 'Clínica',
+                commissionAmount: formatCurrency(consultantCommission),
+                commissionRate: String(consultantRate),
+              })
+              await sendEmail({ to: consultant.email, ...tmpl })
+            }
+          } catch (emailErr) {
+            logger.warn('[confirmPayment] consultant sale-confirmed email failed', {
+              orderId: payment.order_id,
+              consultantId: clinic.consultant_id,
+              error: emailErr,
+            })
+          }
+        }
       }
 
       // Update order status

@@ -7,6 +7,7 @@ import {
   priceColumnLabel,
   unitColumnLabel,
   isPharmacyView,
+  isConsultantView,
 } from '@/lib/orders/view-mode'
 
 /**
@@ -51,6 +52,29 @@ describe('resolveViewMode', () => {
     expect(isPharmacyView('pharmacy')).toBe(true)
     expect(isPharmacyView('admin')).toBe(false)
     expect(isPharmacyView('buyer')).toBe(false)
+    expect(isPharmacyView('consultant')).toBe(false)
+  })
+
+  it('returns "consultant" for SALES_CONSULTANT', () => {
+    expect(resolveViewMode(['SALES_CONSULTANT'])).toBe('consultant')
+  })
+
+  it('PHARMACY_ADMIN still wins over SALES_CONSULTANT (rare staff combo)', () => {
+    expect(resolveViewMode(['SALES_CONSULTANT', 'PHARMACY_ADMIN'])).toBe('pharmacy')
+  })
+
+  it('SALES_CONSULTANT wins over admin/buyer in ranking (least-privilege)', () => {
+    // Even a platform admin who somehow also has the consultant role
+    // should see the strict consultant view on consultant surfaces.
+    expect(resolveViewMode(['PLATFORM_ADMIN', 'SALES_CONSULTANT'])).toBe('consultant')
+    expect(resolveViewMode(['CLINIC_ADMIN', 'SALES_CONSULTANT'])).toBe('consultant')
+  })
+
+  it('isConsultantView reflects the mode', () => {
+    expect(isConsultantView('consultant')).toBe(true)
+    expect(isConsultantView('pharmacy')).toBe(false)
+    expect(isConsultantView('admin')).toBe(false)
+    expect(isConsultantView('buyer')).toBe(false)
   })
 })
 
@@ -142,5 +166,40 @@ describe('column labels', () => {
     expect(priceColumnLabel('buyer')).toBe('Preço')
     expect(unitColumnLabel('admin')).toBe('Unit.')
     expect(unitColumnLabel('buyer')).toBe('Unit.')
+  })
+
+  it('consultant → "Comissão"', () => {
+    expect(priceColumnLabel('consultant')).toBe('Comissão')
+    expect(unitColumnLabel('consultant')).toBe('Comissão/un.')
+  })
+})
+
+describe('consultant view-mode never leaks sales price or repasse', () => {
+  // A SALES_CONSULTANT must never see line-level monetary fields. The
+  // dashboard renders `consultant_commissions.commission_amount` on its
+  // own; if a future page accidentally feeds order_items into a
+  // visibleX helper while `mode === 'consultant'`, we want a loud R$ 0.
+  it('visibleUnitAmount returns 0 even when unit_price is set', () => {
+    expect(visibleUnitAmount('consultant', { unit_price: 100, pharmacy_cost_per_unit: 30 })).toBe(0)
+  })
+
+  it('visibleLineTotal returns 0 even when total_price is set', () => {
+    expect(
+      visibleLineTotal('consultant', {
+        quantity: 5,
+        unit_price: 100,
+        total_price: 1000,
+        pharmacy_cost_per_unit: 30,
+      })
+    ).toBe(0)
+  })
+
+  it('visibleOrderTotal returns 0 even when total_price is set', () => {
+    expect(
+      visibleOrderTotal('consultant', {
+        total_price: 999,
+        order_items: [{ quantity: 2, pharmacy_cost_per_unit: 30 }],
+      })
+    ).toBe(0)
   })
 })

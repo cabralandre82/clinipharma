@@ -34,6 +34,7 @@ export type FinancialViewMode =
   | 'admin' // sees both sales price and repasse
   | 'buyer' // sees only sales price (clinic / doctor / direct buyer)
   | 'pharmacy' // sees only repasse — sales price MUST be hidden
+  | 'consultant' // sees only commission — neither sales price NOR repasse
 
 export type RoleName =
   | 'SUPER_ADMIN'
@@ -41,6 +42,7 @@ export type RoleName =
   | 'CLINIC_ADMIN'
   | 'DOCTOR'
   | 'PHARMACY_ADMIN'
+  | 'SALES_CONSULTANT'
 
 /**
  * Returns the view-mode for an authenticated user.
@@ -59,12 +61,20 @@ export type RoleName =
 export function resolveViewMode(roles: readonly string[] | null | undefined): FinancialViewMode {
   if (!roles || roles.length === 0) return 'buyer'
   if (roles.includes('PHARMACY_ADMIN')) return 'pharmacy'
+  // A SALES_CONSULTANT only sees their commission — never the sales price
+  // and never the pharmacy repasse. We rank this BEFORE admin so an
+  // operator wearing both hats (rare) sees the strict view.
+  if (roles.includes('SALES_CONSULTANT')) return 'consultant'
   if (roles.includes('SUPER_ADMIN') || roles.includes('PLATFORM_ADMIN')) return 'admin'
   return 'buyer'
 }
 
 export function isPharmacyView(mode: FinancialViewMode): boolean {
   return mode === 'pharmacy'
+}
+
+export function isConsultantView(mode: FinancialViewMode): boolean {
+  return mode === 'consultant'
 }
 
 /**
@@ -89,6 +99,10 @@ export function visibleLineTotal(
     const cost = Number(item.pharmacy_cost_per_unit ?? 0)
     return cost * Number(item.quantity)
   }
+  // Consultants must NEVER see line-level monetary totals — return 0 so
+  // any accidental render is loud (R$ 0,00) instead of silently leaking
+  // the sales price.
+  if (mode === 'consultant') return 0
   return Number(item.total_price ?? Number(item.unit_price ?? 0) * Number(item.quantity))
 }
 
@@ -100,6 +114,7 @@ export function visibleUnitAmount(
   }
 ): number {
   if (mode === 'pharmacy') return Number(item.pharmacy_cost_per_unit ?? 0)
+  if (mode === 'consultant') return 0
   return Number(item.unit_price ?? 0)
 }
 
@@ -126,18 +141,24 @@ export function visibleOrderTotal(
       0
     )
   }
+  if (mode === 'consultant') return 0
   return Number(order.total_price ?? 0)
 }
 
 /**
- * Locale label for the price column header. Pharmacy sees "Repasse"
- * everywhere; everyone else sees "Preço" (the sales price the buyer
- * pays). Centralised so tests can grep this single string.
+ * Locale label for the price column header. Pharmacy sees "Repasse",
+ * consultants see "Comissão" (computed elsewhere from
+ * `consultant_commissions.commission_amount`), everyone else sees
+ * "Preço". Centralised so tests can grep this single string.
  */
-export function priceColumnLabel(mode: FinancialViewMode): 'Preço' | 'Repasse' {
-  return mode === 'pharmacy' ? 'Repasse' : 'Preço'
+export function priceColumnLabel(mode: FinancialViewMode): 'Preço' | 'Repasse' | 'Comissão' {
+  if (mode === 'pharmacy') return 'Repasse'
+  if (mode === 'consultant') return 'Comissão'
+  return 'Preço'
 }
 
-export function unitColumnLabel(mode: FinancialViewMode): 'Unit.' | 'Repasse/un.' {
-  return mode === 'pharmacy' ? 'Repasse/un.' : 'Unit.'
+export function unitColumnLabel(mode: FinancialViewMode): 'Unit.' | 'Repasse/un.' | 'Comissão/un.' {
+  if (mode === 'pharmacy') return 'Repasse/un.'
+  if (mode === 'consultant') return 'Comissão/un.'
+  return 'Unit.'
 }

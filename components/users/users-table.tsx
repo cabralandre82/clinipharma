@@ -21,6 +21,7 @@ const ROLE_LABELS: Record<string, string> = {
   CLINIC_ADMIN: 'Clínica',
   DOCTOR: 'Médico',
   PHARMACY_ADMIN: 'Farmácia',
+  SALES_CONSULTANT: 'Consultor',
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -29,6 +30,7 @@ const ROLE_COLORS: Record<string, string> = {
   CLINIC_ADMIN: 'bg-green-100 text-green-800',
   DOCTOR: 'bg-purple-100 text-purple-800',
   PHARMACY_ADMIN: 'bg-orange-100 text-orange-800',
+  SALES_CONSULTANT: 'bg-teal-100 text-teal-800',
 }
 
 type StatusFilter = 'all' | 'active' | 'inactive'

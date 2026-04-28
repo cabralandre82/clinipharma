@@ -25,6 +25,7 @@ vi.mock('@/lib/validators', () => ({
     }),
   },
 }))
+vi.mock('@/lib/email', () => ({ sendEmail: vi.fn().mockResolvedValue(undefined) }))
 
 const actorMock = {
   id: 'admin-1',
@@ -102,6 +103,238 @@ describe('createConsultant', () => {
       cnpj: '11222333000181',
     } as Parameters<typeof createConsultant>[0])
     expect(result.error).toBe('Sem permissão')
+  })
+
+  // ─── Onboarding behaviour pinned for issue #30 ──────────────────────
+  // The consultant must be promoted to a full platform user: auth.users
+  // row + profiles mirror + user_roles row + welcome email. This block
+  // pins all four invariants so a future "optimisation" cannot silently
+  // remove any of them.
+  describe('full onboarding (auth provisioning)', () => {
+    it('creates auth user, seeds SALES_CONSULTANT role, links user_id, sends welcome email', async () => {
+      const emailModule = await import('@/lib/email')
+      vi.mocked(emailModule.sendEmail).mockResolvedValue(undefined)
+
+      const consultantInsertSingle = vi.fn().mockResolvedValue({
+        data: {
+          id: 'cons-1',
+          full_name: 'Consultor',
+          email: 'c@test.com',
+          commission_rate: 7.5,
+        },
+        error: null,
+      })
+      const consultantInsertSelect = vi.fn().mockReturnValue({ single: consultantInsertSingle })
+      const consultantInsert = vi.fn().mockReturnValue({ select: consultantInsertSelect })
+
+      const profilesUpsert = vi.fn().mockResolvedValue({ data: null, error: null })
+      const userRolesUpsert = vi.fn().mockResolvedValue({ data: null, error: null })
+      const consultantUpdate = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+      })
+
+      // sales_consultants is hit twice: once on insert, once on the
+      // user_id link update. We track call count to switch behaviour.
+      let consultantCalls = 0
+      const fromMock = vi.fn().mockImplementation((table: string) => {
+        if (table === 'sales_consultants') {
+          consultantCalls++
+          return consultantCalls === 1 ? { insert: consultantInsert } : { update: consultantUpdate }
+        }
+        if (table === 'profiles') return { upsert: profilesUpsert }
+        if (table === 'user_roles') return { upsert: userRolesUpsert }
+        return makeQueryBuilder(null, null)
+      })
+
+      const createUserMock = vi.fn().mockResolvedValue({
+        data: { user: { id: 'auth-user-1', email: 'c@test.com' } },
+        error: null,
+      })
+      const generateLinkMock = vi.fn().mockResolvedValue({
+        data: { properties: { hashed_token: 'tok-abc' } },
+        error: null,
+      })
+      const deleteUserMock = vi.fn().mockResolvedValue({ data: null, error: null })
+
+      vi.mocked(adminModule.createAdminClient).mockReturnValue({
+        from: fromMock,
+        auth: {
+          admin: {
+            createUser: createUserMock,
+            generateLink: generateLinkMock,
+            deleteUser: deleteUserMock,
+            listUsers: vi.fn().mockResolvedValue({ data: { users: [] }, error: null }),
+          },
+        },
+      } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+      const result = await createConsultant({
+        full_name: 'Consultor',
+        email: 'c@test.com',
+        cnpj: '11222333000181',
+      } as Parameters<typeof createConsultant>[0])
+
+      expect(result.id).toBe('cons-1')
+      expect(createUserMock).toHaveBeenCalledOnce()
+      expect(createUserMock.mock.calls[0]?.[0]).toMatchObject({
+        email: 'c@test.com',
+        email_confirm: true,
+      })
+      expect(userRolesUpsert).toHaveBeenCalledWith(
+        { user_id: 'auth-user-1', role: 'SALES_CONSULTANT' },
+        expect.objectContaining({ onConflict: 'user_id,role' })
+      )
+      expect(consultantCalls).toBe(2)
+      expect(generateLinkMock).toHaveBeenCalledOnce()
+      expect(generateLinkMock.mock.calls[0]?.[0]).toMatchObject({
+        type: 'recovery',
+        email: 'c@test.com',
+      })
+      expect(emailModule.sendEmail).toHaveBeenCalledOnce()
+      const emailArg = vi.mocked(emailModule.sendEmail).mock.calls[0]?.[0]
+      expect(emailArg?.to).toBe('c@test.com')
+      expect(emailArg?.subject).toContain('senha')
+      expect(emailArg?.html).toContain('tok-abc')
+    })
+
+    it('reuses existing auth user when email already exists (idempotent re-link)', async () => {
+      const emailModule = await import('@/lib/email')
+      vi.mocked(emailModule.sendEmail).mockResolvedValue(undefined)
+
+      const consultantInsertSingle = vi.fn().mockResolvedValue({
+        data: { id: 'cons-2', full_name: 'C', email: 'c@test.com', commission_rate: 5 },
+        error: null,
+      })
+      const consultantInsert = vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({ single: consultantInsertSingle }),
+      })
+
+      let consultantCalls = 0
+      const userRolesUpsert = vi.fn().mockResolvedValue({ data: null, error: null })
+      const fromMock = vi.fn().mockImplementation((table: string) => {
+        if (table === 'sales_consultants') {
+          consultantCalls++
+          return consultantCalls === 1
+            ? { insert: consultantInsert }
+            : {
+                update: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+                }),
+              }
+        }
+        if (table === 'profiles')
+          return { upsert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+        if (table === 'user_roles') return { upsert: userRolesUpsert }
+        return makeQueryBuilder(null, null)
+      })
+
+      vi.mocked(adminModule.createAdminClient).mockReturnValue({
+        from: fromMock,
+        auth: {
+          admin: {
+            // First createUser fails because the email already exists.
+            createUser: vi.fn().mockResolvedValue({
+              data: { user: null },
+              error: { message: 'User already registered' },
+            }),
+            // listUsers should then return the pre-existing user so we
+            // can link to it instead of failing the whole onboarding.
+            listUsers: vi.fn().mockResolvedValue({
+              data: {
+                users: [{ id: 'existing-user-9', email: 'c@test.com', banned_until: null }],
+              },
+              error: null,
+            }),
+            generateLink: vi
+              .fn()
+              .mockResolvedValue({ data: { properties: { hashed_token: 'tok' } }, error: null }),
+            deleteUser: vi.fn().mockResolvedValue({ data: null, error: null }),
+          },
+        },
+      } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+      const result = await createConsultant({
+        full_name: 'C',
+        email: 'c@test.com',
+        cnpj: '11222333000181',
+      } as Parameters<typeof createConsultant>[0])
+
+      expect(result.id).toBe('cons-2')
+      // We must have used the existing auth user, NOT a brand new one.
+      expect(userRolesUpsert).toHaveBeenCalledWith(
+        { user_id: 'existing-user-9', role: 'SALES_CONSULTANT' },
+        expect.anything()
+      )
+    })
+  })
+})
+
+describe('assignConsultantToClinic — clinic-linked email', () => {
+  // Pinning issue #16: the consultant must be told via email when a new
+  // clinic is associated with their account. Failure of the email send
+  // must NEVER block the assignment write.
+  it('sends consultantClinicLinked email when assigning a consultant', async () => {
+    const emailModule = await import('@/lib/email')
+    vi.mocked(emailModule.sendEmail).mockResolvedValue(undefined)
+
+    // clinics.update — primary write
+    const clinicsUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+    })
+    // sales_consultants single() and clinics single() for the email build
+    const consultantSingle = vi.fn().mockResolvedValue({
+      data: { email: 'c@test.com', full_name: 'C', commission_rate: 5 },
+      error: null,
+    })
+    const clinicSingle = vi.fn().mockResolvedValue({
+      data: { trade_name: 'Clínica X' },
+      error: null,
+    })
+
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'sales_consultants') {
+        return {
+          select: vi
+            .fn()
+            .mockReturnValue({ eq: vi.fn().mockReturnValue({ single: consultantSingle }) }),
+        }
+      }
+      if (table === 'clinics') {
+        // First call is the update; subsequent select for the email
+        return {
+          update: clinicsUpdate,
+          select: vi
+            .fn()
+            .mockReturnValue({ eq: vi.fn().mockReturnValue({ single: clinicSingle }) }),
+        }
+      }
+      return makeQueryBuilder(null, null)
+    })
+
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: fromMock,
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await assignConsultantToClinic('clinic-1', 'cons-1')
+    expect(result.error).toBeUndefined()
+    expect(emailModule.sendEmail).toHaveBeenCalledOnce()
+    const emailArg = vi.mocked(emailModule.sendEmail).mock.calls[0]?.[0]
+    expect(emailArg?.to).toBe('c@test.com')
+    expect(emailArg?.html).toContain('Clínica X')
+  })
+
+  it('does NOT send email when unlinking (consultantId === null)', async () => {
+    const emailModule = await import('@/lib/email')
+    vi.mocked(emailModule.sendEmail).mockResolvedValue(undefined)
+
+    const qb = makeQueryBuilder(null, null)
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(qb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await assignConsultantToClinic('clinic-1', null)
+    expect(result.error).toBeUndefined()
+    expect(emailModule.sendEmail).not.toHaveBeenCalled()
   })
 })
 

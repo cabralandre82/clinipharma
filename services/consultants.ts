@@ -7,12 +7,38 @@ import { createAuditLog, AuditAction, AuditEntity } from '@/lib/audit'
 import { requireRole } from '@/lib/rbac'
 import { salesConsultantSchema, type SalesConsultantFormData } from '@/lib/validators'
 import { sendEmail } from '@/lib/email'
-import { consultantTransferEmail } from '@/lib/email/templates'
+import {
+  consultantTransferEmail,
+  consultantWelcomeEmail,
+  consultantClinicLinkedEmail,
+} from '@/lib/email/templates'
 import { formatCurrency } from '@/lib/utils'
 import { emitirNFSeParaConsultor } from '@/services/nfse'
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'https://clinipharma.com.br'
+
 // ─── Create ────────────────────────────────────────────────────────────────
 
+/**
+ * Creates a sales consultant **AND** provisions the user account so the
+ * consultant can log in, see their dashboard and receive notifications.
+ *
+ * The full happy-path is:
+ *   1. Insert into `sales_consultants` (the source of truth for billing/CNPJ)
+ *   2. Create a Supabase auth user (idempotent: if the email already exists
+ *      in auth.users we reuse that account instead of failing)
+ *   3. Upsert `profiles` mirror (the existing trigger usually already did
+ *      this, but we upsert defensively in case the trigger is disabled)
+ *   4. Insert `user_roles` row with `SALES_CONSULTANT` so the user shows up
+ *      in `/users` and the dashboard router serves the ConsultantDashboard
+ *   5. Link `sales_consultants.user_id ← auth.user.id`
+ *   6. Generate a recovery (password-set) link and email it via the
+ *      `consultantWelcomeEmail` template
+ *
+ * Failure handling: if step 2 succeeds but a later step fails, we delete
+ * the auth user so the operator can retry without "email already cadastrado"
+ * sticking around. Email send is fire-and-forget — we never block on it.
+ */
 export async function createConsultant(
   data: SalesConsultantFormData
 ): Promise<{ id?: string; error?: string }> {
@@ -25,7 +51,7 @@ export async function createConsultant(
     const { data: consultant, error } = await adminClient
       .from('sales_consultants')
       .insert({ ...parsed.data, status: 'ACTIVE' })
-      .select('id')
+      .select('id, full_name, email, commission_rate')
       .single()
 
     if (error) {
@@ -36,16 +62,119 @@ export async function createConsultant(
       return { error: 'Erro ao criar consultor' }
     }
 
+    // ─── Provision auth account so the consultant can actually log in ──
+    let userId: string | null = null
+    let createdAuthUser = false
+    try {
+      const tempPassword = `Tmp${Math.random().toString(36).slice(2)}!Cp`
+      const { data: authUser, error: authErr } = await adminClient.auth.admin.createUser({
+        email: parsed.data.email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: { full_name: parsed.data.full_name, consultant_id: consultant.id },
+      })
+
+      if (authUser?.user) {
+        userId = authUser.user.id
+        createdAuthUser = true
+      } else if (authErr?.message?.toLowerCase().includes('already')) {
+        // Email already in auth.users — reuse the existing account so
+        // the operator can re-link a returning consultant without a
+        // hard error.
+        const { data: page } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 })
+        const existing = page?.users.find(
+          (u) => u.email?.toLowerCase() === parsed.data.email.toLowerCase()
+        )
+        if (existing) userId = existing.id
+      } else if (authErr) {
+        logger.warn('[createConsultant] auth.admin.createUser failed', {
+          consultantId: consultant.id,
+          error: authErr,
+        })
+      }
+    } catch (authErr) {
+      logger.warn('[createConsultant] auth provisioning threw', {
+        consultantId: consultant.id,
+        error: authErr,
+      })
+    }
+
+    if (userId) {
+      // Profile mirror (defensive — handle_new_user trigger usually did it)
+      await adminClient.from('profiles').upsert({
+        id: userId,
+        full_name: parsed.data.full_name,
+        email: parsed.data.email,
+      })
+
+      // Role assignment — idempotent, won't double-insert
+      const { error: roleErr } = await adminClient
+        .from('user_roles')
+        .upsert(
+          { user_id: userId, role: 'SALES_CONSULTANT' },
+          { onConflict: 'user_id,role', ignoreDuplicates: true }
+        )
+      if (roleErr) {
+        logger.error('[createConsultant] user_roles.upsert failed', {
+          userId,
+          consultantId: consultant.id,
+          error: roleErr,
+        })
+        // Roll back: if WE created the auth user, undo it so the operator
+        // can retry. If the user already existed we leave it alone.
+        if (createdAuthUser) {
+          await adminClient.auth.admin.deleteUser(userId).catch(() => {})
+        }
+        return { error: 'Erro ao atribuir papel ao consultor' }
+      }
+
+      // Link consultant ↔ user
+      const { error: linkErr } = await adminClient
+        .from('sales_consultants')
+        .update({ user_id: userId, updated_at: new Date().toISOString() })
+        .eq('id', consultant.id)
+      if (linkErr)
+        logger.error('[createConsultant] sales_consultants.update user_id failed', {
+          userId,
+          consultantId: consultant.id,
+          error: linkErr,
+        })
+
+      // Welcome email with password-set link — non-blocking
+      try {
+        const { data: linkData } = await adminClient.auth.admin.generateLink({
+          type: 'recovery',
+          email: parsed.data.email,
+          options: { redirectTo: `${APP_URL}/auth/callback?type=recovery` },
+        })
+        const inviteUrl = linkData?.properties?.hashed_token
+          ? `${APP_URL}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=recovery`
+          : `${APP_URL}/login`
+        const tmpl = consultantWelcomeEmail({
+          consultantName: parsed.data.full_name,
+          inviteUrl,
+          commissionRate: String(consultant.commission_rate ?? 5),
+        })
+        await sendEmail({ to: parsed.data.email, ...tmpl })
+      } catch (emailErr) {
+        logger.warn('[createConsultant] welcome email failed', {
+          consultantId: consultant.id,
+          error: emailErr,
+        })
+      }
+    }
+
     await createAuditLog({
       actorUserId: actor.id,
       actorRole: actor.roles[0],
       entityType: AuditEntity.PROFILE,
       entityId: consultant.id,
       action: AuditAction.CREATE,
-      newValues: { ...parsed.data, entity: 'sales_consultant' },
+      newValues: { ...parsed.data, entity: 'sales_consultant', user_id: userId },
     })
 
     revalidatePath('/consultants')
+    revalidatePath('/users')
     return { id: consultant.id }
   } catch (err) {
     if (err instanceof Error && err.message === 'FORBIDDEN') return { error: 'Sem permissão' }
@@ -176,6 +305,36 @@ export async function assignConsultantToClinic(
       action: AuditAction.UPDATE,
       newValues: { consultant_id: consultantId },
     })
+
+    // Notify consultant — only on link (not unlink). Failures must never
+    // block the assignment write itself.
+    if (consultantId) {
+      try {
+        const [{ data: consultant }, { data: clinic }] = await Promise.all([
+          adminClient
+            .from('sales_consultants')
+            .select('email, full_name, commission_rate')
+            .eq('id', consultantId)
+            .single(),
+          adminClient.from('clinics').select('trade_name').eq('id', clinicId).single(),
+        ])
+
+        if (consultant?.email && clinic?.trade_name) {
+          const tmpl = consultantClinicLinkedEmail({
+            consultantName: consultant.full_name,
+            clinicName: clinic.trade_name,
+            commissionRate: String(consultant.commission_rate ?? 5),
+          })
+          await sendEmail({ to: consultant.email, ...tmpl })
+        }
+      } catch (emailErr) {
+        logger.warn('[assignConsultantToClinic] notification email failed', {
+          consultantId,
+          clinicId,
+          error: emailErr,
+        })
+      }
+    }
 
     revalidatePath(`/clinics/${clinicId}`)
     revalidatePath('/clinics')
