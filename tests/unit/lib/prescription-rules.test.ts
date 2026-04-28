@@ -295,4 +295,124 @@ describe('getPrescriptionState', () => {
     expect(typeof met).toBe('boolean')
     expect(met).toBe(true)
   })
+
+  // ──────────────────────────────────────────────────────────────────
+  //  Onda 4 / issue #11 — Model A satisfied via the per-item path.
+  //  The legacy path stayed working (TC-RX-03), and now the new
+  //  per-item upload UI must also count.
+  // ──────────────────────────────────────────────────────────────────
+
+  it('TC-RX-10: Model A satisfied via order_item_prescriptions (per-item path) → met=true', async () => {
+    ;(createAdminClient as ReturnType<typeof vi.fn>).mockReturnValue(
+      makeAdmin({
+        items: [
+          {
+            id: 'item-1',
+            quantity: 4,
+            product_id: 'prod-rx',
+            products: {
+              id: 'prod-rx',
+              name: 'Ozempic 1mg',
+              requires_prescription: true,
+              prescription_type: 'SIMPLE',
+              max_units_per_prescription: null,
+            },
+          },
+        ],
+        // No legacy `order_documents.PRESCRIPTION` row.
+        simpleDocs: [],
+        // Clinic uploaded ONE receipt bound to the item, marking it
+        // as covering the entire quantity (the new UI path).
+        perUnitDocs: [{ order_item_id: 'item-1', units_covered: 4 }],
+      })
+    )
+
+    const { getPrescriptionState } = await import('@/lib/prescription-rules')
+    const result = await getPrescriptionState('order-1')
+
+    expect(result.met).toBe(true)
+    expect(result.items[0].satisfied).toBe(true)
+    expect(result.items[0].units_covered).toBe(4)
+    expect(result.items[0].prescriptions_uploaded).toBe(1)
+    expect(result.items[0].prescriptions_needed).toBe(0)
+  })
+
+  it('TC-RX-11: Model A — both legacy doc AND per-item doc present → satisfied, no double count', async () => {
+    ;(createAdminClient as ReturnType<typeof vi.fn>).mockReturnValue(
+      makeAdmin({
+        items: [
+          {
+            id: 'item-1',
+            quantity: 2,
+            product_id: 'prod-rx',
+            products: {
+              id: 'prod-rx',
+              name: 'Medicamento A',
+              requires_prescription: true,
+              prescription_type: 'SIMPLE',
+              max_units_per_prescription: null,
+            },
+          },
+        ],
+        simpleDocs: [{ id: 'doc-1' }],
+        perUnitDocs: [{ order_item_id: 'item-1', units_covered: 2 }],
+      })
+    )
+
+    const { getPrescriptionState } = await import('@/lib/prescription-rules')
+    const result = await getPrescriptionState('order-1')
+
+    expect(result.met).toBe(true)
+    // Per-item doc takes precedence, so prescriptions_uploaded reports
+    // the per-item count (1), not 2 (legacy + per-item).
+    expect(result.items[0].prescriptions_uploaded).toBe(1)
+    expect(result.items[0].satisfied).toBe(true)
+  })
+
+  it('TC-RX-12: Mixed cart — Model A satisfied per-item + Model B unsatisfied → met=false, reason names B', async () => {
+    ;(createAdminClient as ReturnType<typeof vi.fn>).mockReturnValue(
+      makeAdmin({
+        items: [
+          {
+            id: 'item-A',
+            quantity: 1,
+            product_id: 'prod-A',
+            products: {
+              id: 'prod-A',
+              name: 'Simples A',
+              requires_prescription: true,
+              prescription_type: 'SIMPLE',
+              max_units_per_prescription: null,
+            },
+          },
+          {
+            id: 'item-B',
+            quantity: 2,
+            product_id: 'prod-B',
+            products: {
+              id: 'prod-B',
+              name: 'Controlado B',
+              requires_prescription: true,
+              prescription_type: 'SPECIAL_CONTROL',
+              max_units_per_prescription: 1,
+            },
+          },
+        ],
+        // A satisfied via per-item path.
+        // B has zero uploads.
+        perUnitDocs: [{ order_item_id: 'item-A', units_covered: 1 }],
+        simpleDocs: [],
+      })
+    )
+
+    const { getPrescriptionState } = await import('@/lib/prescription-rules')
+    const result = await getPrescriptionState('order-1')
+
+    expect(result.met).toBe(false)
+    expect(result.items.find((i) => i.product_id === 'prod-A')?.satisfied).toBe(true)
+    expect(result.items.find((i) => i.product_id === 'prod-B')?.satisfied).toBe(false)
+    // Reason should NOT mention the satisfied A, only the missing B.
+    expect(result.reason).toContain('Controlado B')
+    expect(result.reason).not.toContain('Simples A')
+  })
 })

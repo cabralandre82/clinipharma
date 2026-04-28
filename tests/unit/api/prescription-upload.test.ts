@@ -256,6 +256,97 @@ describe('POST /api/orders/[id]/prescriptions', () => {
     expect(res.status).toBe(400)
     expect((await res.json()).error).toContain('>= 1')
   })
+
+  // ──────────────────────────────────────────────────────────────────
+  //  Onda 4 / issue #11 — automatic order status transition.
+  //  When a prescription upload completes the Rx requirement set,
+  //  the order must move from AWAITING_DOCUMENTS to READY_FOR_REVIEW
+  //  so the pharmacy sees the work in their queue. When some receipts
+  //  are still missing, the order must stay parked.
+  // ──────────────────────────────────────────────────────────────────
+
+  it('TC-RXU-11: upload completes Rx set → response carries transitioned=true', async () => {
+    ;(getCurrentUser as ReturnType<typeof vi.fn>).mockResolvedValue(CLINIC_USER)
+    const { getPrescriptionState } = await import('@/lib/prescription-rules')
+    ;(getPrescriptionState as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      met: true,
+      items: [],
+    })
+    // Mock advanceOrderAfterDocumentUpload via module mock so we don't
+    // have to thread auth/postgres through the test admin client.
+    const transitions = await import('@/lib/orders/document-transitions')
+    const advanceSpy = vi
+      .spyOn(transitions, 'advanceOrderAfterDocumentUpload')
+      .mockResolvedValue({ transitioned: true, status: 'READY_FOR_REVIEW' })
+    ;(createAdminClient as ReturnType<typeof vi.fn>).mockReturnValue(makeAdmin())
+
+    const { POST } = await import('@/app/api/orders/[id]/prescriptions/route')
+    const res = await POST(makeRequest(defaultFormFields()), makeParams())
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    expect(body.transitioned).toBe(true)
+    expect(body.order_status).toBe('READY_FOR_REVIEW')
+    expect(advanceSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'order-1',
+        changedByUserId: 'user-1',
+      })
+    )
+    advanceSpy.mockRestore()
+  })
+
+  it('TC-RXU-12: upload still leaves Rx pending → no transition, transitioned=false', async () => {
+    ;(getCurrentUser as ReturnType<typeof vi.fn>).mockResolvedValue(CLINIC_USER)
+    const { getPrescriptionState } = await import('@/lib/prescription-rules')
+    ;(getPrescriptionState as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      met: false,
+      reason: '"Outro": receita não enviada',
+      items: [],
+    })
+    const transitions = await import('@/lib/orders/document-transitions')
+    const advanceSpy = vi.spyOn(transitions, 'advanceOrderAfterDocumentUpload')
+    ;(createAdminClient as ReturnType<typeof vi.fn>).mockReturnValue(makeAdmin())
+
+    const { POST } = await import('@/app/api/orders/[id]/prescriptions/route')
+    const res = await POST(makeRequest(defaultFormFields()), makeParams())
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    expect(body.transitioned).toBe(false)
+    expect(body.order_status).toBeNull()
+    // Critical: when state isn't met yet, advance must NOT be invoked.
+    expect(advanceSpy).not.toHaveBeenCalled()
+    advanceSpy.mockRestore()
+  })
+
+  it('TC-RXU-13: transition error never fails the upload itself', async () => {
+    ;(getCurrentUser as ReturnType<typeof vi.fn>).mockResolvedValue(CLINIC_USER)
+    const { getPrescriptionState } = await import('@/lib/prescription-rules')
+    ;(getPrescriptionState as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      met: true,
+      items: [],
+    })
+    const transitions = await import('@/lib/orders/document-transitions')
+    const advanceSpy = vi
+      .spyOn(transitions, 'advanceOrderAfterDocumentUpload')
+      .mockRejectedValue(new Error('temporary db blip'))
+    ;(createAdminClient as ReturnType<typeof vi.fn>).mockReturnValue(makeAdmin())
+
+    const { POST } = await import('@/app/api/orders/[id]/prescriptions/route')
+    const res = await POST(makeRequest(defaultFormFields()), makeParams())
+
+    // The receipt is already saved; we MUST NOT 5xx because of a
+    // secondary state-update failure. The clinic gets success and the
+    // operator can re-run the transition out-of-band.
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    expect(body.transitioned).toBe(false)
+    advanceSpy.mockRestore()
+  })
 })
 
 // ─── GET /api/orders/[id]/prescription-state ──────────────────────────────────

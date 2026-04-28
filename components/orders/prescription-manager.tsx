@@ -15,11 +15,21 @@ interface PrescriptionManagerProps {
 }
 
 /**
- * Renders per-item prescription upload UI for orders that have products
- * with requires_prescription=true and max_units_per_prescription set (Model B).
+ * Per-product prescription upload UI.
  *
- * For Model A (simple prescription), the regular DocumentManager handles it.
- * This component is only shown when needsPerUnitPrescription=true.
+ * Renders one card per order item that has `requires_prescription=true`,
+ * regardless of model:
+ *
+ *   - Model A (`max_units_per_prescription === null`): one receipt
+ *     covers all units of that item. Single upload slot.
+ *   - Model B (`max_units_per_prescription !== null`): one receipt per
+ *     N units. Progress bar + multiple uploads.
+ *
+ * Pre-Onda 4 this component only handled Model B (issue #11), so
+ * Model A items fell back to the generic DocumentManager which said
+ * "este pedido tem produtos com receita obrigatória" without listing
+ * which products. After Onda 4 each Rx product gets its own card,
+ * with the right semantics for its model.
  */
 export function PrescriptionManager({ orderId, items, canUpload }: PrescriptionManagerProps) {
   const router = useRouter()
@@ -27,11 +37,9 @@ export function PrescriptionManager({ orderId, items, canUpload }: PrescriptionM
   const [selectedItem, setSelectedItem] = useState<string | null>(null)
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
-  const perUnitItems = items.filter(
-    (i) => i.requires_prescription && i.max_units_per_prescription !== null
-  )
+  const rxItems = items.filter((i) => i.requires_prescription)
 
-  if (perUnitItems.length === 0) return null
+  if (rxItems.length === 0) return null
 
   async function handleUpload(item: OrderItemPrescriptionState, file: File) {
     setUploading(item.order_item_id)
@@ -39,7 +47,13 @@ export function PrescriptionManager({ orderId, items, canUpload }: PrescriptionM
       const formData = new FormData()
       formData.append('file', file)
       formData.append('orderItemId', item.order_item_id)
-      formData.append('unitsCovered', String(item.max_units_per_prescription ?? 1))
+      // For Model A (max_units null) one receipt covers every unit, so we
+      // tell the API the whole item.quantity is covered. For Model B we
+      // cover exactly max_units per upload — the user uploads one
+      // receipt per N units until satisfied.
+      const unitsCovered =
+        item.max_units_per_prescription === null ? item.quantity : item.max_units_per_prescription
+      formData.append('unitsCovered', String(unitsCovered))
 
       const res = await fetch(`/api/orders/${orderId}/prescriptions`, {
         method: 'POST',
@@ -62,18 +76,28 @@ export function PrescriptionManager({ orderId, items, canUpload }: PrescriptionM
     }
   }
 
+  // Brief explanation that mixes both models — accurate when the
+  // order has at least one Model A item, at least one Model B item,
+  // or both.
+  const hasModelA = rxItems.some((i) => i.max_units_per_prescription === null)
+  const hasModelB = rxItems.some((i) => i.max_units_per_prescription !== null)
+  const helperText =
+    hasModelA && hasModelB
+      ? 'Anexe uma receita para cada produto abaixo. Alguns produtos exigem uma receita por unidade.'
+      : hasModelB
+        ? 'Os produtos abaixo exigem receita por unidade. Envie uma receita para cada unidade adquirida.'
+        : 'Anexe uma receita para cada produto abaixo. Para esses produtos, uma receita cobre todas as unidades adquiridas.'
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5">
         <Pill className="h-4 w-4 flex-shrink-0 text-blue-600" />
-        <p className="text-sm text-blue-800">
-          Os produtos abaixo exigem <strong>receita por unidade</strong>. Envie uma receita para
-          cada unidade adquirida.
-        </p>
+        <p className="text-sm text-blue-800">{helperText}</p>
       </div>
 
-      {perUnitItems.map((item) => {
+      {rxItems.map((item) => {
         const isUploading = uploading === item.order_item_id
+        const isModelA = item.max_units_per_prescription === null
         const progressPct = item.quantity > 0 ? (item.units_covered / item.quantity) * 100 : 0
 
         return (
@@ -95,9 +119,11 @@ export function PrescriptionManager({ orderId, items, canUpload }: PrescriptionM
                   )}
                   <span className="text-xs text-gray-500">
                     {item.quantity} unidade{item.quantity !== 1 ? 's' : ''} •{' '}
-                    {item.max_units_per_prescription === 1
-                      ? '1 receita por unidade'
-                      : `1 receita por ${item.max_units_per_prescription} unidades`}
+                    {isModelA
+                      ? `1 receita cobre todas as ${item.quantity} unidade${item.quantity !== 1 ? 's' : ''}`
+                      : item.max_units_per_prescription === 1
+                        ? '1 receita por unidade'
+                        : `1 receita por ${item.max_units_per_prescription} unidades`}
                   </span>
                 </div>
               </div>
@@ -108,29 +134,46 @@ export function PrescriptionManager({ orderId, items, canUpload }: PrescriptionM
               )}
             </div>
 
-            {/* Progress */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
+            {/*
+              Progress reporter.
+              Model A (max_units null) is binary — receita enviada or
+              not. A progress bar would be visually misleading (it
+              would oscillate between 0 % and 100 % regardless of qty),
+              so we render a single status line.
+              Model B keeps the original X/Y progress bar.
+            */}
+            {isModelA ? (
+              <div className="text-xs">
                 <span className={item.satisfied ? 'text-green-700' : 'text-amber-700'}>
-                  {item.units_covered} de {item.quantity} unidade{item.quantity !== 1 ? 's' : ''}{' '}
-                  com receita
-                </span>
-                <span className={item.satisfied ? 'text-green-600' : 'text-amber-600'}>
-                  {item.prescriptions_uploaded} receita
-                  {item.prescriptions_uploaded !== 1 ? 's' : ''} enviada
-                  {item.prescriptions_uploaded !== 1 ? 's' : ''}
-                  {item.prescriptions_needed > 0 && ` · ${item.prescriptions_needed} faltando`}
+                  {item.satisfied
+                    ? 'Receita enviada · cobre todas as unidades'
+                    : 'Receita pendente'}
                 </span>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    item.satisfied ? 'bg-green-500' : 'bg-amber-400'
-                  }`}
-                  style={{ width: `${Math.min(progressPct, 100)}%` }}
-                />
+            ) : (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className={item.satisfied ? 'text-green-700' : 'text-amber-700'}>
+                    {item.units_covered} de {item.quantity} unidade{item.quantity !== 1 ? 's' : ''}{' '}
+                    com receita
+                  </span>
+                  <span className={item.satisfied ? 'text-green-600' : 'text-amber-600'}>
+                    {item.prescriptions_uploaded} receita
+                    {item.prescriptions_uploaded !== 1 ? 's' : ''} enviada
+                    {item.prescriptions_uploaded !== 1 ? 's' : ''}
+                    {item.prescriptions_needed > 0 && ` · ${item.prescriptions_needed} faltando`}
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      item.satisfied ? 'bg-green-500' : 'bg-amber-400'
+                    }`}
+                    style={{ width: `${Math.min(progressPct, 100)}%` }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Upload button */}
             {canUpload && !item.satisfied && (

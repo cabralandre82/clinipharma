@@ -157,9 +157,23 @@ export async function getPrescriptionState(
     const maxUnits = product.max_units_per_prescription
 
     if (maxUnits === null) {
-      // Model A: simple prescription (one doc for the whole item)
+      // Model A: a single receipt covers any quantity of the product.
+      //
+      // Two paths satisfy this item:
+      //   (1) Legacy path — a generic PRESCRIPTION document exists in
+      //       `order_documents`. Pre-Onda 4 the only Model A path. We
+      //       keep recognising it so historical orders stay valid.
+      //   (2) Per-item path — a row in `order_item_prescriptions`
+      //       points to *this* order_item_id (Onda 4 / issue #11).
+      //       This is the new clinic-facing UI: "1 receita cobre
+      //       todas as N unidades" with an upload slot bound to the
+      //       specific product.
+      // EITHER path satisfies the item; both being present is fine
+      // and we don't double-count the count.
       needsSimplePrescription = true
-      const satisfied = hasSimpleDoc
+      const itemSpecific = unitsCoveredMap.get(item.id) ?? { count: 0, units: 0 }
+      const hasItemSpecificDoc = itemSpecific.count > 0
+      const satisfied = hasItemSpecificDoc || hasSimpleDoc
       if (!satisfied) allSatisfied = false
       itemStates.push({
         order_item_id: item.id,
@@ -169,9 +183,9 @@ export async function getPrescriptionState(
         requires_prescription: true,
         prescription_type: product.prescription_type,
         max_units_per_prescription: null,
-        prescriptions_uploaded: hasSimpleDoc ? 1 : 0,
-        units_covered: hasSimpleDoc ? item.quantity : 0,
-        prescriptions_needed: hasSimpleDoc ? 0 : 1,
+        prescriptions_uploaded: hasItemSpecificDoc ? itemSpecific.count : hasSimpleDoc ? 1 : 0,
+        units_covered: satisfied ? item.quantity : 0,
+        prescriptions_needed: satisfied ? 0 : 1,
         satisfied,
       })
     } else {

@@ -424,15 +424,23 @@ export function OrderDetail({ order, currentUser, prescriptionItems = [] }: Orde
             </CardContent>
           </Card>
 
-          {/* Per-unit prescriptions (Model B) */}
-          {prescriptionItems.some(
-            (i) => i.requires_prescription && i.max_units_per_prescription !== null
-          ) && (
+          {/*
+            Per-product prescription panel — Onda 4 / issue #11.
+            Renders for ANY item with `requires_prescription`, not
+            just Model B. Each Rx product gets its own card with the
+            right upload semantics for its model. Model A's single
+            "receipt covers all units" upload writes to
+            `order_item_prescriptions` (same table as Model B), and
+            `getPrescriptionState` recognises both legacy
+            `order_documents.PRESCRIPTION` and item-bound docs as
+            satisfying. See `lib/prescription-rules.ts` for the math.
+          */}
+          {prescriptionItems.some((i) => i.requires_prescription) && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Pill className="h-4 w-4" />
-                  Receitas por unidade
+                  Receitas médicas (por produto)
                 </CardTitle>
               </CardHeader>
               <CardContent>

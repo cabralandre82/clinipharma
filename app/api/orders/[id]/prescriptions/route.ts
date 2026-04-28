@@ -4,6 +4,8 @@ import { getCurrentUser } from '@/lib/auth/session'
 import { rateLimit } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
 import { createAuditLog, AuditEntity, AuditAction } from '@/lib/audit'
+import { advanceOrderAfterDocumentUpload } from '@/lib/orders/document-transitions'
+import { getPrescriptionState } from '@/lib/prescription-rules'
 
 const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'image/webp']
@@ -174,5 +176,44 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     },
   })
 
-  return NextResponse.json({ success: true, id: record.id })
+  // After this upload, evaluate whether ALL prescription requirements
+  // are now met — only then should the order leave AWAITING_DOCUMENTS.
+  // Why: a clinic may upload one of several required receipts and
+  // we don't want to advance the order half-way. This is the
+  // prescription-side analogue of `advanceOrderAfterDocumentUpload`
+  // that `app/api/documents/upload/route.ts` calls — Onda 2 wired
+  // generic docs, Onda 4 (issue #11) wires per-item prescriptions.
+  let transitioned = false
+  let nextStatus: string | null = null
+  try {
+    const state = await getPrescriptionState(orderId)
+    if (state.met) {
+      const result = await advanceOrderAfterDocumentUpload({
+        orderId,
+        changedByUserId: user.id,
+        reason: 'Receita por produto enviada — todas as exigências atendidas',
+      })
+      transitioned = result.transitioned
+      nextStatus = result.status
+    } else {
+      // Surface a soft signal in logs to ease ops debugging when an
+      // operator wonders why the order didn't move yet.
+      logger.info('[prescriptions] uploaded but Rx requirements still pending', {
+        orderId,
+        productName: product.name,
+        reason: state.reason,
+      })
+    }
+  } catch (error) {
+    // Never block the upload itself on transition failures — the
+    // receipt is already saved and the audit row is in place.
+    logger.error('[prescriptions] post-upload transition failed', { error, orderId })
+  }
+
+  return NextResponse.json({
+    success: true,
+    id: record.id,
+    order_status: nextStatus,
+    transitioned,
+  })
 }

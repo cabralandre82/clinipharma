@@ -30,6 +30,7 @@ import {
   User,
   MapPin,
   PlusCircle,
+  Pill,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { DoctorAddress } from '@/types'
@@ -226,16 +227,63 @@ export function NewOrderForm({
             <p className="text-sm text-gray-400">Nenhum produto adicionado ainda.</p>
           )}
 
+          {/*
+            Prescription summary callout.
+            Resolves issue #11: when the cart contains multiple Rx
+            products, the form previously said "este pedido contém
+            produtos com receita obrigatória" without listing **which**
+            ones. Listing the names here mirrors the per-item upload
+            slots that PrescriptionManager renders in the order detail
+            page, so the clinic builds a mental model from the cart all
+            the way through to upload.
+          */}
+          {cart.some((c) => c.product.requires_prescription) && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <Pill className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+              <div className="text-sm">
+                <p className="font-medium text-amber-900">
+                  Este pedido tem {cart.filter((c) => c.product.requires_prescription).length}{' '}
+                  produto
+                  {cart.filter((c) => c.product.requires_prescription).length > 1 ? 's' : ''} com
+                  receita obrigatória
+                </p>
+                <p className="mt-0.5 text-xs text-amber-800">
+                  Você poderá anexar uma receita por produto na próxima etapa:{' '}
+                  {cart
+                    .filter((c) => c.product.requires_prescription)
+                    .map((c) => c.product.name)
+                    .join(', ')}
+                </p>
+              </div>
+            </div>
+          )}
+
           {cart.map((item) => (
             <div
               key={item.product.id}
-              className="flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50/40 p-3"
+              className={`flex items-center gap-3 rounded-lg border p-3 ${
+                item.product.requires_prescription
+                  ? 'border-amber-200 bg-amber-50/60'
+                  : 'border-blue-100 bg-blue-50/40'
+              }`}
             >
               <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border bg-white">
-                <Package className="h-5 w-5 text-blue-400" />
+                {item.product.requires_prescription ? (
+                  <Pill className="h-5 w-5 text-amber-500" />
+                ) : (
+                  <Package className="h-5 w-5 text-blue-400" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-gray-900">{item.product.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-sm font-medium text-gray-900">{item.product.name}</p>
+                  {item.product.requires_prescription && (
+                    <span className="inline-flex flex-shrink-0 items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-800 uppercase">
+                      <Pill className="h-2.5 w-2.5" aria-hidden="true" />
+                      Receita
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500">
                   {item.product.concentration} · {formatCurrency(item.product.price_current)}/un
                 </p>
@@ -269,18 +317,34 @@ export function NewOrderForm({
             <div className="flex items-end gap-2 border-t pt-3">
               <div className="flex-1 space-y-1">
                 <Label className="text-xs text-gray-500">Adicionar produto</Label>
+                {/*
+                  Dropdown options prefix Rx products with "💊" so the
+                  clinic sees at-a-glance which products will require a
+                  receipt before adding them. Native <option> can't host
+                  child elements (icons / badges), so we use a Unicode
+                  marker that screen readers announce as "pill". Aria
+                  description below repeats the count for AT users.
+                */}
                 <select
                   value={selectedProductId}
                   onChange={(e) => setSelectedProductId(e.target.value)}
+                  aria-describedby="rx-products-hint"
                   className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
                 >
                   <option value="">Selecione...</option>
                   {eligibleProducts.map((p) => (
                     <option key={p.id} value={p.id}>
+                      {p.requires_prescription ? '💊 ' : ''}
                       {p.name} — {formatCurrency(p.price_current)}
+                      {p.requires_prescription ? ' (receita obrigatória)' : ''}
                     </option>
                   ))}
                 </select>
+                {eligibleProducts.some((p) => p.requires_prescription) && (
+                  <p id="rx-products-hint" className="text-xs text-amber-700">
+                    Produtos marcados com 💊 exigem receita médica.
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-gray-500">Qtd</Label>

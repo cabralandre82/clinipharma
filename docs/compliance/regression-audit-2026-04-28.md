@@ -148,7 +148,19 @@ Após Onda 1 + 2 implementadas:
   - [x] `npx tsc --noEmit` ✓
   - [x] `npx vitest run` ✓ **1951/1951 passing**
   - [x] `npx eslint` em todos arquivos modificados ✓ zero erros
-- [ ] Onda 3 — Multi-receita por produto, consultor-as-user
+- [x] **Onda 4 — concluída em 2026-04-28** (issue #11 fechada)
+  - [x] **Fase 1 — visibilidade no cart**: badge "Receita" + emoji 💊 no dropdown da `new-order-form.tsx` + callout "Este pedido tem N produto(s) com receita obrigatória: X, Y, Z" listando explicitamente quais.
+  - [x] **Fase 2 — upload por produto unificado**:
+    - `lib/prescription-rules.ts` — Model A passa a aceitar AMBOS os caminhos: legacy `order_documents.PRESCRIPTION` E `order_item_prescriptions` (sem dupla contagem).
+    - `components/orders/prescription-manager.tsx` — filter agora `requires_prescription` (cobre Model A + Model B). Para Model A, status binário "Receita enviada / pendente"; para Model B, barra de progresso preservada.
+    - `components/orders/order-detail.tsx` — condição de render mudou de `max_units !== null` para `requires_prescription`. Header passou a ser "Receitas médicas (por produto)".
+    - `app/api/orders/[id]/prescriptions/route.ts` — após upload, chama `getPrescriptionState` + `advanceOrderAfterDocumentUpload` se TODAS as receitas chegaram. Erros na transição não falham o upload.
+  - [x] **Fase 3 — testes**: 3 novos casos em `tests/unit/lib/prescription-rules.test.ts` (TC-RX-10/11/12 — Model A via per-item path, dupla via legacy+per-item, mixed cart) + 3 em `tests/unit/api/prescription-upload.test.ts` (TC-RXU-11/12/13 — transition triggered, transition gated, transition error não falha upload).
+  - [x] `npx tsc --noEmit` ✓
+  - [x] `npx vitest run` ✓ **1966/1966 passing** (+6)
+  - [x] `npx eslint .` ✓ zero erros
+  - [x] `./scripts/claims/run-all.sh` ✓ 16/16 verifiers verde
+- [ ] Épico — Consultor como usuário (login + dashboard + emails) — **issue #30** aberta.
 - [x] **Guardrails permanentes — concluídos em 2026-04-28**
   - [x] `scripts/claims/check-rbac-view-leak.sh` — varre superfícies pharmacy-facing por `price_current`/`unit_price`/`total_price`; aceita gates explícitos (import de `lib/orders/view-mode`, `isPharmacyAdmin`, `viewMode`, `// @rbac-view: ok`). 29 arquivos no scope, 0 leaks.
   - [x] `scripts/claims/run-all.sh` — verifier integrado ao run weekly.
@@ -171,9 +183,7 @@ Após Onda 1 + 2 implementadas:
 
 ### Próximos itens (não nesta janela)
 
-- **Onda 3** (épico):
-  - Item #11 — Multi-receita por produto (UI por item de pedido).
-  - Itens #16, #17 — Consultor como `profile`/usuário (login, dashboard próprio, emails).
-  - Sentry SDK upgrade (resolve os DEPRECATION warnings do build).
+- **Issue #30** (épico): Consultor como `profile`/usuário (login, dashboard próprio, emails de cadastro/venda/vínculo de clínica). Cobre os itens #16 e #17 da auditoria original. Estimativa 2–4 dias.
+- **Sentry SDK upgrade**: Resolve os 5 DEPRECATION warnings cosméticos do build (`sentry.client.config.ts` → `instrumentation-client.ts`, `autoInstrumentMiddleware` → `webpack.autoInstrumentMiddleware`, etc). Housekeeping; não bloqueia produção.
 
 Será atualizado on-the-fly conforme commits aterrissam.
