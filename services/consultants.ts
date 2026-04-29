@@ -17,6 +17,91 @@ import { emitirNFSeParaConsultor } from '@/services/nfse'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'https://clinipharma.com.br'
 
+/**
+ * Maps a PostgREST/Postgres error from `sales_consultants.insert` into
+ * a Portuguese, actionable message. The operator triggering this is
+ * always a SUPER_ADMIN, so the message can name the constraint /
+ * column directly (no leak of sensitive values, just shape).
+ *
+ * Recognized error codes (subset of Postgres SQLSTATE):
+ *   23505 unique_violation         — CNPJ / email duplicado
+ *   23502 not_null_violation       — coluna obrigatória vazia
+ *   23514 check_violation          — commission_rate fora do range, status inválido
+ *   23503 foreign_key_violation    — referência inválida (raro nesta tabela)
+ *   22P02 invalid_text_representation — formato (ex.: enum inválido)
+ *   42501 insufficient_privilege   — RLS bloqueou
+ *   PGRST*                         — erros do PostgREST (geralmente schema cache)
+ *
+ * Anything unrecognized falls back to a message that quotes the SQLSTATE
+ * code, so the operator can search the runbook by code instead of
+ * staring at "Erro ao criar consultor".
+ */
+function friendlyConsultantInsertError(error: {
+  code?: string
+  message?: string
+  details?: string | null
+  hint?: string | null
+}): string {
+  const code = error.code ?? ''
+  const message = error.message ?? ''
+  const details = error.details ?? ''
+  const haystack = `${message} ${details}`.toLowerCase()
+
+  if (code === '23505') {
+    if (haystack.includes('email')) {
+      return 'Email já cadastrado para outro consultor. Verifique a lista em /consultants ou use outro email.'
+    }
+    if (haystack.includes('cnpj')) {
+      return 'CNPJ já cadastrado para outro consultor. Cada CNPJ pode estar vinculado a apenas um consultor.'
+    }
+    return 'Já existe um consultor com algum dos dados informados (campo único duplicado). Verifique email e CNPJ.'
+  }
+
+  if (code === '23502') {
+    // Postgres puts the column name in `message` like
+    // "null value in column \"full_name\" violates not-null constraint"
+    const colMatch = message.match(/column "([^"]+)"/i)
+    const col = colMatch?.[1]
+    if (col) {
+      return `Campo obrigatório não preenchido: ${col}.`
+    }
+    return 'Campo obrigatório não preenchido. Confira nome, email e CNPJ.'
+  }
+
+  if (code === '23514') {
+    if (haystack.includes('commission_rate')) {
+      return 'Taxa de comissão deve estar entre 0% e 100%. Ajuste em Configurações → Taxa de comissão.'
+    }
+    if (haystack.includes('status')) {
+      return 'Status inválido. Permitidos: ACTIVE, INACTIVE ou SUSPENDED.'
+    }
+    return `Restrição do banco bloqueou a criação (constraint violada). Detalhes: ${message}`
+  }
+
+  if (code === '23503') {
+    return `Referência inválida no cadastro (foreign key): ${details || message}`
+  }
+
+  if (code === '22P02') {
+    return `Formato de dado inválido em algum campo. Detalhes: ${message}`
+  }
+
+  if (code === '42501') {
+    return 'Sem permissão para criar consultor (RLS). Faça login como SUPER_ADMIN.'
+  }
+
+  if (code.startsWith('PGRST')) {
+    return `Erro de schema (${code}). Provavelmente uma migration pendente. Detalhes: ${message}`
+  }
+
+  // Unknown error — surface the SQLSTATE code so it's searchable in
+  // logs and runbooks instead of a generic toast.
+  if (code) {
+    return `Erro ao criar consultor (código ${code}). Detalhes nos logs do servidor.`
+  }
+  return `Erro ao criar consultor: ${message || 'sem mensagem do banco'}.`
+}
+
 // ─── Create ────────────────────────────────────────────────────────────────
 
 /**
@@ -55,11 +140,31 @@ export async function createConsultant(
       .single()
 
     if (error) {
-      if (error.code === '23505') {
-        if (error.message.includes('cnpj')) return { error: 'CNPJ já cadastrado' }
-        if (error.message.includes('email')) return { error: 'Email já cadastrado' }
-      }
-      return { error: 'Erro ao criar consultor' }
+      // Always log the raw error first — the historical "Erro ao criar
+      // consultor" toast was a black box for the operator. Anything we
+      // can't classify still ends up in the server log with full
+      // context (code, message, details, hint).
+      logger.error('[createConsultant] sales_consultants.insert failed', {
+        actorUserId: actor.id,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        // Echo only non-sensitive identifying fields. We deliberately
+        // do NOT log bank/pix data even though they're under audit-log
+        // RLS — the logger forwards to Sentry and they don't need to
+        // see secondary copies.
+        email: parsed.data.email,
+        cnpj: parsed.data.cnpj,
+      })
+
+      // Map the known error families to actionable Portuguese
+      // messages. The operator who triggers this is always a
+      // SUPER_ADMIN (RBAC gate above), so it's safe to surface the
+      // technical reason (which column / which constraint) — these
+      // operators are the ones who have to fix the data.
+      const friendly = friendlyConsultantInsertError(error)
+      return { error: friendly }
     }
 
     // ─── Provision auth account so the consultant can actually log in ──
@@ -200,7 +305,16 @@ export async function updateConsultant(
       .update({ ...parsed.data, updated_at: new Date().toISOString() })
       .eq('id', id)
 
-    if (error) return { error: 'Erro ao atualizar consultor' }
+    if (error) {
+      logger.error('[updateConsultant] sales_consultants.update failed', {
+        consultantId: id,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      })
+      return { error: friendlyConsultantInsertError(error) }
+    }
 
     await createAuditLog({
       actorUserId: actor.id,

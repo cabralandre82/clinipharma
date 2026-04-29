@@ -75,7 +75,7 @@ describe('createConsultant', () => {
       email: 'c@test.com',
       cnpj: '11222333000181',
     } as Parameters<typeof createConsultant>[0])
-    expect(result.error).toBe('CNPJ já cadastrado')
+    expect(result.error).toMatch(/CNPJ já cadastrado/)
   })
 
   it('returns email error on email duplicate', async () => {
@@ -92,7 +92,7 @@ describe('createConsultant', () => {
       email: 'c@test.com',
       cnpj: '11222333000181',
     } as Parameters<typeof createConsultant>[0])
-    expect(result.error).toBe('Email já cadastrado')
+    expect(result.error).toMatch(/Email já cadastrado/)
   })
 
   it('returns Sem permissão when FORBIDDEN', async () => {
@@ -408,7 +408,13 @@ describe('updateConsultant', () => {
 
     const { updateConsultant } = await import('@/services/consultants')
     const result = await updateConsultant('cons-1', { full_name: 'New' })
-    expect(result.error).toBe('Erro ao atualizar consultor')
+    // The new helper surfaces the underlying message instead of the
+    // generic "Erro ao atualizar consultor" toast — operators were
+    // staring at black-box errors with no way to triage. The exact
+    // string includes the raw message; we only pin that an error was
+    // returned and that it carries the diagnostic detail.
+    expect(result.error).toBeDefined()
+    expect(result.error).toMatch(/fail/)
   })
 })
 
