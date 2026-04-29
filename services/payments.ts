@@ -60,19 +60,45 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ erro
     }
     const items = (orderData.order_items ?? []) as OrderItemRow[]
 
-    // Sum frozen cost values across all items
+    // Pharmacy cost is the price-frozen value the pharmacy charges us
+    // per unit. It is INVARIANT to coupons — coupons are platform-side
+    // marketing money and do not change what the pharmacy receives.
     const pharmacyTransfer =
       Math.round(
         items.reduce((sum, i) => sum + Number(i.pharmacy_cost_per_unit ?? 0) * i.quantity, 0) * 100
       ) / 100
 
-    const platformCommission =
-      Math.round(
-        items.reduce(
-          (sum, i) => sum + Number(i.platform_commission_per_unit ?? 0) * i.quantity,
-          0
-        ) * 100
-      ) / 100
+    // Platform commission must reconcile to what the customer actually
+    // paid. Pre-2026-04-29 we summed `platform_commission_per_unit *
+    // quantity` from the price-freeze snapshot, which was computed at
+    // item creation as `unit_price - pharmacy_cost` BEFORE the coupon
+    // was applied. On a coupon order this produced the bug:
+    //
+    //   total_price (paid)   = R$ 180,50
+    //   pharmacy_transfer    = R$ 100,00
+    //   platform_commission  = R$  90,00 (snapshot, pre-coupon)
+    //   ───────────────────────────────────
+    //   gap (phantom money)  = R$   9,50
+    //
+    // The platform was implicitly absorbing the coupon discount but
+    // RECORDING the pre-coupon margin, so payment_received did NOT
+    // equal pharmacy_transfer + platform_commission. The financial
+    // ledger had R$ 9.50 of money that never came in.
+    //
+    // Fix: derive platform commission from the reconciliation
+    // invariant. The pharmacy gets its frozen cost (untouched by
+    // coupons), and the platform absorbs the coupon as a reduction
+    // of its own margin. The arithmetic is now exact and bookable:
+    //
+    //   pharmacy_transfer + platform_commission = total_price (paid)
+    //
+    // If a future product policy decides "coupons are pharmacy-funded"
+    // (i.e. the pharmacy should absorb the discount), this needs to
+    // become a per-coupon `funded_by` column with the calculation
+    // forking on it. For now, every coupon in production is platform-
+    // funded.
+    const orderTotal = Number(orderData.total_price ?? 0)
+    const platformCommission = Math.max(0, Math.round((orderTotal - pharmacyTransfer) * 100) / 100)
 
     // Wave 7 — atomic critical section. When `payments.atomic_confirm` is
     // on, all of the writes below (payment UPDATE, commission / transfer /

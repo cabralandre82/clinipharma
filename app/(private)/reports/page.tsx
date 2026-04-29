@@ -164,6 +164,42 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       .lte('created_at', rangeTo),
   ])
 
+  // ── Platform revenue (canonical view, migration 063) ─────────
+  // The view does the reconciliation arithmetic in SQL so every UI
+  // surface that needs "what did the platform actually keep on a paid
+  // order" reads the same number. Pre-2026-04-29 each report rolled
+  // its own formula and at least one of them (this very page) was
+  // computing platform commission from the pre-coupon snapshot —
+  // overstating the platform share whenever a coupon was used. The
+  // view is now authoritative.
+  const platformRevenueRes = await admin
+    .from('platform_revenue_view')
+    .select('order_id, gross_paid, pharmacy_share, consultant_share, platform_net, payment_status')
+    .gte('order_created_at', rangeFrom)
+    .lte('order_created_at', rangeTo)
+  type RevenueRow = {
+    gross_paid: number | null
+    pharmacy_share: number | null
+    consultant_share: number | null
+    platform_net: number | null
+    payment_status: string | null
+  }
+  const revenueRows = (platformRevenueRes.data ?? []) as RevenueRow[]
+  // We only sum on rows where the customer actually paid — otherwise
+  // an unpaid order with a phantom commission row (legacy data) would
+  // inflate the KPI.
+  const paidRevenueRows = revenueRows.filter((r) => r.payment_status === 'CONFIRMED')
+  const platformGrossPaid = paidRevenueRows.reduce((s, r) => s + Number(r.gross_paid ?? 0), 0)
+  const platformPharmacyShare = paidRevenueRows.reduce(
+    (s, r) => s + Number(r.pharmacy_share ?? 0),
+    0
+  )
+  const platformConsultantShare = paidRevenueRows.reduce(
+    (s, r) => s + Number(r.consultant_share ?? 0),
+    0
+  )
+  const platformNet = paidRevenueRows.reduce((s, r) => s + Number(r.platform_net ?? 0), 0)
+
   const orders = ordersRes.data ?? []
   const payments = paymentsRes.data ?? []
   const transfers = transfersRes.data ?? []
@@ -423,35 +459,58 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         />
       </div>
 
-      {/* KPIs — Financeiro */}
+      {/* KPIs — Financeiro
+          Reads from `public.platform_revenue_view` (migration 063), the
+          single source of truth. The four numbers below add up by
+          construction: gross_paid = pharmacy_share + consultant_share
+          + platform_net. Pre-2026-04-29 the page was showing the
+          pre-coupon platform commission summed from the price-freeze
+          snapshot, which over-stated the platform share whenever a
+          coupon was used. */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard
           icon={<CreditCard className="h-5 w-5 text-green-600" />}
-          label="Receita confirmada"
-          value={formatCurrency(totalRevenue)}
+          label="Receita bruta (paga)"
+          value={formatCurrency(platformGrossPaid)}
           bg="green"
           large
         />
         <KpiCard
           icon={<ArrowLeftRight className="h-5 w-5 text-blue-600" />}
-          label="Total repassado"
-          value={formatCurrency(totalTransferred)}
+          label="Repassado às farmácias"
+          value={formatCurrency(platformPharmacyShare)}
           bg="blue"
           large
         />
         <KpiCard
-          icon={<TrendingUp className="h-5 w-5 text-indigo-600" />}
-          label="Comissão plataforma"
-          value={formatCurrency(totalCommission)}
-          bg="indigo"
+          icon={<Building2 className="h-5 w-5 text-purple-600" />}
+          label="Pago a consultores"
+          value={formatCurrency(platformConsultantShare)}
+          bg="purple"
           large
         />
+        <KpiCard
+          icon={<TrendingUp className="h-5 w-5 text-emerald-600" />}
+          label="Receita líquida da plataforma"
+          value={formatCurrency(platformNet)}
+          bg="emerald"
+          large
+        />
+      </div>
+
+      {/* Ticket médio + métricas operacionais (segunda linha) */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard
           icon={<ShoppingBag className="h-5 w-5 text-teal-600" />}
           label="Ticket médio"
           value={formatCurrency(avgTicket)}
           bg="teal"
-          large
+        />
+        <KpiCard
+          icon={<ArrowLeftRight className="h-5 w-5 text-amber-600" />}
+          label="Repasses concluídos"
+          value={formatCurrency(totalTransferred)}
+          bg="amber"
         />
       </div>
 
@@ -596,6 +655,8 @@ function KpiCard({
     red: 'bg-red-50',
     indigo: 'bg-indigo-50',
     teal: 'bg-teal-50',
+    purple: 'bg-purple-50',
+    emerald: 'bg-emerald-50',
   }
   return (
     <Card>

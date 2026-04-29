@@ -204,6 +204,46 @@ export function OrderDetail({ order, currentUser, prescriptionItems = [] }: Orde
       created_at: string
     }>) ?? []
 
+  // Consultant commission. Same PostgREST 1:1-vs-array shape gotcha as
+  // `payments` (the join can come back as either an object or an
+  // array depending on FK uniqueness inference). Tolerate both.
+  type ConsultantCommissionRow = {
+    id: string
+    commission_amount: number
+    commission_rate: number | null
+    status: string
+  }
+  const consultantCommissionRaw = order.consultant_commissions as
+    | ConsultantCommissionRow
+    | ConsultantCommissionRow[]
+    | null
+    | undefined
+  const consultantCommission: ConsultantCommissionRow | null = Array.isArray(
+    consultantCommissionRaw
+  )
+    ? (consultantCommissionRaw[0] ?? null)
+    : (consultantCommissionRaw ?? null)
+
+  // Platform net revenue for THIS order. We compute the same number
+  // here that `public.platform_revenue_view` (migration 063) computes
+  // server-side, so the detail page and the /reports KPI agree to the
+  // cent. Pre-2026-04-29 the page didn't expose this at all — the
+  // operator had to read commission off the pharmacy transfer card and
+  // mentally subtract; on coupon orders the displayed commission was
+  // wrong (price-freeze snapshot, pre-coupon) so the mental math was
+  // wrong too.
+  const grossPaid = Number(order.total_price ?? 0)
+  const pharmacyShare = transfer ? Number(transfer.net_amount ?? 0) : 0
+  const consultantShare = consultantCommission
+    ? Number(consultantCommission.commission_amount ?? 0)
+    : 0
+  const platformNet = Math.max(0, grossPaid - pharmacyShare - consultantShare)
+  const reconGap =
+    grossPaid -
+    pharmacyShare -
+    consultantShare -
+    (transfer ? Number(transfer.commission_amount ?? 0) : 0)
+
   const clinic = order.clinics as { trade_name: string; city: string; state: string } | null
   const doctor = order.doctors as {
     full_name: string
@@ -598,18 +638,70 @@ export function OrderDetail({ order, currentUser, prescriptionItems = [] }: Orde
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/*
+                  Reconciliation breakdown — the most important number
+                  on this page for an admin. Reads:
+                    bruto pago - repasse farmácia - consultor = receita líquida
+                  Same arithmetic as `public.platform_revenue_view`
+                  (migration 063). On coupon orders the platform
+                  absorbs the discount (cupom é platform-funded), so
+                  the líquida already accounts for it.
+                */}
+                {transfer && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                      Receita líquida da plataforma
+                    </p>
+                    <div className="space-y-1.5 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Bruto pago pelo cliente</span>
+                        <span className="font-semibold">{formatCurrency(grossPaid)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">- Repasse à farmácia</span>
+                        <span className="text-red-700">- {formatCurrency(pharmacyShare)}</span>
+                      </div>
+                      {consultantShare > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">- Comissão do consultor</span>
+                          <span className="text-red-700">- {formatCurrency(consultantShare)}</span>
+                        </div>
+                      )}
+                      <Separator />
+                      <div className="flex justify-between text-base font-bold">
+                        <span>Receita líquida</span>
+                        <span className="text-emerald-700">{formatCurrency(platformNet)}</span>
+                      </div>
+                      {Math.abs(reconGap) > 0.01 && (
+                        <div className="mt-2 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-800">
+                          <strong>Atenção:</strong> divergência de{' '}
+                          {formatCurrency(Math.abs(reconGap))} entre o valor pago e a soma das
+                          partes (repasse + consultor + comissão registrada). Revise os valores
+                          gravados em <code>commissions</code> / <code>transfers</code>.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {commission && (
                   <div>
                     <p className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
-                      Comissão
+                      Comissão registrada
                     </p>
                     <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Percentual</span>
-                        <span className="font-semibold">
-                          {commission.commission_percentage ?? '—'}%
+                        <span className="text-gray-500">Tipo</span>
+                        <span>
+                          {commission.commission_type === 'FIXED' ? 'Fixa' : 'Percentual'}
                         </span>
                       </div>
+                      {commission.commission_percentage != null && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Percentual</span>
+                          <span className="font-semibold">{commission.commission_percentage}%</span>
+                        </div>
+                      )}
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Valor</span>
                         <span className="font-semibold">
@@ -627,18 +719,18 @@ export function OrderDetail({ order, currentUser, prescriptionItems = [] }: Orde
                     </p>
                     <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Bruto</span>
+                        <span className="text-gray-500">Bruto pago</span>
                         <span>{formatCurrency(transfer.gross_amount)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Comissão</span>
+                        <span className="text-gray-500">Margem da plataforma</span>
                         <span className="text-red-600">
                           - {formatCurrency(transfer.commission_amount)}
                         </span>
                       </div>
                       <Separator />
                       <div className="flex justify-between text-sm font-semibold">
-                        <span>Líquido</span>
+                        <span>Farmácia recebe</span>
                         <span className="text-green-700">
                           {formatCurrency(transfer.net_amount)}
                         </span>
@@ -649,6 +741,42 @@ export function OrderDetail({ order, currentUser, prescriptionItems = [] }: Orde
                           className={`font-medium ${transfer.status === 'COMPLETED' ? 'text-green-700' : 'text-amber-700'}`}
                         >
                           {transfer.status === 'COMPLETED' ? 'Concluído' : 'Pendente'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {consultantCommission && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                      Comissão do consultor
+                    </p>
+                    <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      {consultantCommission.commission_rate != null && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Taxa</span>
+                          <span className="font-semibold">
+                            {consultantCommission.commission_rate}%
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Valor</span>
+                        <span className="font-semibold">
+                          {formatCurrency(consultantCommission.commission_amount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Status</span>
+                        <span
+                          className={`font-medium ${
+                            consultantCommission.status === 'PAID'
+                              ? 'text-green-700'
+                              : 'text-amber-700'
+                          }`}
+                        >
+                          {consultantCommission.status === 'PAID' ? 'Pago' : 'Pendente'}
                         </span>
                       </div>
                     </div>

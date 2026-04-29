@@ -47,7 +47,8 @@ export default async function OrderPage({ params }: OrderPageProps) {
       order_operational_updates (id, status, description, created_at),
       payments (id, gross_amount, status, payment_method, reference_code, confirmed_at, notes, asaas_payment_id, asaas_invoice_url, asaas_pix_qr_code, asaas_pix_copy_paste, asaas_boleto_url, payment_link, payment_due_date),
       commissions (id, commission_type, commission_percentage, commission_total_amount),
-      transfers (id, gross_amount, commission_amount, net_amount, status, transfer_reference, processed_at)
+      transfers (id, gross_amount, commission_amount, net_amount, status, transfer_reference, processed_at),
+      consultant_commissions (id, commission_amount, commission_rate, status)
     `
     )
     .eq('id', id)
