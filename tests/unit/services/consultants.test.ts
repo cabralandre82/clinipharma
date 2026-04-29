@@ -870,4 +870,139 @@ describe('deleteConsultant', () => {
     const result = await deleteConsultant('cons-1')
     expect(result.error).toBe('Sem permissão')
   })
+
+  it('surfaces a friendly error when sales_consultants.delete fails', async () => {
+    // Pin the catch path that maps SQL errors via
+    // friendlyConsultantInsertError. Without this branch under test
+    // global coverage drops below the 80% threshold the CI enforces.
+    const stub = buildAdminClient({
+      consultant: { id: 'cons-1', user_id: null, full_name: 'C', email: 'c@x' },
+      commissionCount: 0,
+      transferCount: 0,
+      deleteErr: { code: '23503', message: 'foreign key referenced from somewhere' },
+    })
+    vi.mocked(adminModule.createAdminClient).mockReturnValue(
+      stub.admin as unknown as ReturnType<typeof adminModule.createAdminClient>
+    )
+
+    const result = await deleteConsultant('cons-1')
+    // friendlyConsultantInsertError translates 23503 → "ainda referenciado".
+    expect(result.error).toMatch(/referenciado|FK|foreign key|consultor/i)
+  })
+
+  it('aborts with actionable message when clinics enumerate-for-unlink fails', async () => {
+    // Pin the early-abort branch: if we can't enumerate the clinics
+    // pointing to this consultant we MUST NOT proceed with the
+    // delete (would orphan FK references). Instead surface a clear
+    // operator message. Exercises the error logger + return path.
+    const consultantSingle = vi.fn().mockResolvedValue({
+      data: { id: 'cons-1', user_id: null, full_name: 'C', email: 'c@x' },
+      error: null,
+    })
+    const consultantSelect = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({ single: consultantSingle }),
+    })
+    const commissionsCount = vi.fn().mockResolvedValue({ count: 0, error: null })
+    const transfersCount = vi.fn().mockResolvedValue({ count: 0, error: null })
+    const clinicsFetch = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ data: null, error: { message: 'rls denied' } }),
+    })
+    const consultantDelete = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    })
+
+    let consultantHits = 0
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'sales_consultants') {
+        consultantHits++
+        if (consultantHits === 1) return { select: consultantSelect }
+        return { delete: consultantDelete }
+      }
+      if (table === 'consultant_commissions')
+        return { select: vi.fn().mockReturnValue({ eq: commissionsCount }) }
+      if (table === 'consultant_transfers')
+        return { select: vi.fn().mockReturnValue({ eq: transfersCount }) }
+      if (table === 'clinics') return { select: clinicsFetch }
+      return makeQueryBuilder(null, null)
+    })
+
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: fromMock,
+      auth: { admin: { deleteUser: vi.fn() } },
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await deleteConsultant('cons-1')
+    expect(result.error).toMatch(/clínicas vinculadas/)
+    // We must NOT have proceeded to the actual delete — the consultant
+    // row stays intact so the operator can retry.
+    expect(consultantDelete).not.toHaveBeenCalled()
+  })
+})
+
+describe('createConsultant — additional rollback paths', () => {
+  // These tests exist purely to keep the consultants.ts file above the
+  // 80% global coverage gate. They pin behaviour we already documented
+  // but had branches uncovered (rollback warnings on auth.admin
+  // .deleteUser failure, sales_consultants.delete failure during
+  // rollback). Removing them is fine the day we factor rollback into a
+  // dedicated helper.
+
+  it('keeps surfacing the SQL detail even when rollback steps fail', async () => {
+    const consultantInsertSingle = vi.fn().mockResolvedValue({
+      data: { id: 'cons-rb', full_name: 'C', email: 'c@test.com' },
+      error: null,
+    })
+    const consultantInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({ single: consultantInsertSingle }),
+    })
+    const consultantDelete = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: { message: 'rollback failed too' } }),
+    })
+
+    let consultantCalls = 0
+    const userRolesUpsert = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: '42501', message: 'permission denied for user_roles' },
+    })
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'sales_consultants') {
+        consultantCalls++
+        return consultantCalls === 1 ? { insert: consultantInsert } : { delete: consultantDelete }
+      }
+      if (table === 'profiles')
+        return { upsert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+      if (table === 'user_roles') return { upsert: userRolesUpsert }
+      return makeQueryBuilder(null, null)
+    })
+
+    // deleteUser also fails — exercise the warn() path
+    const deleteUserMock = vi.fn().mockRejectedValue(new Error('auth boom'))
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: fromMock,
+      auth: {
+        admin: {
+          createUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'auth-rb', email: 'c@test.com' } },
+            error: null,
+          }),
+          generateLink: vi.fn(),
+          deleteUser: deleteUserMock,
+          listUsers: vi.fn().mockResolvedValue({ data: { users: [] }, error: null }),
+        },
+      },
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await createConsultant({
+      full_name: 'C',
+      email: 'c@test.com',
+      cnpj: '11222333000181',
+    } as Parameters<typeof createConsultant>[0])
+
+    // The user-facing toast carries the friendly RLS message (42501 →
+    // "Sem permissão para criar consultor (RLS)..."). Rollback
+    // bookkeeping issues don't get to mask the root cause.
+    expect(result.error).toMatch(/RLS/)
+    expect(deleteUserMock).toHaveBeenCalled()
+    expect(consultantDelete).toHaveBeenCalled()
+  })
 })
