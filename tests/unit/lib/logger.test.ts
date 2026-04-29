@@ -53,13 +53,58 @@ describe('logger — structural output', () => {
     expect(parsed.errorStack).toContain('Error: test error')
   })
 
-  it('logger.error handles non-Error objects', async () => {
+  it('logger.error handles non-Error objects (e.g. PostgrestError) by promoting canonical fields', async () => {
+    // Regression for the 2026-04-29 hot-incident: when the order_items
+    // insert failed with a Postgres trigger error, services/orders.ts
+    // called `logger.error('Order items error:', { error: pgError })`
+    // where pgError was a plain { code, message, details, hint } object
+    // (PostgrestError shape). The previous logger fell into
+    // `String(error)` and emitted literal "[object Object]" — turning
+    // every DB failure in production into an unactionable mystery.
+    //
+    // The fix promotes `code`, `message`, `details`, `hint` to their
+    // own keys so a log search like `errorCode=P0001` returns rows,
+    // and JSON-serialises the rest into `errorRaw` so nothing is lost.
     const { logger } = await import('@/lib/logger')
-    logger.error('db failed', { error: { code: '23505', message: 'unique constraint' } })
+    const pgError = {
+      code: 'P0001',
+      message:
+        'money_sync_orders: total_price 180.50 disagrees with total_price_cents 19000 (drift > 1 cent)',
+      details: null,
+      hint: null,
+    }
+    logger.error('Order items error:', { error: pgError })
 
     const parsed = parseLastLog(console.error as ReturnType<typeof vi.spyOn>)
     expect(parsed.level).toBe('error')
-    expect(parsed.errorRaw ?? parsed.errorMessage).toBeTruthy()
+    expect(parsed.errorCode).toBe('P0001')
+    expect(parsed.errorMessage).toContain('money_sync_orders')
+    expect(parsed.errorMessage).toContain('drift > 1 cent')
+    // The `[object Object]` failure mode would manifest as errorRaw
+    // being literally that string. Assert the shape is preserved.
+    expect(parsed.errorRaw).not.toBe('[object Object]')
+    expect(typeof parsed.errorRaw).toBe('string')
+    expect(JSON.parse(parsed.errorRaw as string)).toMatchObject({ code: 'P0001' })
+  })
+
+  it('logger.error preserves custom keys on non-Error objects via errorRaw', async () => {
+    const { logger } = await import('@/lib/logger')
+    logger.error('rpc rejected', {
+      error: { code: '23505', message: 'unique constraint', constraint: 'orders_pkey' },
+    })
+    const parsed = parseLastLog(console.error as ReturnType<typeof vi.spyOn>)
+    expect(parsed.errorCode).toBe('23505')
+    expect(parsed.errorMessage).toBe('unique constraint')
+    expect(JSON.parse(parsed.errorRaw as string).constraint).toBe('orders_pkey')
+  })
+
+  it('logger.error falls back to String() for primitives and non-object values', async () => {
+    const { logger } = await import('@/lib/logger')
+    logger.error('string error', { error: 'plain string error' })
+    const parsed = parseLastLog(console.error as ReturnType<typeof vi.spyOn>)
+    expect(parsed.errorRaw).toBe('plain string error')
+    expect(parsed.errorCode).toBeUndefined()
+    expect(parsed.errorMessage).toBeUndefined()
   })
 
   it('includes extra context fields in the log entry', async () => {

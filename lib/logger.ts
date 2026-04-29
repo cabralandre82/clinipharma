@@ -215,6 +215,27 @@ export const logger = {
       errorContext.errorMessage = error.message
       errorContext.errorStack = error.stack
       errorContext.errorName = error.name
+    } else if (error !== null && typeof error === 'object') {
+      // Most Supabase / PostgREST errors are PLAIN OBJECTS (not Error
+      // instances), shaped { code, message, details, hint }. Before
+      // 2026-04-29 we fell into the `String(error)` branch below and
+      // wrote literal "[object Object]" to server_logs — turning every
+      // DB failure into an unactionable mystery. Now we promote the
+      // canonical fields to their own keys so a log search like
+      // `errorCode=23505` actually returns rows.
+      const e = error as Record<string, unknown>
+      if (typeof e.message === 'string') errorContext.errorMessage = e.message
+      if (typeof e.code === 'string') errorContext.errorCode = e.code
+      if (typeof e.details === 'string') errorContext.errorDetails = e.details
+      if (typeof e.hint === 'string') errorContext.errorHint = e.hint
+      // Anything else (custom keys, RPC-specific payloads) goes into a
+      // single bag so we don't silently lose context. JSON-serialised
+      // because `redact()` only descends into plain objects.
+      try {
+        errorContext.errorRaw = JSON.stringify(error)
+      } catch {
+        errorContext.errorRaw = String(error)
+      }
     } else if (error !== undefined) {
       errorContext.errorRaw = String(error)
     }
