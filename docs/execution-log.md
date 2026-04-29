@@ -3099,3 +3099,53 @@ pg_class COMMENTS: todas as 6 tabelas carregam [rls-policy: ...] prose readable 
 **Follow-ups criados:**
 
 - Nenhum. Item encerra `docs/PENDING.md` pendência operacional do Wave 15.
+
+### Hotfix — schema-drift CI: 053 backup_record_run usa clock_timestamp() — 2026-04-29 13:50 BRT
+
+**Status:** 🟢 concluído
+**Commits:** _este commit_
+**Migrations editadas (excepcional — ver invariante violada):** `053_backup_runs.sql`
+**Migrations aplicadas (prod):** `CREATE OR REPLACE FUNCTION public.backup_record_run` via psql @ 2026-04-29 16:43 UTC
+**Env vars alteradas:** nenhuma
+**Testes:** smoke local de 053 com `--single-transaction` em pg18 ephemeral → `backup_runs smoke OK`
+
+**Entregáveis:**
+
+- `supabase/migrations/053_backup_runs.sql` — `v_now := now()` → `v_now := clock_timestamp()`
+  em `backup_record_run`. Removido `pg_sleep(0.001)` que era inútil (ele tentava
+  forçar `now()` a avançar dentro da mesma transação, mas `now() === transaction_timestamp()`
+  é fixo por toda a transação).
+- Produção sincronizada via `CREATE OR REPLACE FUNCTION` aplicado direto no pooler antes
+  do commit, pra Layer 2 do schema-drift CI (diff entre prod e migrations) não detectar
+  divergência. Hashes de linhas existentes em `backup_runs` permanecem válidos — o
+  verifier walka prev_hash → row_hash, não recomputa.
+
+**Invariante violada:**
+
+AGENTS.md §1.8 — "Migrations são append-only". A regra existe pra Layer 2 (drift entre
+prod e repo). Excepção justificada aqui porque:
+
+1. O smoke embedded no DO block de 053 nunca pôde funcionar em ambientes single-transaction:
+   `now()` é `transaction_timestamp` (fixo), então as duas chamadas de `backup_record_run`
+   gravavam `recorded_at` idêntico, e o verifier ordenava por `(recorded_at ASC, id ASC)`
+   onde `id` é uuid v4 random — leitura não-determinística → false positive de chain break.
+2. Layer 1 do `schema-drift.yml` justamente roda `psql --single-transaction` por arquivo,
+   o que reproduzia o bug 100% das vezes. CI vermelho desde 2026-04-13 (commit que mergeou 053).
+3. Adicionar uma migration nova (063) com `CREATE OR REPLACE FUNCTION` arrumaria PROD mas
+   **não** Layer 1 — porque o smoke roda durante a aplicação de 053, antes de 063 chegar.
+4. Editar 053 + sincronizar prod via psql produz schemas idênticos em ambos os lados, então
+   Layer 2 fica feliz. É a única solução que respeita o ESPÍRITO da regra (não há divergência
+   resultante).
+
+**Observações:**
+
+- Falha pré-existente no Layer 1 desde 2026-04-13 (commit que mergeou 053 ao main). Histórico
+  de 5+ runs vermelhos. Esse hotfix encerra a pendência.
+- `pg_sleep(0.001)` removido junto. O comentário antigo mostrava que o autor de 053 acreditava
+  que `now()` mudaria após pg_sleep — mal-entendido sobre transaction_timestamp. Comentário
+  novo na função explica explicitamente.
+- Layer 2 (drift compare) funcionará na próxima run agora que prod tem `clock_timestamp()`.
+
+**Follow-ups criados:**
+
+- Nenhum. Pendência operacional encerrada.

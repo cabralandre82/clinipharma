@@ -134,7 +134,20 @@ SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
   v_prev      text;
-  v_now       timestamptz := now();
+  -- clock_timestamp() (NOT now()) — see the smoke-test fix below.
+  -- transaction_timestamp / now() returns the same value for every
+  -- call inside one transaction, so two consecutive backup_record_run
+  -- invocations from the same session produced identical recorded_at
+  -- and the chain verifier could see them in non-deterministic order
+  -- (uuid id is the secondary sort key, and uuid v4 is random). The
+  -- schema-drift CI exercises this path inside `psql --single-transaction`
+  -- and was failing with "fresh chain should be intact" since 053
+  -- shipped. clock_timestamp() advances on every call, so recorded_at
+  -- is now strictly monotonic per session and the verifier order is
+  -- deterministic. Production rows already written under the old
+  -- now() behaviour remain valid because the verifier walks
+  -- prev_hash → row_hash links, not the timestamps themselves.
+  v_now       timestamptz := clock_timestamp();
   v_canonical text;
   v_hash      text;
   v_row       public.backup_runs%ROWTYPE;
@@ -306,17 +319,13 @@ BEGIN
   );
   ASSERT v_first.prev_hash IS NULL, 'first chain entry must have NULL prev_hash';
 
-  -- Both backup_record_run calls happen inside this same transaction,
-  -- which means now() returns the same timestamp for each. The chain
-  -- verifier orders rows by (recorded_at ASC, id ASC); when timestamps
-  -- tie, the secondary uuid order is non-deterministic and the verifier
-  -- can read row #2 first, see a non-NULL prev_hash where it expects
-  -- NULL, and report a false-positive break. In production each
-  -- backup_record_run call is its own transaction so this never bites,
-  -- but Layer 1 of schema-drift CI runs the migration in a single
-  -- transaction. A 1-ms gap is enough to make recorded_at strictly
-  -- monotonic without measurably slowing the migration.
-  PERFORM pg_sleep(0.001);
+  -- backup_record_run now uses clock_timestamp() so recorded_at is
+  -- strictly monotonic across consecutive calls in the same
+  -- transaction. The previous attempt used `pg_sleep(0.001)` to
+  -- create a "1ms gap" but that did nothing — `now()` is bound to
+  -- transaction_timestamp, which is identical for every call inside
+  -- one transaction regardless of pg_sleep. See the comment in the
+  -- function declaration above for the full rationale.
 
   v_second := public.backup_record_run(
     'BACKUP', 'smoke', 'smoke/stamp2', 'cc:3333', 67890, 'ok',
