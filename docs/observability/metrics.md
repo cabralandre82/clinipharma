@@ -135,11 +135,15 @@ Não-exemplos (proibidos):
 
 ### 3.7 Conciliação financeira
 
-| Métrica                       | Tipo      | Labels       | Descrição                               | Dashboard      |
-| ----------------------------- | --------- | ------------ | --------------------------------------- | -------------- |
-| `money_drift_total`           | counter   | `entity`     | Diferenças encontradas na reconciliação | money-and-dsar |
-| `money_reconcile_duration_ms` | histogram | (sem labels) | Latência do cron de reconciliação       | money-and-dsar |
-| `money_reconcile_last_run_ts` | gauge     | (sem labels) | Timestamp Unix da última execução       | money-and-dsar |
+| Métrica                                   | Tipo      | Labels       | Descrição                                                                                            | Dashboard      |
+| ----------------------------------------- | --------- | ------------ | ---------------------------------------------------------------------------------------------------- | -------------- |
+| `money_drift_total`                       | counter   | `entity`     | Diferenças encontradas na reconciliação                                                              | money-and-dsar |
+| `money_reconcile_duration_ms`             | histogram | (sem labels) | Latência do cron de reconciliação                                                                    | money-and-dsar |
+| `money_reconcile_last_run_ts`             | gauge     | (sem labels) | Timestamp Unix da última execução                                                                    | money-and-dsar |
+| `platform_revenue_recon_duration_ms`      | histogram | (sem labels) | Latência do cron `reconcile-platform-revenue` (varredura da view `platform_revenue_view`)            | money-and-dsar |
+| `platform_revenue_recon_last_run_ts`      | gauge     | (sem labels) | Timestamp Unix da última execução do cron de reconciliação                                           | money-and-dsar |
+| `platform_revenue_recon_gap_total`        | counter   | `severity`   | Pedidos com `\|recon_gap\| ≥ threshold` encontrados na varredura. Steady-state = 0; > 0 abre runbook | money-and-dsar |
+| `platform_revenue_recon_gap_amount_cents` | gauge     | (sem labels) | Soma absoluta do gap em centavos no último run; ajuda dimensionar exposição financeira               | money-and-dsar |
 
 ### 3.8 DSAR (LGPD art. 18)
 
@@ -387,10 +391,12 @@ um runbook citado não existir, ou se uma métrica "must-page"
 
 ### 6.11 Conciliação financeira
 
-| Alerta                | Severidade | Trigger                                                 | Runbook                        |
-| --------------------- | ---------- | ------------------------------------------------------- | ------------------------------ |
-| `MoneyDrift`          | critical   | `increase(money_drift_total[1h]) > 0`                   | `docs/runbooks/money-drift.md` |
-| `MoneyReconcileStale` | warning    | `time() - money_reconcile_last_run_ts > 3600` por 5 min | `docs/runbooks/money-drift.md` |
+| Alerta                      | Severidade | Trigger                                                                | Runbook                                            |
+| --------------------------- | ---------- | ---------------------------------------------------------------------- | -------------------------------------------------- |
+| `MoneyDrift`                | critical   | `increase(money_drift_total[1h]) > 0`                                  | `docs/runbooks/money-drift.md`                     |
+| `MoneyReconcileStale`       | warning    | `time() - money_reconcile_last_run_ts > 3600` por 5 min                | `docs/runbooks/money-drift.md`                     |
+| `PlatformRevenueRecon`      | warning    | `increase(platform_revenue_recon_gap_total[24h]) > 0`                  | `docs/runbooks/platform-revenue-reconciliation.md` |
+| `PlatformRevenueReconStale` | warning    | `time() - platform_revenue_recon_last_run_ts > 86400 + 3600` por 5 min | `docs/runbooks/platform-revenue-reconciliation.md` |
 
 > **Invariante:** toda linha acima tem um `- alert:` correspondente
 > em `monitoring/prometheus/alerts.yml` com o mesmo nome, severidade

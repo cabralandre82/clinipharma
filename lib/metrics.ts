@@ -311,6 +311,14 @@ export const Metrics = {
   SECRET_OLDEST_AGE_SECONDS: 'secret_oldest_age_seconds',
   SECRET_ROTATION_DURATION_MS: 'secret_rotation_duration_ms',
   SECRET_ROTATION_LAST_RUN_TS: 'secret_rotation_last_run_ts',
+  // Wave 16 — platform revenue reconciliation (migration 064 + cron
+  // reconcile-platform-revenue). Fires when the ledger commission row
+  // disagrees with the gross-commission formula by more than 1 cent
+  // on a paid order. Steady-state value of GAP_TOTAL is 0.
+  PLATFORM_REVENUE_RECON_DURATION_MS: 'platform_revenue_recon_duration_ms',
+  PLATFORM_REVENUE_RECON_LAST_RUN_TS: 'platform_revenue_recon_last_run_ts',
+  PLATFORM_REVENUE_RECON_GAP_TOTAL: 'platform_revenue_recon_gap_total',
+  PLATFORM_REVENUE_RECON_GAP_AMOUNT_CENTS: 'platform_revenue_recon_gap_amount_cents',
 } as const
 
 // ── Surge detector ───────────────────────────────────────────────────────────

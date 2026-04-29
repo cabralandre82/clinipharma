@@ -84,6 +84,10 @@
     {
       "path": "/api/cron/synthetic-probe",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-platform-revenue",
+      "schedule": "30 4 * * *"
     }
   ]
 }

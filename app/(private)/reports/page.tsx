@@ -174,7 +174,9 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   // view is now authoritative.
   const platformRevenueRes = await admin
     .from('platform_revenue_view')
-    .select('order_id, gross_paid, pharmacy_share, consultant_share, platform_net, payment_status')
+    .select(
+      'order_id, gross_paid, pharmacy_share, consultant_share, platform_net, payment_status, transfer_status'
+    )
     .gte('order_created_at', rangeFrom)
     .lte('order_created_at', rangeTo)
   type RevenueRow = {
@@ -183,6 +185,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     consultant_share: number | null
     platform_net: number | null
     payment_status: string | null
+    transfer_status: string | null
   }
   const revenueRows = (platformRevenueRes.data ?? []) as RevenueRow[]
   // We only sum on rows where the customer actually paid — otherwise
@@ -190,10 +193,21 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   // inflate the KPI.
   const paidRevenueRows = revenueRows.filter((r) => r.payment_status === 'CONFIRMED')
   const platformGrossPaid = paidRevenueRows.reduce((s, r) => s + Number(r.gross_paid ?? 0), 0)
+  // Pharmacy share split into accrued (everything we owe on paid orders)
+  // and effectively wired (rows whose `transfer_status` is COMPLETED).
+  // Pre-2026-04-29 the page just showed "platformPharmacyShare" with the
+  // label "Repassado às farmácias" — but that number is the *accrued
+  // liability*, not what actually left our bank account. The user
+  // surfaced the discrepancy on CP-2026-000015 (pharmacy share R$ 100
+  // appeared as "repassado" while the transfer was still PENDING).
   const platformPharmacyShare = paidRevenueRows.reduce(
     (s, r) => s + Number(r.pharmacy_share ?? 0),
     0
   )
+  const platformPharmacyPaid = paidRevenueRows
+    .filter((r) => r.transfer_status === 'COMPLETED')
+    .reduce((s, r) => s + Number(r.pharmacy_share ?? 0), 0)
+  const platformPharmacyDue = Math.max(0, platformPharmacyShare - platformPharmacyPaid)
   const platformConsultantShare = paidRevenueRows.reduce(
     (s, r) => s + Number(r.consultant_share ?? 0),
     0
@@ -223,13 +237,26 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const avgTicket = confirmedPayments.length ? totalRevenue / confirmedPayments.length : 0
 
   const completedTransfers = transfers.filter((t) => t.status === 'COMPLETED')
-  const pendingTransfers = transfers.filter((t) => t.status === 'PENDING').length
+  const pendingTransferRows = transfers.filter((t) => t.status === 'PENDING')
+  const pendingTransfers = pendingTransferRows.length
+  const pendingTransferAmount = pendingTransferRows.reduce(
+    (s, t) => s + Number(t.net_amount ?? 0),
+    0
+  )
   const totalTransferred = completedTransfers.reduce((s, t) => s + Number(t.net_amount), 0)
-  const totalCommission = completedTransfers.reduce((s, t) => s + Number(t.commission_amount), 0)
 
-  const pendingConsultantComm = (commissionRes.data ?? [])
+  // Consultant commissions: split accrued vs effectively paid the same
+  // way we did with pharmacy transfers. Status enum: PENDING / PAID /
+  // CANCELED (`consultant_commissions` table). PAID == cash already
+  // wired, anything else == liability still on the books.
+  const consultantCommRows = commissionRes.data ?? []
+  const pendingConsultantComm = consultantCommRows
     .filter((c) => c.status === 'PENDING')
     .reduce((s, c) => s + Number(c.commission_amount), 0)
+  const paidConsultantComm = consultantCommRows
+    .filter((c) => c.status === 'PAID')
+    .reduce((s, c) => s + Number(c.commission_amount), 0)
+  const dueConsultantComm = Math.max(0, platformConsultantShare - paidConsultantComm)
 
   // ── Monthly data for charts ───────────────────────────
   // Build month buckets between from and to (up to 12)
@@ -459,14 +486,21 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         />
       </div>
 
-      {/* KPIs — Financeiro
+      {/* KPIs — Financeiro (linha 1 = receita contábil)
           Reads from `public.platform_revenue_view` (migration 063), the
-          single source of truth. The four numbers below add up by
-          construction: gross_paid = pharmacy_share + consultant_share
-          + platform_net. Pre-2026-04-29 the page was showing the
-          pre-coupon platform commission summed from the price-freeze
-          snapshot, which over-stated the platform share whenever a
-          coupon was used. */}
+          single source of truth for accrued revenue on paid orders. The
+          four numbers below add up by construction:
+            gross_paid = pharmacy_share + consultant_share + platform_net.
+
+          Pre-2026-04-29 the second card read "Repassado às farmácias"
+          and showed `pharmacy_share`, which is the *liability* — what
+          we owe the pharmacy on paid orders, regardless of whether the
+          transfer actually went out. CP-2026-000015 surfaced the bug:
+          R$ 100 appeared as "repassado" with the transfer still PENDING
+          in the ledger. The label is now "Devido às farmácias" and
+          carries a sub-text breaking down the cash position
+          (`X já repassados`). The same split is applied to consultant
+          commissions, which have the same liability/cash distinction. */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard
           icon={<CreditCard className="h-5 w-5 text-green-600" />}
@@ -477,17 +511,29 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         />
         <KpiCard
           icon={<ArrowLeftRight className="h-5 w-5 text-blue-600" />}
-          label="Repassado às farmácias"
+          label="Devido às farmácias"
           value={formatCurrency(platformPharmacyShare)}
           bg="blue"
           large
+          subText={
+            platformPharmacyShare > 0
+              ? `${formatCurrency(platformPharmacyPaid)} já repassados · ${formatCurrency(platformPharmacyDue)} pendentes`
+              : undefined
+          }
+          subTone={platformPharmacyDue > 0.01 ? 'warn' : 'good'}
         />
         <KpiCard
           icon={<Building2 className="h-5 w-5 text-purple-600" />}
-          label="Pago a consultores"
+          label="Devido a consultores"
           value={formatCurrency(platformConsultantShare)}
           bg="purple"
           large
+          subText={
+            platformConsultantShare > 0
+              ? `${formatCurrency(paidConsultantComm)} já pagos · ${formatCurrency(dueConsultantComm)} pendentes`
+              : undefined
+          }
+          subTone={dueConsultantComm > 0.01 ? 'warn' : 'good'}
         />
         <KpiCard
           icon={<TrendingUp className="h-5 w-5 text-emerald-600" />}
@@ -498,7 +544,12 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         />
       </div>
 
-      {/* Ticket médio + métricas operacionais (segunda linha) */}
+      {/* Linha 2 — Caixa real (o que de fato saiu/entrou)
+          Sums from the `transfers` table directly. Different from the
+          accrued KPIs above: a transfer only counts here once status
+          flips to COMPLETED (i.e. the bank operation actually ran).
+          This is the line we use to answer "did the cash leave the
+          account this month?". */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard
           icon={<ShoppingBag className="h-5 w-5 text-teal-600" />}
@@ -507,10 +558,24 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           bg="teal"
         />
         <KpiCard
-          icon={<ArrowLeftRight className="h-5 w-5 text-amber-600" />}
-          label="Repasses concluídos"
+          icon={<ArrowLeftRight className="h-5 w-5 text-emerald-600" />}
+          label="Repasses já efetivados"
           value={formatCurrency(totalTransferred)}
+          bg="emerald"
+          subText={`${completedTransfers.length} transferência(s) concluída(s)`}
+          subTone="good"
+        />
+        <KpiCard
+          icon={<Clock className="h-5 w-5 text-amber-600" />}
+          label="Repasses pendentes"
+          value={formatCurrency(pendingTransferAmount)}
           bg="amber"
+          subText={
+            pendingTransfers > 0
+              ? `${pendingTransfers} transferência(s) aguardando execução`
+              : 'Nenhum repasse na fila'
+          }
+          subTone={pendingTransfers > 0 ? 'warn' : 'good'}
         />
       </div>
 
@@ -641,12 +706,16 @@ function KpiCard({
   value,
   bg,
   large = false,
+  subText,
+  subTone = 'neutral',
 }: {
   icon: React.ReactNode
   label: string
   value: string
   bg: string
   large?: boolean
+  subText?: string
+  subTone?: 'neutral' | 'warn' | 'good'
 }) {
   const bgMap: Record<string, string> = {
     blue: 'bg-blue-50',
@@ -658,6 +727,11 @@ function KpiCard({
     purple: 'bg-purple-50',
     emerald: 'bg-emerald-50',
   }
+  const subToneMap: Record<string, string> = {
+    neutral: 'text-gray-500',
+    warn: 'text-amber-700',
+    good: 'text-emerald-700',
+  }
   return (
     <Card>
       <CardContent className="p-5">
@@ -668,6 +742,7 @@ function KpiCard({
         </div>
         <p className="text-xs tracking-wide text-gray-500 uppercase">{label}</p>
         <p className={`mt-1 font-bold text-gray-900 ${large ? 'text-xl' : 'text-2xl'}`}>{value}</p>
+        {subText && <p className={`mt-1 text-xs font-medium ${subToneMap[subTone]}`}>{subText}</p>}
       </CardContent>
     </Card>
   )
