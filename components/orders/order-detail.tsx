@@ -200,6 +200,17 @@ export function OrderDetail({ order, currentUser, prescriptionItems = [] }: Orde
   } | null
   const pharmacy = order.pharmacies as { trade_name: string; city: string; state: string } | null
   const isClinicAdmin = currentUser.roles.includes('CLINIC_ADMIN')
+  const isDoctorRole = currentUser.roles.includes('DOCTOR')
+  // Anyone who BUYS on this order needs to see the payment card so
+  // they can actually pay. The page-level scope check in
+  // `app/(private)/orders/[id]/page.tsx` already enforces that
+  // non-admins reach this component only for orders they own, so we
+  // don't have to re-check ownership here. Pharmacy admins are
+  // explicitly excluded — they receive the repasse, they don't pay
+  // for the order. The previous `isAdmin`-only gate (pre-2026-04-29)
+  // hid PaymentOptions even from the clinic that was supposed to pay,
+  // which is the bug that left order CP-2026-000015 visibly stuck.
+  const canSeePayment = isAdmin || isClinicAdmin || isDoctorRole
 
   const orderItems = (order.order_items ?? []) as Array<{
     id: string
@@ -473,87 +484,108 @@ export function OrderDetail({ order, currentUser, prescriptionItems = [] }: Orde
             </CardContent>
           </Card>
 
-          {/* Financial (admin only) */}
-          {isAdmin && (
+          {/*
+            Payment card — visible to anyone who buys on this order
+            (admin / clinic admin / doctor). Pharmacy admins do NOT
+            see this card; they're paid by the platform, not by the
+            buyer, so the gateway tabs are irrelevant for them.
+
+            Split out from the old "Financeiro (admin only)" block on
+            2026-04-29 — that gate was hiding PIX/Boleto/Cartão from
+            the very clinics that were supposed to pay (incident
+            CP-2026-000015). Comissão + Repasse stay admin-only in
+            the separate card below — those columns leak our take
+            and the pharmacy split.
+          */}
+          {canSeePayment && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <CreditCard className="h-4 w-4" />
-                  Financeiro
+                  Pagamento
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Payment */}
-                <div>
-                  <p className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
-                    Pagamento
-                  </p>
-                  {payment ? (
-                    <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Valor</span>
-                        <span className="font-semibold">
-                          {formatCurrency(payment.gross_amount)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Status</span>
-                        <span
-                          className={`font-medium ${payment.status === 'CONFIRMED' ? 'text-green-700' : 'text-amber-700'}`}
-                        >
-                          {PAYMENT_STATUS_LABELS[payment.status] ?? payment.status}
-                        </span>
-                      </div>
-                      {payment.reference_code && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Referência</span>
-                          <span className="font-mono text-xs">{payment.reference_code}</span>
-                        </div>
-                      )}
-                      {payment.confirmed_at && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Confirmado em</span>
-                          <span>{formatDate(payment.confirmed_at)}</span>
-                        </div>
-                      )}
+                {payment ? (
+                  <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Valor</span>
+                      <span className="font-semibold">{formatCurrency(payment.gross_amount)}</span>
                     </div>
-                  ) : (
-                    <p className="text-sm text-gray-400">Sem dados de pagamento</p>
-                  )}
-                  {/* Asaas payment gateway options */}
-                  {(order.order_status === 'AWAITING_PAYMENT' || payment?.asaas_payment_id) && (
-                    <div className="mt-3">
-                      <PaymentOptions
-                        orderId={String(order.id)}
-                        orderCode={String(order.code)}
-                        amount={Number(order.total_price ?? 0) * 100}
-                        payment={
-                          payment
-                            ? {
-                                asaasPaymentId: payment.asaas_payment_id,
-                                asaasInvoiceUrl: payment.asaas_invoice_url,
-                                asaasPixQrCode: payment.asaas_pix_qr_code,
-                                asaasPixCopyPaste: payment.asaas_pix_copy_paste,
-                                asaasBoletoUrl: payment.asaas_boleto_url,
-                                paymentLink: payment.payment_link,
-                                paymentDueDate: payment.payment_due_date,
-                                status: payment.status,
-                              }
-                            : null
-                        }
-                        isAdmin={isAdmin}
-                      />
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Status</span>
+                      <span
+                        className={`font-medium ${payment.status === 'CONFIRMED' ? 'text-green-700' : 'text-amber-700'}`}
+                      >
+                        {PAYMENT_STATUS_LABELS[payment.status] ?? payment.status}
+                      </span>
                     </div>
-                  )}
-                  {isAdmin && payment?.status === 'PENDING' && !payment?.asaas_payment_id && (
-                    <ButtonLink href={`/payments?order=${order.id}`} size="sm" className="mt-2">
-                      Confirmar pagamento manualmente
-                    </ButtonLink>
-                  )}
-                </div>
+                    {payment.reference_code && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Referência</span>
+                        <span className="font-mono text-xs">{payment.reference_code}</span>
+                      </div>
+                    )}
+                    {payment.confirmed_at && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Confirmado em</span>
+                        <span>{formatDate(payment.confirmed_at)}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">Sem dados de pagamento</p>
+                )}
+                {(order.order_status === 'AWAITING_PAYMENT' || payment?.asaas_payment_id) && (
+                  <div>
+                    <PaymentOptions
+                      orderId={String(order.id)}
+                      orderCode={String(order.code)}
+                      amount={Number(order.total_price ?? 0) * 100}
+                      payment={
+                        payment
+                          ? {
+                              asaasPaymentId: payment.asaas_payment_id,
+                              asaasInvoiceUrl: payment.asaas_invoice_url,
+                              asaasPixQrCode: payment.asaas_pix_qr_code,
+                              asaasPixCopyPaste: payment.asaas_pix_copy_paste,
+                              asaasBoletoUrl: payment.asaas_boleto_url,
+                              paymentLink: payment.payment_link,
+                              paymentDueDate: payment.payment_due_date,
+                              status: payment.status,
+                            }
+                          : null
+                      }
+                      isAdmin={isAdmin}
+                    />
+                  </div>
+                )}
+                {isAdmin && payment?.status === 'PENDING' && !payment?.asaas_payment_id && (
+                  <ButtonLink href={`/payments?order=${order.id}`} size="sm" className="mt-2">
+                    Confirmar pagamento manualmente
+                  </ButtonLink>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-                {/* Commission — admin only (RLS also blocks non-admins, this is defense-in-depth) */}
-                {isAdmin && commission && (
+          {/*
+            Internal financials — strictly admin. Commission shows our
+            take percentage, transfer shows the pharmacy split. RLS
+            already blocks non-admins from reading the rows; this gate
+            is defense-in-depth so the section header itself doesn't
+            even render for the wrong audience.
+          */}
+          {isAdmin && (commission || transfer) && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CreditCard className="h-4 w-4" />
+                  Financeiro interno
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {commission && (
                   <div>
                     <p className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                       Comissão
@@ -575,7 +607,6 @@ export function OrderDetail({ order, currentUser, prescriptionItems = [] }: Orde
                   </div>
                 )}
 
-                {/* Transfer */}
                 {transfer && (
                   <div>
                     <p className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
