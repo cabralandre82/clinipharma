@@ -118,10 +118,14 @@ describe('lib/jobs/asaas-webhook', () => {
     expect(src).toContain('already_confirmed')
   })
 
-  it('has update-order-status step that writes to order_status_history', () => {
-    expect(src).toContain("step.run('update-order-status'")
-    expect(src).toContain('order_status_history')
-    expect(src).toContain('PAYMENT_CONFIRMED')
+  it('has release-for-execution step that delegates to the shared helper', () => {
+    // Pre-2026-04-29 the worker advanced the order to PAYMENT_CONFIRMED
+    // and stopped there. That left the order in a black hole — pharmacy
+    // never saw it. The new contract: enqueue -> releaseOrderForExecution
+    // helper -> RELEASED_FOR_EXECUTION + status history + pharmacy fanout.
+    expect(src).toContain("step.run('release-for-execution'")
+    expect(src).toContain('releaseOrderForExecution')
+    expect(src).toContain('payment_status: ')
   })
 
   it('has notify-clinic step with SMS, WhatsApp, email, and push', () => {

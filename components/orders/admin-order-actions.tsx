@@ -56,16 +56,25 @@ const TRANSITION_CONFIG: Record<
   },
 }
 
-/** Statuses that already have a dedicated UI or don't need an admin button */
+/**
+ * Statuses where THIS component renders no buttons because another UI
+ * surface owns the action (the documents tab, the payment card, the
+ * pharmacy operations panel, etc.).
+ *
+ * 2026-04-29 — `COMMISSION_CALCULATED`, `TRANSFER_PENDING` and
+ * `TRANSFER_COMPLETED` were removed from this set. Previously, an order
+ * paid manually by an admin would land in `COMMISSION_CALCULATED` and
+ * the admin had ZERO actions visible (the SKIP set hid every button)
+ * even though the next correct action was "release to pharmacy". The
+ * "Liberar para execução" button now shows up on all three legacy
+ * mid-financial states so any stuck order can be unblocked.
+ */
 const SKIP_STATUSES = new Set([
   'AWAITING_DOCUMENTS',
   'READY_FOR_REVIEW',
   'AWAITING_PAYMENT',
   'PAYMENT_UNDER_REVIEW',
   'PAYMENT_CONFIRMED',
-  'COMMISSION_CALCULATED',
-  'TRANSFER_PENDING',
-  'TRANSFER_COMPLETED',
   'RECEIVED_BY_PHARMACY',
   'IN_EXECUTION',
   'READY',

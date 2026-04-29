@@ -9,6 +9,7 @@ import { inngest } from '@/lib/inngest'
 import { asaasIdempotencyKey, claimWebhookEvent, completeWebhookEvent } from '@/lib/webhooks/dedup'
 import { logger } from '@/lib/logger'
 import { safeEqualString } from '@/lib/security/hmac'
+import { releaseOrderForExecution } from '@/lib/orders/release-for-execution'
 
 // Wave 5: token comparison is now constant-time so the static ASAAS
 // access token cannot leak via timing side-channels. Both transport
@@ -117,24 +118,42 @@ export async function POST(req: NextRequest) {
     .eq('order_id', orderId)
 
   if (event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED') {
-    // Idempotency guard: only advance if not already confirmed
-    if ((order as any).order_status === 'PAYMENT_CONFIRMED') {
+    // Idempotency guard. We treat any state at or beyond
+    // RELEASED_FOR_EXECUTION as already-confirmed-and-released so a
+    // duplicate webhook (Asaas retries) doesn't double-emit.
+    const POST_PAYMENT_STATES = new Set([
+      'PAYMENT_CONFIRMED',
+      'COMMISSION_CALCULATED',
+      'TRANSFER_PENDING',
+      'TRANSFER_COMPLETED',
+      'RELEASED_FOR_EXECUTION',
+      'RECEIVED_BY_PHARMACY',
+      'IN_EXECUTION',
+      'READY',
+      'SHIPPED',
+      'DELIVERED',
+      'COMPLETED',
+    ])
+    if (POST_PAYMENT_STATES.has(String((order as any).order_status))) {
       return NextResponse.json({ ok: true, skipped: 'already_confirmed' })
     }
 
-    // Advance order status
+    // Advance straight to RELEASED_FOR_EXECUTION via the shared helper.
+    // It transitions the order, writes the status history row, and
+    // pings the pharmacy in three channels (in-app · push · email).
+    // We persist payments.payment_status = CONFIRMED here so the helper
+    // sees a consistent paid state.
     await admin
       .from('orders')
-      .update({ order_status: 'PAYMENT_CONFIRMED', updated_at: new Date().toISOString() })
+      .update({
+        payment_status: 'CONFIRMED',
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', orderId)
 
-    // Record status history
-    await admin.from('order_status_history').insert({
-      order_id: orderId,
-      old_status: (order as any).order_status,
-      new_status: 'PAYMENT_CONFIRMED',
-      changed_by_user_id: '00000000-0000-0000-0000-000000000000', // system
-      reason: `Confirmado automaticamente via Asaas (evento: ${event})`,
+    await releaseOrderForExecution({
+      orderId,
+      reason: `Pagamento confirmado via Asaas (evento: ${event})`,
     })
 
     // Notify clinic user

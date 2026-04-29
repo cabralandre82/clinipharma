@@ -10,6 +10,18 @@ describe('isValidTransition — admin', () => {
     expect(isValidTransition('PAYMENT_CONFIRMED', 'COMMISSION_CALCULATED', 'admin')).toBe(true)
   })
 
+  it('allows COMMISSION_CALCULATED → RELEASED_FOR_EXECUTION (post-2026-04-29 short-circuit)', () => {
+    // Operationally critical: paid orders go straight to the pharmacy
+    // queue. The legacy chain (TRANSFER_PENDING → TRANSFER_COMPLETED →
+    // RELEASED) remains valid for back-office flows but the default
+    // path via releaseOrderForExecution() skips it.
+    expect(isValidTransition('COMMISSION_CALCULATED', 'RELEASED_FOR_EXECUTION', 'admin')).toBe(true)
+  })
+
+  it('allows PAYMENT_CONFIRMED → RELEASED_FOR_EXECUTION (paid via webhook)', () => {
+    expect(isValidTransition('PAYMENT_CONFIRMED', 'RELEASED_FOR_EXECUTION', 'admin')).toBe(true)
+  })
+
   it('blocks COMPLETED → any status (terminal)', () => {
     expect(isValidTransition('COMPLETED', 'CANCELED', 'admin')).toBe(false)
     expect(isValidTransition('COMPLETED', 'DRAFT', 'admin')).toBe(false)

@@ -4,6 +4,7 @@ import { createNotification, createNotificationForRole } from '@/lib/notificatio
 import { sendEmail } from '@/lib/email'
 import { sendSms, SMS, sendWhatsApp, WA } from '@/lib/zenvia'
 import { sendPushToUser } from '@/lib/push'
+import { releaseOrderForExecution } from '@/lib/orders/release-for-execution'
 
 type ClinicData = {
   trade_name: string
@@ -51,24 +52,41 @@ export const asaasWebhookJob = inngest.createFunction(
       return data
     })
 
-    // Idempotency guard
-    if ((order as { order_status: string }).order_status === 'PAYMENT_CONFIRMED') {
+    // Idempotency guard — treat any post-payment state as already done
+    // so duplicate Inngest deliveries don't double-emit notifications.
+    const POST_PAYMENT_STATES = new Set([
+      'PAYMENT_CONFIRMED',
+      'COMMISSION_CALCULATED',
+      'TRANSFER_PENDING',
+      'TRANSFER_COMPLETED',
+      'RELEASED_FOR_EXECUTION',
+      'RECEIVED_BY_PHARMACY',
+      'IN_EXECUTION',
+      'READY',
+      'SHIPPED',
+      'DELIVERED',
+      'COMPLETED',
+    ])
+    if (POST_PAYMENT_STATES.has((order as { order_status: string }).order_status)) {
       return { skipped: true, reason: 'already_confirmed' }
     }
 
-    await step.run('update-order-status', async () => {
+    // Advance directly to RELEASED_FOR_EXECUTION so the pharmacy queue
+    // picks the order up. The shared helper writes the status history
+    // row and notifies pharmacy admins (in-app + push + email).
+    await step.run('release-for-execution', async () => {
       const admin = createAdminClient()
       await admin
         .from('orders')
-        .update({ order_status: 'PAYMENT_CONFIRMED', updated_at: new Date().toISOString() })
+        .update({
+          payment_status: 'CONFIRMED',
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', orderId)
 
-      await admin.from('order_status_history').insert({
-        order_id: orderId,
-        old_status: (order as { order_status: string }).order_status,
-        new_status: 'PAYMENT_CONFIRMED',
-        changed_by_user_id: '00000000-0000-0000-0000-000000000000',
-        reason: `Confirmado via Asaas (evento: ${event.data.event})`,
+      await releaseOrderForExecution({
+        orderId,
+        reason: `Pagamento confirmado via Asaas (evento: ${event.data.event})`,
       })
     })
 

@@ -32,8 +32,17 @@ const ADMIN_TRANSITIONS: Record<string, OrderStatus[]> = {
   READY_FOR_REVIEW: ['AWAITING_PAYMENT', 'AWAITING_DOCUMENTS', 'CANCELED'],
   AWAITING_PAYMENT: ['PAYMENT_UNDER_REVIEW', 'PAYMENT_CONFIRMED', 'CANCELED'],
   PAYMENT_UNDER_REVIEW: ['PAYMENT_CONFIRMED', 'AWAITING_PAYMENT', 'CANCELED'],
-  PAYMENT_CONFIRMED: ['COMMISSION_CALCULATED', 'CANCELED'],
-  COMMISSION_CALCULATED: ['TRANSFER_PENDING', 'CANCELED'],
+  PAYMENT_CONFIRMED: ['COMMISSION_CALCULATED', 'RELEASED_FOR_EXECUTION', 'CANCELED'],
+  // 2026-04-29: COMMISSION_CALCULATED can now go DIRECTLY to
+  // RELEASED_FOR_EXECUTION. Operationally the pharmacy MUST start
+  // separating the moment payment is confirmed — making them wait for
+  // the financial transfer (which happens D+N via bank wire) is a
+  // product blocker. The TRANSFER_PENDING / TRANSFER_COMPLETED states
+  // remain valid transitions for back-office workflows that want to
+  // gate execution on the wire (e.g. a pharmacy that is on cash-on-
+  // delivery terms), but the default path for paid orders is straight
+  // to RELEASED_FOR_EXECUTION via `releaseOrderForExecution(...)`.
+  COMMISSION_CALCULATED: ['RELEASED_FOR_EXECUTION', 'TRANSFER_PENDING', 'CANCELED'],
   TRANSFER_PENDING: ['TRANSFER_COMPLETED', 'RELEASED_FOR_EXECUTION', 'CANCELED'],
   TRANSFER_COMPLETED: ['RELEASED_FOR_EXECUTION', 'CANCELED'],
   RELEASED_FOR_EXECUTION: ['RECEIVED_BY_PHARMACY', 'CANCELED', 'WITH_ISSUE'],

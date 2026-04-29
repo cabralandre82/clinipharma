@@ -19,6 +19,7 @@ import {
   recordAtomicFallback,
   shouldUseAtomicRpc,
 } from '@/lib/services/atomic.server'
+import { releaseOrderForExecution } from '@/lib/orders/release-for-execution'
 
 interface ConfirmPaymentInput {
   paymentId: string
@@ -250,6 +251,26 @@ export async function confirmPayment(input: ConfirmPaymentInput): Promise<{ erro
           error: histErr,
           orderId: payment.order_id,
         })
+    }
+
+    // Operationally critical: the pharmacy MUST see this order in their
+    // queue NOW. Pre-2026-04-29 the order would sit in
+    // COMMISSION_CALCULATED until somebody manually clicked through
+    // TRANSFER_PENDING → TRANSFER_COMPLETED → RELEASED_FOR_EXECUTION,
+    // and the UI didn't surface those transitions on
+    // COMMISSION_CALCULATED at all (orders just disappeared into a
+    // black hole). The transfer rows still track the financial leg
+    // independently. Idempotent — no-op if the order is already
+    // released (e.g. RPC path or webhook beat us to it).
+    const released = await releaseOrderForExecution({
+      orderId: payment.order_id,
+      reason: `Pagamento confirmado (${input.paymentMethod}${input.referenceCode ? ' · ref: ' + input.referenceCode : ''}) · liberado para farmácia`,
+      actorUserId: user.id,
+    })
+    if (!released.ok) {
+      logger.error('[confirmPayment] releaseOrderForExecution failed', {
+        orderId: payment.order_id,
+      })
     }
 
     await createAuditLog({
