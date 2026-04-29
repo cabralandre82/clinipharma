@@ -46,12 +46,26 @@ export const contractAutoSendJob = inngest.createFunction(
           .single()
         return data
       } else if (entityType === 'CONSULTANT') {
-        const { data } = await admin
+        const { data: consultant } = await admin
           .from('sales_consultants')
-          .select('id, full_name, cnpj, email, commission_rate')
+          .select('id, full_name, cnpj, email')
           .eq('id', entityId)
           .single()
-        return data
+        if (!consultant) return null
+        // Migration 005 moved commission_rate from sales_consultants
+        // to app_settings (uniform rate for all consultants). Fetch
+        // the global rate here so the contract template still has it.
+        const { data: rateRow } = await admin
+          .from('app_settings')
+          .select('value_json')
+          .eq('key', 'consultant_commission_rate')
+          .single()
+        const rateRaw = rateRow?.value_json
+        const commission_rate =
+          rateRaw === null || rateRaw === undefined
+            ? 5
+            : Number(typeof rateRaw === 'string' ? rateRaw : JSON.stringify(rateRaw))
+        return { ...(consultant as Record<string, unknown>), commission_rate }
       }
 
       return null

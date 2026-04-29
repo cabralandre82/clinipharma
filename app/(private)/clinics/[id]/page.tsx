@@ -51,10 +51,22 @@ export default async function ClinicDetailPage({ params }: PageProps) {
         .then((r) => r.data as Pick<SalesConsultant, 'id' | 'full_name' | 'status'> | null)
     : null
 
-  const { data: allConsultants } = await supabase
+  // commission_rate is no longer a per-consultant column (migration 005
+  // moved it to app_settings). Selecting it here would fail with
+  // PostgREST 42703 and mask `allConsultants` to null, causing the
+  // "Você ainda não cadastrou nenhum consultor" empty state even when
+  // active consultants exist (regression hit on 2026-04-29).
+  const { data: allConsultants, error: allConsultantsErr } = await supabase
     .from('sales_consultants')
-    .select('id, full_name, commission_rate, status')
+    .select('id, full_name, status')
     .order('full_name')
+  if (allConsultantsErr) {
+    logger.error('[clinics/:id] failed to load consultants list', {
+      clinicId: id,
+      code: allConsultantsErr.code,
+      message: allConsultantsErr.message,
+    })
+  }
 
   const { data: membersRaw } = await supabase
     .from('clinic_members')

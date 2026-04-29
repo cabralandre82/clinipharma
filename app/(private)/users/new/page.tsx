@@ -33,7 +33,7 @@ export default async function NewUserPage() {
         .order('trade_name'),
       supabase
         .from('sales_consultants')
-        .select('id, full_name, commission_rate, status')
+        .select('id, full_name, status')
         .eq('status', 'ACTIVE')
         .order('full_name'),
     ])
