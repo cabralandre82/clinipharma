@@ -699,7 +699,8 @@ describe('createOrder — initial status depends on requires_prescription', () =
     const admin = mockSupabaseAdmin()
     const membershipQb = makeQueryBuilder({ clinic_id: CID }, null)
 
-    const orderInsertResult = makeQueryBuilder({ id: OID, code: 'ORD-100' }, null)
+    const generic = makeQueryBuilder(null, null)
+
     const orderInsertQb = {
       insert: vi.fn().mockImplementation((row: unknown) => {
         insertSpy(row)
@@ -718,14 +719,11 @@ describe('createOrder — initial status depends on requires_prescription', () =
       }),
     }
 
-    const generic = makeQueryBuilder(null, null)
-
     let call = 0
     admin.from = vi.fn().mockImplementation((table: string) => {
       call++
       if (call === 1) return membershipQb
-      if (table === 'orders' && call === 2)
-        return orderInsertQb as unknown as typeof orderInsertResult
+      if (table === 'orders' && call === 2) return orderInsertQb as unknown as typeof generic
       if (table === 'order_status_history') return historyQb as unknown as typeof generic
       return generic
     })
