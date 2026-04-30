@@ -197,6 +197,37 @@ describe('confirmPaymentAtomic', () => {
     })
     expect(res.data?.new_lock_version).toBe(2)
     expect(res.data?.consultant_commission).toBeNull()
+    // INV-4 cap flag: defaults to false when the RPC didn't include
+    // it (legacy payloads pre-mig-073). Wrapper guarantees consumers
+    // always see a boolean, never undefined.
+    expect(res.data?.consultant_capped).toBe(false)
+  })
+
+  it('surfaces consultant_capped=true when the RPC reports INV-4 cap fired', async () => {
+    // Cenário: order com consultant 5% × R$ 1000 = R$ 50 raw, mas
+    // platform_commission só sobrou R$ 30 → confirm_payment_atomic
+    // (mig-073) capa em 30 e marca consultant_capped=true.
+    mockRpc.mockResolvedValue({
+      data: {
+        payment_id: 'p-1',
+        order_id: 'o-1',
+        pharmacy_transfer: 970,
+        platform_commission: 30,
+        consultant_commission: 30,
+        consultant_capped: true,
+        new_lock_version: 2,
+      },
+      error: null,
+    })
+
+    const res = await confirmPaymentAtomic('p-1', {
+      paymentMethod: 'PIX',
+      confirmedByUserId: 'admin-1',
+    })
+
+    expect(res.data?.consultant_commission).toBe(30)
+    expect(res.data?.platform_commission).toBe(30)
+    expect(res.data?.consultant_capped).toBe(true)
   })
 
   it('propagates already_processed reason on duplicate confirmation', async () => {

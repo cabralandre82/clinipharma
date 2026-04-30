@@ -212,6 +212,9 @@ export interface ProductCategory {
   updated_at: string
 }
 
+export type PricingMode = 'FIXED' | 'TIERED_PROFILE'
+export type ConsultantCommissionBasis = 'TOTAL_PRICE' | 'PHARMACY_TRANSFER' | 'FIXED_PER_UNIT'
+
 export interface Product {
   id: string
   category_id: string
@@ -232,11 +235,86 @@ export interface Product {
   status: 'active' | 'unavailable' | 'inactive'
   featured: boolean
   is_manipulated: boolean
+  /**
+   * Migration 070 (PR-A): opt-in flag for the tiered pricing engine.
+   * Products at 'FIXED' (default) keep the legacy
+   * `price_current`/`pharmacy_cost` semantics. Products flipped to
+   * 'TIERED_PROFILE' have their pricing resolved via
+   * `pricing_profiles` + `pricing_profile_tiers` at order time.
+   */
+  pricing_mode: PricingMode
   created_at: string
   updated_at: string
   requires_prescription: boolean
   prescription_type: 'SIMPLE' | 'SPECIAL_CONTROL' | 'ANTIMICROBIAL' | null
   max_units_per_prescription: number | null
+}
+
+/**
+ * Slowly-Changing-Dimension Type 2 row of pricing configuration for
+ * a product. Only one row per product is alive at any instant
+ * (`effective_until IS NULL`). Migration 070 + 071.
+ */
+export interface PricingProfile {
+  id: string
+  product_id: string
+  pharmacy_cost_unit_cents: number
+  /** Absolute platform-revenue floor per unit (cents). Null if pct-only. */
+  platform_min_unit_cents: number | null
+  /** Percentage floor per unit (0..100). Null if absolute-only. */
+  platform_min_unit_pct: number | null
+  consultant_commission_basis: ConsultantCommissionBasis
+  consultant_commission_fixed_per_unit_cents: number | null
+  effective_from: string
+  effective_until: string | null
+  created_by_user_id: string
+  change_reason: string
+  created_at: string
+}
+
+export interface PricingProfileTier {
+  id: string
+  pricing_profile_id: string
+  min_quantity: number
+  max_quantity: number
+  unit_price_cents: number
+}
+
+/**
+ * The "ficha" returned by `compute_unit_price`, used by the freeze
+ * trigger and (PR-C/D) the simulator UI. Numbers are integer cents
+ * unless suffix says otherwise.
+ */
+export interface PricingBreakdown {
+  pricing_profile_id: string
+  tier_id: string
+  tier_unit_cents: number
+  pharmacy_cost_unit_cents: number
+  effective_floor_cents: number
+  floor_breakdown: {
+    floor_cents: number
+    source: 'product' | 'buyer_override' | 'no_profile'
+    profile_id?: string
+    floor_abs_cents: number | null
+    floor_pct_cents: number | null
+  }
+  coupon_id: string | null
+  coupon_disc_per_unit_raw_cents: number
+  coupon_disc_per_unit_capped_cents: number
+  /** True when INV-2 cap silenced part of the coupon. */
+  coupon_capped: boolean
+  final_unit_price_cents: number
+  platform_commission_per_unit_cents: number
+  consultant_basis: ConsultantCommissionBasis
+  consultant_per_unit_raw_cents: number
+  consultant_per_unit_cents: number
+  /** True when INV-4 cap brought consultant <= platform per unit. */
+  consultant_capped: boolean
+  quantity: number
+  final_total_cents: number
+  pharmacy_transfer_cents: number
+  platform_commission_total_cents: number
+  consultant_commission_total_cents: number
 }
 
 export interface ProductWithRelations extends Product {
@@ -320,6 +398,13 @@ export interface OrderItem {
   total_price: number
   pharmacy_cost_per_unit?: number | null
   platform_commission_per_unit?: number | null
+  /**
+   * Migration 070 (PR-A): which `pricing_profiles` row was alive when
+   * this item was frozen. Null for legacy FIXED items. Forensics
+   * anchor — lets the operator reconstruct the exact pricing context
+   * months later without scanning SCD-2 by timestamp.
+   */
+  pricing_profile_id?: string | null
   created_at: string
   product?: Product
 }

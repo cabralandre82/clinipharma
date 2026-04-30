@@ -227,6 +227,18 @@ export interface ConfirmPaymentResult {
   pharmacy_transfer: number
   platform_commission: number
   consultant_commission: number | null
+  /**
+   * INV-4 cap signal — true when consultant commission would have
+   * exceeded the platform commission and was capped at it. Surfaced
+   * here so the UI / observability stack can highlight the event.
+   * Null when no consultant was attached to the order at all
+   * (legacy clinics/doctors without consultant_id).
+   *
+   * Added in migration 073 (PR-A); legacy RPC payloads pre-073 do
+   * not include the field — the wrapper defaults to `false` so the
+   * type is non-optional in the consumer's view.
+   */
+  consultant_capped: boolean
   new_lock_version: number
 }
 
@@ -259,6 +271,7 @@ export async function confirmPaymentAtomic(
       platform_commission: Number(data?.platform_commission ?? 0),
       consultant_commission:
         data?.consultant_commission == null ? null : Number(data.consultant_commission),
+      consultant_capped: Boolean(data?.consultant_capped ?? false),
       new_lock_version: Number(data?.new_lock_version ?? 0),
     },
   }
