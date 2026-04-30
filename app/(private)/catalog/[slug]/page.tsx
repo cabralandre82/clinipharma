@@ -6,6 +6,7 @@ import { ProductRecommendations } from '@/components/catalog/product-recommendat
 import { BackButton } from '@/components/ui/back-button'
 import { getCurrentUser } from '@/lib/auth/session'
 import { resolveBuyerCouponPreview } from '@/lib/orders/buyer-coupon-context'
+import { getActiveBuyerTiers } from '@/lib/pricing/buyer-tiers'
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>
@@ -22,6 +23,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params
   const admin = createAdminClient()
 
+  // `*` already pulls `pricing_mode` (it's a column on `products`),
+  // but we leave the explicit comment here so future schema reviewers
+  // notice this page depends on it for the tier UI swap.
   const { data: product } = await admin
     .from('products')
     .select(
@@ -75,10 +79,23 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const couponMap = await resolveBuyerCouponPreview(currentUser, [product.id])
   const coupon = couponMap[product.id] ?? null
 
+  // PR-D2: when the product is in TIERED_PROFILE, fetch the active
+  // tiers so the detail page can swap the static price box for an
+  // interactive simulator. Hits 1 read; cached at the route level
+  // because the detail page is dynamic-by-default in Next 15.
+  // We do NOT short-circuit on missing tiers — the UI gracefully
+  // falls back to the legacy FIXED layout (super-admin presumably
+  // forgot to publish a profile, and the buyer should see something
+  // rather than a hard error).
+  const tiers =
+    product.pricing_mode === 'TIERED_PROFILE'
+      ? ((await getActiveBuyerTiers(product.id))?.tiers ?? null)
+      : null
+
   return (
     <div className="space-y-6">
       <BackButton href="/catalog" label="Catálogo" />
-      <ProductDetail product={product} coupon={coupon} />
+      <ProductDetail product={product} coupon={coupon} tiers={tiers} />
       {recommendations.length > 0 && (
         <ProductRecommendations
           recommendations={

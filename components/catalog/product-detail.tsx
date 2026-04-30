@@ -18,6 +18,9 @@ import {
   Tag,
 } from 'lucide-react'
 import { previewDiscountedUnitPrice, type CatalogCouponPreview } from '@/lib/coupons/preview'
+import { BuyerTierSection } from './buyer-tier-section'
+import type { BuyerTierRow } from '@/lib/pricing/buyer-tiers-shared'
+import type { PricingMode } from '@/types'
 
 interface ProductDetailProps {
   product: {
@@ -33,6 +36,9 @@ interface ProductDetailProps {
     estimated_deadline_days: number
     featured: boolean
     is_manipulated?: boolean
+    /** PR-D2: when 'TIERED_PROFILE', `tiers` is required and the
+     *  Price Box swaps to a quantity-driven simulator. */
+    pricing_mode?: PricingMode
     product_categories: { id: string; name: string; slug: string } | null
     pharmacies: { id: string; trade_name: string; city: string; state: string } | null
     product_images: {
@@ -49,12 +55,22 @@ interface ProductDetailProps {
    * Pharmacies always receive `null` here.
    */
   coupon?: CatalogCouponPreview | null
+  /**
+   * PR-D2: tiers ativos (já filtrados para campos buyer-safe).
+   * Quando o produto está em TIERED_PROFILE e tem profile ativo,
+   * a Price Box vira simulador interativo ao invés de mostrar o
+   * `price_current` estático. Quando null (FIXED ou TIERED sem
+   * profile ativo), o layout legado é preservado byte-a-byte.
+   */
+  tiers?: BuyerTierRow[] | null
 }
 
-export function ProductDetail({ product, coupon = null }: ProductDetailProps) {
+export function ProductDetail({ product, coupon = null, tiers = null }: ProductDetailProps) {
   const couponPreview = coupon ? previewDiscountedUnitPrice(product.price_current, coupon) : null
   const hasDiscount = !!couponPreview && couponPreview.perUnitDiscount > 0
   const visibleUnitPrice = hasDiscount ? couponPreview!.discountedUnit : product.price_current
+  const useTieredUI =
+    product.pricing_mode === 'TIERED_PROFILE' && Array.isArray(tiers) && tiers.length > 0
   const sortedImages = [...(product.product_images ?? [])].sort(
     (a, b) => a.sort_order - b.sort_order
   )
@@ -170,50 +186,81 @@ export function ProductDetail({ product, coupon = null }: ProductDetailProps) {
             </div>
           </div>
 
-          {/* Price Box */}
-          <div className="rounded-2xl bg-[hsl(213,75%,24%)] p-5 text-white">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="mb-1 text-xs tracking-wide text-blue-200 uppercase">Preço unitário</p>
-                <p className="text-3xl font-bold">{formatCurrency(visibleUnitPrice)}</p>
-                {hasDiscount && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span
-                      className="text-sm text-blue-200/80 line-through decoration-blue-100/60"
-                      aria-label={`Preço sem cupom: ${formatCurrency(product.price_current)}`}
-                    >
-                      {formatCurrency(product.price_current)}
-                    </span>
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full bg-emerald-400/20 px-2 py-0.5 text-xs font-medium text-emerald-100 ring-1 ring-emerald-300/40"
-                      title={
-                        coupon!.discount_type === 'PERCENT'
-                          ? `Cupom ${coupon!.code}: -${coupon!.discount_value}% por unidade`
-                          : `Cupom ${coupon!.code}: -${formatCurrency(coupon!.discount_value)} por unidade`
-                      }
-                    >
-                      <Tag className="h-3 w-3" aria-hidden="true" />
-                      Cupom {coupon!.code} aplicado
-                    </span>
-                  </div>
-                )}
-                <p className="mt-1 text-xs text-blue-200">Valor fixo · Plataforma Clinipharma</p>
+          {/* Price Box — TIERED variant: tier table + simulator. */}
+          {useTieredUI ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                <Clock className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-700">
+                  Prazo estimado:{' '}
+                  <strong className="text-gray-900">
+                    {product.estimated_deadline_days} dias úteis
+                  </strong>
+                </span>
               </div>
-              <div className="text-right">
-                <div className="rounded-xl bg-white/15 p-2.5">
-                  <Clock className="h-5 w-5 text-white" />
+              <BuyerTierSection
+                productId={product.id}
+                productSlug={product.slug}
+                isManipulated={product.is_manipulated ?? false}
+                tiers={tiers ?? []}
+                couponId={coupon?.id ?? null}
+                couponCode={coupon?.code ?? null}
+              />
+            </div>
+          ) : (
+            <>
+              {/* Price Box — FIXED (legacy). */}
+              <div className="rounded-2xl bg-[hsl(213,75%,24%)] p-5 text-white">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="mb-1 text-xs tracking-wide text-blue-200 uppercase">
+                      Preço unitário
+                    </p>
+                    <p className="text-3xl font-bold">{formatCurrency(visibleUnitPrice)}</p>
+                    {hasDiscount && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span
+                          className="text-sm text-blue-200/80 line-through decoration-blue-100/60"
+                          aria-label={`Preço sem cupom: ${formatCurrency(product.price_current)}`}
+                        >
+                          {formatCurrency(product.price_current)}
+                        </span>
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-emerald-400/20 px-2 py-0.5 text-xs font-medium text-emerald-100 ring-1 ring-emerald-300/40"
+                          title={
+                            coupon!.discount_type === 'PERCENT'
+                              ? `Cupom ${coupon!.code}: -${coupon!.discount_value}% por unidade`
+                              : `Cupom ${coupon!.code}: -${formatCurrency(coupon!.discount_value)} por unidade`
+                          }
+                        >
+                          <Tag className="h-3 w-3" aria-hidden="true" />
+                          Cupom {coupon!.code} aplicado
+                        </span>
+                      </div>
+                    )}
+                    <p className="mt-1 text-xs text-blue-200">
+                      Valor fixo · Plataforma Clinipharma
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="rounded-xl bg-white/15 p-2.5">
+                      <Clock className="h-5 w-5 text-white" />
+                    </div>
+                  </div>
+                </div>
+                <Separator className="my-3 bg-white/20" />
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-blue-200" />
+                  <span className="text-sm text-blue-100">
+                    Prazo estimado:{' '}
+                    <strong className="text-white">
+                      {product.estimated_deadline_days} dias úteis
+                    </strong>
+                  </span>
                 </div>
               </div>
-            </div>
-            <Separator className="my-3 bg-white/20" />
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-blue-200" />
-              <span className="text-sm text-blue-100">
-                Prazo estimado:{' '}
-                <strong className="text-white">{product.estimated_deadline_days} dias úteis</strong>
-              </span>
-            </div>
-          </div>
+            </>
+          )}
 
           {/* Pharmacy */}
           {product.pharmacies && (
@@ -233,21 +280,25 @@ export function ProductDetail({ product, coupon = null }: ProductDetailProps) {
             </div>
           )}
 
-          {/* CTA */}
-          <ButtonLink
-            href={`/orders/new?product=${product.id}`}
-            size="lg"
-            className="w-full text-base"
-          >
-            <ShoppingCart className="mr-2 h-5 w-5" />
-            Solicitar pedido
-          </ButtonLink>
+          {/* CTA — only for FIXED. TIERED has its CTA inside the simulator. */}
+          {!useTieredUI && (
+            <ButtonLink
+              href={`/orders/new?product=${product.id}`}
+              size="lg"
+              className="w-full text-base"
+            >
+              <ShoppingCart className="mr-2 h-5 w-5" />
+              Solicitar pedido
+            </ButtonLink>
+          )}
 
-          {/* Trust signals */}
+          {/* Trust signals — TIERED swaps "preço fixo" by "preço por
+              quantidade transparente" so the buyer doesn't read a
+              false claim. */}
           <div className="grid grid-cols-2 gap-2">
             {[
               product.is_manipulated ? 'Produto manipulado certificado' : 'Produto industrializado',
-              'Preço fixo garantido',
+              useTieredUI ? 'Preço por quantidade transparente' : 'Preço fixo garantido',
               'Entrega rastreada para clínica',
               'Plataforma B2B fechada',
             ].map((item) => (
