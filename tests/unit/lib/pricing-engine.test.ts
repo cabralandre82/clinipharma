@@ -4,6 +4,9 @@ import {
   computeUnitPrice,
   resolveEffectiveFloor,
   buildPricingMatrix,
+  previewUnitPrice,
+  buildCouponImpactMatrix,
+  type CouponVariant,
 } from '@/lib/services/pricing-engine.server'
 
 vi.mock('@/lib/db/admin', () => ({ createAdminClient: vi.fn() }))
@@ -222,7 +225,9 @@ describe('buildPricingMatrix', () => {
     expect(cells[0]?.breakdown?.final_unit_price_cents).toBe(100001)
   })
 
-  it('defaults to a single null-coupon column when couponIds omitted', async () => {
+  // --- previewUnitPrice (PR-C3) -----------------------------------------
+
+  it('defaults to a single null-coupon column when couponIds omitted (legacy buildPricingMatrix)', async () => {
     const rpcCalls: Array<{ coupon: unknown }> = []
     mockRpc(
       vi.fn().mockImplementation(async (_rpc: string, params: Record<string, unknown>) => {
@@ -262,5 +267,192 @@ describe('buildPricingMatrix', () => {
     })
     expect(cells.length).toBe(2)
     expect(rpcCalls.every((c) => c.coupon === null)).toBe(true)
+  })
+})
+
+// ── previewUnitPrice (PR-C3) ─────────────────────────────────────────────
+
+const HAPPY_PREVIEW = {
+  pricing_profile_id: 'p-1',
+  tier_id: 't-1',
+  tier_unit_cents: 150000,
+  pharmacy_cost_unit_cents: 50000,
+  effective_floor_cents: 50000,
+  floor_breakdown: { floor_cents: 50000, source: 'product' },
+  coupon_id: null,
+  coupon_disc_per_unit_raw_cents: 45000,
+  coupon_disc_per_unit_capped_cents: 45000,
+  coupon_capped: false,
+  final_unit_price_cents: 105000,
+  platform_commission_per_unit_cents: 55000,
+  consultant_basis: 'TOTAL_PRICE',
+  consultant_per_unit_raw_cents: 5250,
+  consultant_per_unit_cents: 5250,
+  consultant_capped: false,
+  quantity: 1,
+  final_total_cents: 105000,
+  pharmacy_transfer_cents: 50000,
+  platform_commission_total_cents: 55000,
+  consultant_commission_total_cents: 5250,
+  is_preview: true,
+  coupon_active: true,
+}
+
+describe('previewUnitPrice (hypothetical coupon)', () => {
+  it('passes hypothetical params through to preview_unit_price RPC', async () => {
+    const rpc = mockRpc(vi.fn().mockResolvedValue({ data: HAPPY_PREVIEW, error: null }))
+    const res = await previewUnitPrice({
+      productId: PRODUCT_ID,
+      quantity: 3,
+      hypothetical: { discountType: 'PERCENT', discountValue: 30 },
+      clinicId: CLINIC_ID,
+    })
+    expect(res.error).toBeUndefined()
+    expect(res.data?.final_unit_price_cents).toBe(105000)
+    expect(rpc).toHaveBeenCalledWith('preview_unit_price', {
+      p_product_id: PRODUCT_ID,
+      p_quantity: 3,
+      p_clinic_id: CLINIC_ID,
+      p_doctor_id: null,
+      p_disc_type: 'PERCENT',
+      p_disc_value: 30,
+      p_max_disc_cents: null,
+      p_at: null,
+    })
+  })
+
+  it('forwards no_coupon (no hypothetical) as nulls', async () => {
+    const rpc = mockRpc(vi.fn().mockResolvedValue({ data: HAPPY_PREVIEW, error: null }))
+    await previewUnitPrice({ productId: PRODUCT_ID, quantity: 1 })
+    const args = rpc.mock.calls[0]?.[1] as Record<string, unknown>
+    expect(args.p_disc_type).toBeNull()
+    expect(args.p_disc_value).toBeNull()
+    expect(args.p_max_disc_cents).toBeNull()
+  })
+
+  it('rejects invalid PERCENT > 100 client-side without RPC call', async () => {
+    const rpc = mockRpc(vi.fn())
+    const res = await previewUnitPrice({
+      productId: PRODUCT_ID,
+      quantity: 1,
+      hypothetical: { discountType: 'PERCENT', discountValue: 150 },
+    })
+    expect(res.error?.reason).toBe('rpc_unavailable')
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('rejects invalid quantity client-side', async () => {
+    const rpc = mockRpc(vi.fn())
+    const res = await previewUnitPrice({
+      productId: PRODUCT_ID,
+      quantity: 0,
+      hypothetical: { discountType: 'PERCENT', discountValue: 30 },
+    })
+    expect(res.error?.reason).toBe('invalid_quantity')
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('rejects FIXED with negative value client-side', async () => {
+    const rpc = mockRpc(vi.fn())
+    const res = await previewUnitPrice({
+      productId: PRODUCT_ID,
+      quantity: 1,
+      hypothetical: { discountType: 'FIXED', discountValue: -10 },
+    })
+    expect(res.error?.reason).toBe('rpc_unavailable')
+    expect(rpc).not.toHaveBeenCalled()
+  })
+})
+
+// ── buildCouponImpactMatrix (PR-C3) ──────────────────────────────────────
+
+describe('buildCouponImpactMatrix', () => {
+  it('routes each variant to the correct RPC (preview vs compute)', async () => {
+    const rpcCalls: Array<{ rpc: string; params: Record<string, unknown> }> = []
+    mockRpc(
+      vi.fn().mockImplementation(async (rpc: string, params: Record<string, unknown>) => {
+        rpcCalls.push({ rpc, params })
+        return {
+          data: { ...HAPPY_PREVIEW, quantity: params.p_quantity },
+          error: null,
+        }
+      })
+    )
+
+    const variants: CouponVariant[] = [
+      { kind: 'no_coupon', label: 'Sem cupom' },
+      {
+        kind: 'hypothetical',
+        label: '30% PCT',
+        discountType: 'PERCENT',
+        discountValue: 30,
+      },
+      { kind: 'existing', label: 'CODE-X', couponId: 'coupon-1' },
+    ]
+    const cells = await buildCouponImpactMatrix({
+      productId: PRODUCT_ID,
+      quantities: [1, 4],
+      variants,
+      clinicId: CLINIC_ID,
+    })
+
+    expect(cells.length).toBe(6) // 2 qty × 3 variants
+    // Order: q1·v0, q1·v1, q1·v2, q4·v0, q4·v1, q4·v2
+    const order = cells.map((c) => `${c.quantity}-${c.variantKind}`)
+    expect(order).toEqual([
+      '1-no_coupon',
+      '1-hypothetical',
+      '1-existing',
+      '4-no_coupon',
+      '4-hypothetical',
+      '4-existing',
+    ])
+
+    // Variant 0 + 1 should hit preview_unit_price; variant 2 hits
+    // compute_unit_price.
+    const previewCalls = rpcCalls.filter((c) => c.rpc === 'preview_unit_price')
+    const computeCalls = rpcCalls.filter((c) => c.rpc === 'compute_unit_price')
+    expect(previewCalls.length).toBe(4) // 2 qty × 2 variants
+    expect(computeCalls.length).toBe(2)
+    expect(computeCalls[0]?.params.p_coupon_id).toBe('coupon-1')
+  })
+
+  it('preserves variantIdx and label on every cell', async () => {
+    mockRpc(vi.fn().mockResolvedValue({ data: HAPPY_PREVIEW, error: null }))
+    const cells = await buildCouponImpactMatrix({
+      productId: PRODUCT_ID,
+      quantities: [1],
+      variants: [
+        { kind: 'no_coupon', label: 'A' },
+        { kind: 'no_coupon', label: 'B' },
+      ],
+    })
+    expect(cells[0]?.variantIdx).toBe(0)
+    expect(cells[0]?.variantLabel).toBe('A')
+    expect(cells[1]?.variantIdx).toBe(1)
+    expect(cells[1]?.variantLabel).toBe('B')
+  })
+
+  it('captures pricing errors per cell without short-circuiting the matrix', async () => {
+    let call = 0
+    mockRpc(
+      vi.fn().mockImplementation(async () => {
+        call += 1
+        if (call === 2) {
+          // 2nd cell: pricing error
+          return { data: { error: 'no_tier_for_quantity' }, error: null }
+        }
+        return { data: HAPPY_PREVIEW, error: null }
+      })
+    )
+    const cells = await buildCouponImpactMatrix({
+      productId: PRODUCT_ID,
+      quantities: [1, 999],
+      variants: [{ kind: 'no_coupon', label: 'baseline' }],
+    })
+    expect(cells.length).toBe(2)
+    expect(cells[0]?.error).toBeUndefined()
+    expect(cells[1]?.error?.reason).toBe('no_tier_for_quantity')
+    expect(cells[1]?.breakdown).toBeUndefined()
   })
 })

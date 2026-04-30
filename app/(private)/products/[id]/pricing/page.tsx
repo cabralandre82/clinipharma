@@ -113,7 +113,7 @@ export default async function ProductPricingPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <Link href="/products" className="hover:text-primary">
@@ -129,6 +129,11 @@ export default async function ProductPricingPage({ params }: PageProps) {
           <h1 className="mt-1 text-2xl font-bold text-gray-900">{product.name}</h1>
           <p className="text-sm text-gray-500">SKU: {product.sku}</p>
         </div>
+        {product.pricing_mode === 'TIERED_PROFILE' && profile && (
+          <ButtonLink href={`/products/${id}/pricing/coupon-matrix`} variant="outline" size="sm">
+            Matriz de impacto de cupons
+          </ButtonLink>
+        )}
       </div>
 
       {/* ── Mode + actions ───────────────────────────────────────────── */}

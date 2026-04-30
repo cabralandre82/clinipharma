@@ -192,9 +192,75 @@ export async function resolveEffectiveFloor(
   })
 }
 
+// ── Hypothetical-coupon preview (PR-C3 of ADR-001) ──────────────────────
+//
+// Backed by `preview_unit_price` (mig-077). Use when the operator is
+// EVALUATING a coupon ('what if I gave clinic X 30% off?') BEFORE
+// creating it in the `coupons` table. The function accepts the
+// discount params directly instead of looking them up.
+
+export type HypotheticalDiscountType = 'PERCENT' | 'FIXED'
+
+export interface PreviewWithHypotheticalArgs {
+  productId: string
+  quantity: number
+  clinicId?: string | null
+  doctorId?: string | null
+  /** When undefined, simulates "no coupon" (baseline). */
+  hypothetical?: {
+    discountType: HypotheticalDiscountType
+    /** percentage (0..100) when PERCENT; R$/unit when FIXED. */
+    discountValue: number
+    /** optional global cap in cents (mirrors coupons.max_discount_amount). */
+    maxDiscountCents?: number | null
+  }
+  at?: string | null
+}
+
+/**
+ * Compute the per-unit pricing breakdown for a hypothetical coupon
+ * (or none). Same shape as `computeUnitPrice` so the UI can treat
+ * both interchangeably; only difference is `coupon_id` is always
+ * NULL and (when hypothetical is set) `coupon_active` is true.
+ */
+export async function previewUnitPrice(
+  args: PreviewWithHypotheticalArgs
+): Promise<{ data?: PricingBreakdown; error?: PricingEngineError }> {
+  if (!args.productId) {
+    return { error: { reason: 'rpc_unavailable', raw: 'missing productId' } }
+  }
+  if (!Number.isFinite(args.quantity) || args.quantity <= 0) {
+    return { error: { reason: 'invalid_quantity', raw: args.quantity } }
+  }
+
+  const h = args.hypothetical
+  if (h) {
+    if (h.discountType !== 'PERCENT' && h.discountType !== 'FIXED') {
+      return { error: { reason: 'rpc_unavailable', raw: 'invalid discountType' } }
+    }
+    if (!Number.isFinite(h.discountValue) || h.discountValue <= 0) {
+      return { error: { reason: 'rpc_unavailable', raw: 'invalid discountValue' } }
+    }
+    if (h.discountType === 'PERCENT' && h.discountValue > 100) {
+      return { error: { reason: 'rpc_unavailable', raw: 'PERCENT > 100' } }
+    }
+  }
+
+  return callPricingRpc<PricingBreakdown>('preview_unit_price', {
+    p_product_id: args.productId,
+    p_quantity: args.quantity,
+    p_clinic_id: args.clinicId ?? null,
+    p_doctor_id: args.doctorId ?? null,
+    p_disc_type: h?.discountType ?? null,
+    p_disc_value: h?.discountValue ?? null,
+    p_max_disc_cents: h?.maxDiscountCents ?? null,
+    p_at: args.at ?? null,
+  })
+}
+
 // ── Matrix preview helper ────────────────────────────────────────────────
 //
-// Used by PR-C2's super-admin "coupon impact preview" page and by
+// Used by PR-C3's super-admin "coupon impact preview" page and by
 // PR-D's clinic-side simulator. Computes a 2-D matrix of breakdowns
 // for an array of quantities and an optional list of coupon IDs.
 // Caller can then aggregate into a heatmap / table.
@@ -246,5 +312,102 @@ export async function buildPricingMatrix(args: MatrixArgs): Promise<MatrixCell[]
     }
   }
 
+  return cells
+}
+
+// ── Coupon impact matrix (PR-C3) ─────────────────────────────────────────
+//
+// A "variant" is what the matrix shows in each column: either
+// "no_coupon" (baseline), or a hypothetical (PERCENT/FIXED + value),
+// or an existing coupon by id. The matrix is N quantities × M variants.
+// Each cell is one breakdown.
+
+export type CouponVariant =
+  | { kind: 'no_coupon'; label: string }
+  | {
+      kind: 'hypothetical'
+      label: string
+      discountType: HypotheticalDiscountType
+      discountValue: number
+      maxDiscountCents?: number | null
+    }
+  | { kind: 'existing'; label: string; couponId: string }
+
+export interface CouponMatrixCell {
+  quantity: number
+  variantIdx: number
+  variantLabel: string
+  variantKind: CouponVariant['kind']
+  breakdown?: PricingBreakdown
+  error?: PricingEngineError
+}
+
+export interface CouponMatrixArgs {
+  productId: string
+  quantities: number[]
+  variants: CouponVariant[]
+  clinicId?: string | null
+  doctorId?: string | null
+  at?: string | null
+}
+
+/**
+ * Build the coupon impact matrix for the super-admin UI. One call
+ * per (quantity, variant) combination — sequential, indexed RPCs.
+ *
+ * For typical sizes (~6 quantities × ~5 variants = 30 calls) the
+ * total is dominated by network round-trip; ~50 ms each on a warm
+ * pool. Acceptable for a server component render.
+ */
+export async function buildCouponImpactMatrix(args: CouponMatrixArgs): Promise<CouponMatrixCell[]> {
+  const cells: CouponMatrixCell[] = []
+  for (const qty of args.quantities) {
+    for (let v = 0; v < args.variants.length; v += 1) {
+      const variant = args.variants[v]
+      if (!variant) continue
+      let cell: { data?: PricingBreakdown; error?: PricingEngineError }
+
+      if (variant.kind === 'no_coupon') {
+        cell = await previewUnitPrice({
+          productId: args.productId,
+          quantity: qty,
+          clinicId: args.clinicId,
+          doctorId: args.doctorId,
+          at: args.at,
+        })
+      } else if (variant.kind === 'hypothetical') {
+        cell = await previewUnitPrice({
+          productId: args.productId,
+          quantity: qty,
+          clinicId: args.clinicId,
+          doctorId: args.doctorId,
+          hypothetical: {
+            discountType: variant.discountType,
+            discountValue: variant.discountValue,
+            maxDiscountCents: variant.maxDiscountCents ?? null,
+          },
+          at: args.at,
+        })
+      } else {
+        cell = await computeUnitPrice({
+          productId: args.productId,
+          quantity: qty,
+          clinicId: args.clinicId,
+          doctorId: args.doctorId,
+          couponId: variant.couponId,
+          at: args.at,
+        })
+      }
+
+      cells.push({
+        quantity: qty,
+        variantIdx: v,
+        variantLabel: variant.label,
+        variantKind: variant.kind,
+        breakdown: cell.data,
+        error: cell.error,
+      })
+    }
+  }
   return cells
 }
