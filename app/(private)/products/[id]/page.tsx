@@ -239,6 +239,11 @@ export default async function ProductDetailAdminPage({ params }: PageProps) {
           <p className="text-sm text-gray-500">SKU: {product.sku}</p>
         </div>
         <div className="flex gap-3">
+          {!isPharmacy && (
+            <ButtonLink href={`/products/${id}/pricing`} variant="outline">
+              Pricing avançado
+            </ButtonLink>
+          )}
           <ButtonLink href={`/products/${id}/edit`} variant="outline">
             Editar
           </ButtonLink>
@@ -368,6 +373,9 @@ export default async function ProductDetailAdminPage({ params }: PageProps) {
                 {product.active ? 'Ativo' : 'Inativo'}
               </Badge>
               {product.featured && <Badge className="bg-amber-100 text-amber-800">Destaque</Badge>}
+              {!isPharmacy && product.pricing_mode === 'TIERED_PROFILE' && (
+                <Badge className="bg-purple-100 text-purple-700">Tier</Badge>
+              )}
             </div>
             <div className="flex flex-wrap gap-2 pt-2">
               <ToggleProductActive productId={id} active={product.active} />
