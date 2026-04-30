@@ -419,6 +419,17 @@ um runbook citado não existir, ou se uma métrica "must-page"
 | `PlatformRevenueRecon`      | warning    | `increase(platform_revenue_recon_gap_total[24h]) > 0`                  | `docs/runbooks/platform-revenue-reconciliation.md` |
 | `PlatformRevenueReconStale` | warning    | `time() - platform_revenue_recon_last_run_ts > 86400 + 3600` por 5 min | `docs/runbooks/platform-revenue-reconciliation.md` |
 
+### 6.12 Pricing engine (PR-E de ADR-001)
+
+| Alerta                         | Severidade | Trigger                                                                        | Runbook                           |
+| ------------------------------ | ---------- | ------------------------------------------------------------------------------ | --------------------------------- |
+| `PricingProfilesMissing`       | warning    | `pricing_health_profiles_missing > 0` por 30 min                               | `docs/runbooks/pricing-health.md` |
+| `PricingHealthCheckStale`      | warning    | `time() - pricing_health_last_success_ts > 26h` por 5 min                      | `docs/runbooks/pricing-health.md` |
+| `PricingINV4CapBurst`          | warning    | `increase(pricing_inv4_cap_total{product_id}[1h]) > 20` por 15 min             | `docs/runbooks/pricing-health.md` |
+| `PricingINV2CapBurst`          | warning    | `increase(pricing_inv2_cap_total{product_id}[1h]) > 20` por 15 min             | `docs/runbooks/pricing-health.md` |
+| `PricingPreviewErrorRate`      | warning    | error-rate (excluindo auth/429/400) de `pricing_preview_total` > 5% por 15 min | `docs/runbooks/pricing-health.md` |
+| `PricingPreviewLatencyP95High` | warning    | p95 de `pricing_preview_duration_ms` > 1500 ms por 15 min                      | `docs/runbooks/pricing-health.md` |
+
 > **Invariante:** toda linha acima tem um `- alert:` correspondente
 > em `monitoring/prometheus/alerts.yml` com o mesmo nome, severidade
 > igual ou mais alta, e o runbook citado existe no repositório.

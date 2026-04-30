@@ -537,3 +537,134 @@ groups:
         annotations:
           summary: 'Money reconciliation has not run in the last hour'
           runbook: docs/runbooks/money-drift.md
+
+  # ───────────────────────────────────────────────────────────────
+  # 11. Pricing engine (PR-E of ADR-001)
+  # ───────────────────────────────────────────────────────────────
+  - name: pricing
+    interval: 1m
+    rules:
+      - alert: PricingProfilesMissing
+        expr: pricing_health_profiles_missing > 0
+        for: 30m
+        labels:
+          severity: warning
+          team: finance
+          service: clinipharma
+        annotations:
+          summary: '{{ $value }} TIERED product(s) without an active pricing profile'
+          description: |
+            One or more products are configured as
+            `pricing_mode='TIERED_PROFILE'` but have no active row in
+            `pricing_profiles` (effective_until IS NULL). Buyers
+            opening the simulator/catalog of those products see the
+            "Sem precificação ativa no momento" fallback. Resolution
+            is operational: super-admin publishes a profile or
+            switches the product back to FIXED. The cron
+            `pricing-health-check` keeps emitting the alert until
+            the gauge returns to 0.
+          runbook: docs/runbooks/pricing-health.md
+          dashboard: /admin/pricing/health
+
+      - alert: PricingHealthCheckStale
+        expr: time() - pricing_health_last_success_ts > 26 * 3600
+        for: 5m
+        labels:
+          severity: warning
+          team: sre
+          service: clinipharma
+        annotations:
+          summary: 'pricing-health-check cron did not run in the last 26 hours'
+          description: |
+            The cron is scheduled daily at 07:35 UTC. Anything past
+            26h indicates the cron is wedged or its schedule is
+            broken. Check `cron_runs` for the last entry of
+            `job_name='pricing-health-check'` and the runbook.
+          runbook: docs/runbooks/pricing-health.md
+
+      - alert: PricingINV4CapBurst
+        expr: sum by (product_id) (increase(pricing_inv4_cap_total[1h])) > 20
+        for: 15m
+        labels:
+          severity: warning
+          team: finance
+          service: clinipharma
+        annotations:
+          summary: 'INV-4 (consultor cap) acionado > 20 vezes em 1h no produto {{ $labels.product_id }}'
+          description: |
+            The platform's INV-4 invariant (consultant commission
+            per unit MUST NOT exceed platform commission per unit)
+            kept clamping the consultant share for product
+            `{{ $labels.product_id }}`. Operationally this means the
+            `pricing_profile.consultant_pct` (or the chosen
+            `consultant_basis`) configured for the active profile
+            produces a consultant share that exceeds the platform's
+            unit revenue. Revenue remains correct (the cap protects
+            the platform) but the consultant is underpaid relative
+            to the configured pct — likely a misconfigured profile.
+          runbook: docs/runbooks/pricing-health.md
+          dashboard: /admin/pricing/health
+
+      - alert: PricingINV2CapBurst
+        expr: sum by (product_id) (increase(pricing_inv2_cap_total[1h])) > 20
+        for: 15m
+        labels:
+          severity: warning
+          team: finance
+          service: clinipharma
+        annotations:
+          summary: 'INV-2 (cupom cap) acionado > 20 vezes em 1h no produto {{ $labels.product_id }}'
+          description: |
+            INV-2 keeps clamping the coupon discount on product
+            `{{ $labels.product_id }}` because the discount would
+            otherwise drop the platform unit revenue below the
+            effective floor. The buyer still gets a coupon, but a
+            smaller one than the coupon's nominal pct/value. This
+            is correct on the math side but could be a UX surprise
+            and a sign that the coupon was over-promised relative to
+            the floor — review the coupon vs the buyer's effective
+            floor.
+          runbook: docs/runbooks/pricing-health.md
+          dashboard: /admin/pricing/health
+
+      - alert: PricingPreviewErrorRate
+        expr: |
+          sum(rate(pricing_preview_total{outcome!~"success|rate_limited|unauthorized|bad_request"}[15m]))
+          /
+          clamp_min(sum(rate(pricing_preview_total[15m])), 1e-9)
+          > 0.05
+        for: 15m
+        labels:
+          severity: warning
+          team: sre
+          service: clinipharma
+        annotations:
+          summary: '/api/pricing/preview error rate > 5% (engine-level)'
+          description: |
+            More than 5% of preview calls in the last 15 minutes
+            returned a pricing engine error (no_active_profile /
+            no_tier_for_quantity / invalid_quantity /
+            rpc_unavailable). Auth + 429 + 400 are excluded — those
+            are usually client-side. A spike here means the engine
+            itself is misbehaving or a freshly published product
+            has bad config affecting many buyers.
+          runbook: docs/runbooks/pricing-health.md
+          dashboard: /admin/pricing/health
+
+      - alert: PricingPreviewLatencyP95High
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(pricing_preview_duration_ms_bucket[15m]))) > 1500
+        for: 15m
+        labels:
+          severity: warning
+          team: sre
+          service: clinipharma
+        annotations:
+          summary: '/api/pricing/preview p95 > 1500 ms over 15 min'
+          description: |
+            Buyer-side simulator latency degraded. The endpoint
+            wraps a single SQL function (`compute_unit_price`) plus
+            session resolution; a sustained p95 > 1.5s indicates a
+            DB hotspot or a render path calling preview unbatched.
+          runbook: docs/runbooks/pricing-health.md
+          dashboard: /admin/pricing/health
