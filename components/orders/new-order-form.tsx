@@ -4,14 +4,16 @@
 // price the buyer is about to pay.
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createOrder, type OrderDocument } from '@/services/orders'
 import { resolveDoctorFieldState } from '@/lib/orders/doctor-field-rules'
+import { useTieredPricePreview } from '@/lib/orders/use-tiered-price-preview'
 import { REQUIRED_DOCUMENT_TYPES } from '@/components/orders/document-manager'
 import { formatCurrency, cn } from '@/lib/utils'
 import { previewDiscountedUnitPrice, type CatalogCouponPreview } from '@/lib/coupons/preview'
+import type { PricingMode } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,6 +50,13 @@ export interface NewOrderFormProduct {
   pharmacy_id: string
   pharmacies: { id: string; trade_name: string } | null
   product_images: { id: string; public_url: string | null; sort_order: number }[]
+  /**
+   * PR-D1: when 'TIERED_PROFILE', the visible price varies with the
+   * cart quantity and is fetched ad-hoc from /api/pricing/preview.
+   * 'FIXED' keeps the legacy `price_current` behaviour. Default
+   * 'FIXED' for safety when consumers haven't been updated yet.
+   */
+  pricing_mode?: PricingMode
 }
 
 interface CartItem {
@@ -98,21 +107,6 @@ export function NewOrderForm({
   myDoctorClinics = [],
   couponPreviewByProduct = {},
 }: NewOrderFormProps) {
-  // Single source of truth for "what does this product cost in this
-  // cart, given the buyer's coupons?". Returns full + discounted unit
-  // prices and the coupon meta. We compute it on demand because the
-  // user can swap clinics mid-flow (admins/doctors w/ multiple
-  // clinics) without us re-fetching — but for the catalog buyer view
-  // this only changes the surface, not the DB write (the trigger
-  // re-evaluates coupon eligibility server-side at insert time).
-  function priceFor(productId: string, unitPrice: number) {
-    const coupon = couponPreviewByProduct[productId]
-    if (!coupon) {
-      return { unit: unitPrice, full: unitPrice, perUnitDiscount: 0, coupon: null as null }
-    }
-    const { discountedUnit, perUnitDiscount } = previewDiscountedUnitPrice(unitPrice, coupon)
-    return { unit: discountedUnit, full: unitPrice, perUnitDiscount, coupon }
-  }
   const router = useRouter()
   const isDoctor = !!myDoctorId
 
@@ -149,6 +143,113 @@ export function NewOrderForm({
       (!cartPharmacyId || p.pharmacy_id === cartPharmacyId)
   )
 
+  // ── PR-D1: tiered price live cache ────────────────────────────────────
+  // For every cart item with pricing_mode='TIERED_PROFILE', we ask the
+  // backend `/api/pricing/preview` for the unit price at the current
+  // quantity. The hook caches results so scrubbing the qty input
+  // 1→2→3→2 hits cache on the way back. FIXED products bypass the
+  // cache entirely (no fetch).
+  const tieredItems = useMemo(
+    () =>
+      cart
+        .filter((c) => c.product.pricing_mode === 'TIERED_PROFILE')
+        .map((c) => {
+          const coupon = couponPreviewByProduct[c.product.id]
+          return {
+            productId: c.product.id,
+            quantity: c.quantity,
+            couponId: coupon?.id ?? null,
+          }
+        }),
+    [cart, couponPreviewByProduct]
+  )
+  // We don't pass clinic/doctor scope — the API derives them from
+  // session for non-admins and we want to respect that single source
+  // of truth. Cache key uses '' for both.
+  const tieredCache = useTieredPricePreview(tieredItems)
+
+  /**
+   * Single source of truth for "what does this row in the cart cost".
+   *
+   * - FIXED products: legacy `price_current × coupon` math.
+   * - TIERED products with a fresh preview: use the breakdown.
+   * - TIERED products still loading: fall back to FIXED-style numbers
+   *   (which is just the catalog `price_current`) so the UI is never
+   *   blank. `isLoading` flag tells the renderer to show a subtle
+   *   spinner.
+   * - TIERED products with an error: same fallback + error message
+   *   surfaced inline.
+   */
+  function priceFor(productId: string, unitPrice: number, quantity: number, mode?: PricingMode) {
+    const coupon = couponPreviewByProduct[productId] ?? null
+
+    if (mode === 'TIERED_PROFILE') {
+      const entry = tieredCache.get(productId, quantity, coupon?.id ?? null)
+      if (entry?.state === 'ok' && entry.breakdown) {
+        const unit = entry.breakdown.final_unit_price_cents / 100
+        const tierUnit = entry.breakdown.tier_unit_cents / 100
+        return {
+          unit,
+          full: tierUnit,
+          perUnitDiscount: tierUnit - unit,
+          coupon,
+          isTiered: true,
+          isLoading: false,
+          tierError: null as string | null,
+          breakdown: entry.breakdown,
+        }
+      }
+      if (entry?.state === 'error') {
+        return {
+          unit: unitPrice,
+          full: unitPrice,
+          perUnitDiscount: 0,
+          coupon,
+          isTiered: true,
+          isLoading: false,
+          tierError: entry.errorReason ?? 'unknown',
+          breakdown: undefined,
+        }
+      }
+      // pending or not yet fetched
+      return {
+        unit: unitPrice,
+        full: unitPrice,
+        perUnitDiscount: 0,
+        coupon,
+        isTiered: true,
+        isLoading: true,
+        tierError: null as string | null,
+        breakdown: undefined,
+      }
+    }
+
+    // FIXED — legacy path.
+    if (!coupon) {
+      return {
+        unit: unitPrice,
+        full: unitPrice,
+        perUnitDiscount: 0,
+        coupon: null as null,
+        isTiered: false,
+        isLoading: false,
+        tierError: null as string | null,
+        breakdown: undefined,
+      }
+    }
+    const { discountedUnit, perUnitDiscount } = previewDiscountedUnitPrice(unitPrice, coupon)
+    return {
+      unit: discountedUnit,
+      full: unitPrice,
+      perUnitDiscount,
+      coupon,
+      isTiered: false,
+      isLoading: false,
+      tierError: null as string | null,
+      breakdown: undefined,
+    }
+  }
+
   function addToCart() {
     const product = availableProducts.find((p) => p.id === selectedProductId)
     if (!product) return
@@ -168,10 +269,23 @@ export function NewOrderForm({
   }
 
   const total = cart.reduce(
-    (sum, c) => sum + priceFor(c.product.id, c.product.price_current).unit * c.quantity,
+    (sum, c) =>
+      sum +
+      priceFor(c.product.id, c.product.price_current, c.quantity, c.product.pricing_mode).unit *
+        c.quantity,
     0
   )
-  const grossTotal = cart.reduce((sum, c) => sum + c.product.price_current * c.quantity, 0)
+  // grossTotal = preço "tabela" antes de qualquer desconto. Para TIERED
+  // usamos o tier_unit (também via priceFor.full); para FIXED é o
+  // price_current. Se o preview do tier ainda não chegou, full == unit
+  // e o totalDiscount fica 0 — UX-correto (não cria desconto fantasma).
+  const grossTotal = cart.reduce(
+    (sum, c) =>
+      sum +
+      priceFor(c.product.id, c.product.price_current, c.quantity, c.product.pricing_mode).full *
+        c.quantity,
+    0
+  )
   const totalDiscount = grossTotal - total
   const maxDeadline = Math.max(0, ...cart.map((c) => c.product.estimated_deadline_days))
   const pharmacyName = cart[0]?.product.pharmacies?.trade_name ?? '—'
@@ -317,7 +431,12 @@ export function NewOrderForm({
                     </span>
                   )}
                   {(() => {
-                    const p = priceFor(item.product.id, item.product.price_current)
+                    const p = priceFor(
+                      item.product.id,
+                      item.product.price_current,
+                      item.quantity,
+                      item.product.pricing_mode
+                    )
                     if (p.perUnitDiscount <= 0 || !p.coupon) return null
                     return (
                       <span
@@ -333,11 +452,45 @@ export function NewOrderForm({
                       </span>
                     )
                   })()}
+                  {(() => {
+                    const p = priceFor(
+                      item.product.id,
+                      item.product.price_current,
+                      item.quantity,
+                      item.product.pricing_mode
+                    )
+                    if (!p.isTiered) return null
+                    return (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-700 ring-1 ring-purple-200"
+                        title="Preço varia conforme a quantidade pedida"
+                      >
+                        Preço por quantidade
+                      </span>
+                    )
+                  })()}
                 </div>
                 <p className="text-xs text-gray-500">
                   {item.product.concentration} ·{' '}
                   {(() => {
-                    const p = priceFor(item.product.id, item.product.price_current)
+                    const p = priceFor(
+                      item.product.id,
+                      item.product.price_current,
+                      item.quantity,
+                      item.product.pricing_mode
+                    )
+                    if (p.isLoading) {
+                      return <span className="text-gray-400 italic">calculando…</span>
+                    }
+                    if (p.tierError) {
+                      const friendly =
+                        p.tierError === 'no_tier_for_quantity'
+                          ? 'Quantidade fora das faixas cadastradas'
+                          : p.tierError === 'no_active_profile'
+                            ? 'Produto sem precificação ativa'
+                            : 'Preço indisponível no momento'
+                      return <span className="text-amber-700">{friendly}</span>
+                    }
                     if (p.perUnitDiscount <= 0) return `${formatCurrency(p.full)}/un`
                     return (
                       <>
@@ -362,12 +515,19 @@ export function NewOrderForm({
                   className="w-20 text-center"
                 />
                 {(() => {
-                  const p = priceFor(item.product.id, item.product.price_current)
+                  const p = priceFor(
+                    item.product.id,
+                    item.product.price_current,
+                    item.quantity,
+                    item.product.pricing_mode
+                  )
                   const lineTotal = p.unit * item.quantity
                   const lineFull = p.full * item.quantity
                   return (
                     <span className="w-28 text-right text-sm font-semibold text-slate-700">
-                      {p.perUnitDiscount > 0 ? (
+                      {p.isLoading ? (
+                        <span className="text-xs text-gray-400 italic">…</span>
+                      ) : p.perUnitDiscount > 0 ? (
                         <span className="flex flex-col items-end leading-tight">
                           <span className="text-emerald-700">{formatCurrency(lineTotal)}</span>
                           <span className="text-[10px] font-normal text-gray-300 line-through">
@@ -414,14 +574,18 @@ export function NewOrderForm({
                 >
                   <option value="">Selecione...</option>
                   {eligibleProducts.map((p) => {
-                    const pr = priceFor(p.id, p.price_current)
+                    // Dropdown shows price for qty=1 because that's what the
+                    // user lands on when adding the row. The price will
+                    // recompute the moment they bump the qty input.
+                    const pr = priceFor(p.id, p.price_current, 1, p.pricing_mode)
                     // Native <option> can't render rich content, so we inline
                     // the discounted price (and append "(cupom XYZ)") so the
                     // buyer sees the deal before adding to cart.
+                    const tierSuffix = p.pricing_mode === 'TIERED_PROFILE' ? ' (a partir de)' : ''
                     const priceLabel =
                       pr.perUnitDiscount > 0 && pr.coupon
-                        ? `${formatCurrency(pr.unit)} (cupom ${pr.coupon.code})`
-                        : formatCurrency(pr.full)
+                        ? `${formatCurrency(pr.unit)} (cupom ${pr.coupon.code})${tierSuffix}`
+                        : `${formatCurrency(pr.full)}${tierSuffix}`
                     return (
                       <option key={p.id} value={p.id}>
                         {p.requires_prescription ? '💊 ' : ''}
@@ -755,7 +919,12 @@ export function NewOrderForm({
             <h3 className="mb-3 font-semibold text-gray-900">Resumo do pedido</h3>
             <div className="space-y-2 text-sm">
               {cart.map((item) => {
-                const p = priceFor(item.product.id, item.product.price_current)
+                const p = priceFor(
+                  item.product.id,
+                  item.product.price_current,
+                  item.quantity,
+                  item.product.pricing_mode
+                )
                 const lineTotal = p.unit * item.quantity
                 const lineFull = p.full * item.quantity
                 return (
@@ -767,9 +936,19 @@ export function NewOrderForm({
                           (cupom {p.coupon.code})
                         </span>
                       )}
+                      {p.isTiered && !p.tierError && !p.isLoading && (
+                        <span
+                          className="ml-1 text-[11px] text-purple-600"
+                          title="Preço apurado pelo tier ativo"
+                        >
+                          (tier)
+                        </span>
+                      )}
                     </span>
                     <span className="ml-4 text-gray-900">
-                      {p.perUnitDiscount > 0 ? (
+                      {p.isLoading ? (
+                        <span className="text-xs text-gray-400 italic">…</span>
+                      ) : p.perUnitDiscount > 0 ? (
                         <>
                           <span className="text-emerald-700">{formatCurrency(lineTotal)}</span>
                           <span className="ml-1 text-[11px] text-gray-300 line-through">

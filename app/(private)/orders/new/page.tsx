@@ -40,7 +40,7 @@ export default async function NewOrderPage({ searchParams }: NewOrderPageProps) 
   const { data: productsRaw } = await admin
     .from('products')
     .select(
-      'id, name, slug, concentration, presentation, price_current, estimated_deadline_days, requires_prescription, pharmacy_id, pharmacies(id, trade_name), product_images(id, public_url, alt_text, sort_order)'
+      'id, name, slug, concentration, presentation, price_current, estimated_deadline_days, requires_prescription, pharmacy_id, pricing_mode, pharmacies(id, trade_name), product_images(id, public_url, alt_text, sort_order)'
     )
     .eq('active', true)
     .order('name')
