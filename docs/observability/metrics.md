@@ -145,6 +145,27 @@ Não-exemplos (proibidos):
 | `platform_revenue_recon_gap_total`        | counter   | `severity`   | Pedidos com `\|recon_gap\| ≥ threshold` encontrados na varredura. Steady-state = 0; > 0 abre runbook | money-and-dsar |
 | `platform_revenue_recon_gap_amount_cents` | gauge     | (sem labels) | Soma absoluta do gap em centavos no último run; ajuda dimensionar exposição financeira               | money-and-dsar |
 
+### 3.7.1 Pricing engine (PR-E de ADR-001)
+
+Observabilidade do motor de preços por tier (`compute_unit_price`,
+RPC `/api/pricing/preview`, cron `pricing-health-check`). Os
+contadores `*_cap_total` mostram quantas vezes os invariantes INV-2
+(coupon discount cap) e INV-4 (consultor ≤ plataforma) foram
+acionados — sinal operacional de que algum profile / cupom está
+batendo na borda da margem mínima.
+
+| Métrica                           | Tipo      | Labels                           | Descrição                                                                                                                                                                                                   | Dashboard      |
+| --------------------------------- | --------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| `pricing_preview_total`           | counter   | `outcome`, `has_coupon`, `actor` | Cada chamada a `/api/pricing/preview`. `outcome` ∈ `success\|no_active_profile\|no_tier_for_quantity\|invalid_quantity\|rpc_unavailable\|rate_limited\|unauthorized\|bad_request`. `actor` ∈ `admin\|buyer` | money-and-dsar |
+| `pricing_preview_duration_ms`     | histogram | `outcome`                        | Latência fim-a-fim do `/api/pricing/preview` (auth + DB scope + RPC). Use p95/p99 para SLO do simulador                                                                                                     | money-and-dsar |
+| `pricing_inv2_cap_total`          | counter   | `product_id`                     | Coupon clamping (INV-2) acionado num preview — o desconto teria empurrado a plataforma abaixo do floor; foi clampado. Sinal de cupom mais agressivo que a margem mínima                                     | money-and-dsar |
+| `pricing_inv4_cap_total`          | counter   | `product_id`                     | Consultant clamping (INV-4) acionado — comissão do consultor teria excedido a receita unitária da plataforma; foi clampada para não ultrapassar                                                             | money-and-dsar |
+| `pricing_profile_missing_total`   | counter   | `product_id`                     | Cada call a `/api/pricing/preview` que respondeu `no_active_profile`. Por-produto: cardinality limitada pelo catálogo. Roll-up para alerta no cron `pricing-health-check`                                   | money-and-dsar |
+| `pricing_health_run_total`        | counter   | `outcome`                        | Cada execução do cron `pricing-health-check`. `outcome` ∈ `success\|missing_detected`                                                                                                                       | money-and-dsar |
+| `pricing_health_last_success_ts`  | gauge     | (sem labels)                     | Timestamp Unix da última execução do cron `pricing-health-check`                                                                                                                                            | money-and-dsar |
+| `pricing_health_profiles_missing` | gauge     | (sem labels)                     | Quantidade de produtos `pricing_mode='TIERED_PROFILE'` sem profile ativo na última varredura. Steady-state = 0                                                                                              | money-and-dsar |
+| `pricing_health_duration_ms`      | histogram | (sem labels)                     | Latência do cron `pricing-health-check`                                                                                                                                                                     | money-and-dsar |
+
 ### 3.8 DSAR (LGPD art. 18)
 
 | Métrica                       | Tipo      | Labels         | Descrição                                                                                             | Dashboard      |

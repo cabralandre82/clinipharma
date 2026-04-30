@@ -319,6 +319,26 @@ export const Metrics = {
   PLATFORM_REVENUE_RECON_LAST_RUN_TS: 'platform_revenue_recon_last_run_ts',
   PLATFORM_REVENUE_RECON_GAP_TOTAL: 'platform_revenue_recon_gap_total',
   PLATFORM_REVENUE_RECON_GAP_AMOUNT_CENTS: 'platform_revenue_recon_gap_amount_cents',
+  // PR-E (ADR-001) — pricing-engine observability.
+  // Counts every call to /api/pricing/preview labelled by outcome
+  // (`success` / `no_active_profile` / `no_tier_for_quantity` /
+  // `invalid_quantity` / `rpc_unavailable`). Latency goes in the
+  // histogram. Cap counters fire whenever a successful preview hit
+  // INV-2 (coupon clamped down to platform floor) or INV-4
+  // (consultant clamped to platform per-unit revenue) — operational
+  // signals that a profile config is bumping into a guard rail.
+  // `PRICING_PROFILE_MISSING_TOTAL` is incremented per call and the
+  // cron `pricing-health-check` rolls it up to a per-product gauge
+  // for the dashboard.
+  PRICING_PREVIEW_TOTAL: 'pricing_preview_total',
+  PRICING_PREVIEW_DURATION_MS: 'pricing_preview_duration_ms',
+  PRICING_INV2_CAP_TOTAL: 'pricing_inv2_cap_total',
+  PRICING_INV4_CAP_TOTAL: 'pricing_inv4_cap_total',
+  PRICING_PROFILE_MISSING_TOTAL: 'pricing_profile_missing_total',
+  PRICING_HEALTH_RUN_TOTAL: 'pricing_health_run_total',
+  PRICING_HEALTH_LAST_SUCCESS_TS: 'pricing_health_last_success_ts',
+  PRICING_HEALTH_PROFILES_MISSING: 'pricing_health_profiles_missing',
+  PRICING_HEALTH_DURATION_MS: 'pricing_health_duration_ms',
 } as const
 
 // ── Surge detector ───────────────────────────────────────────────────────────

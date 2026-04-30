@@ -18,7 +18,18 @@ import * as sessionModule from '@/lib/auth/session'
 import * as adminModule from '@/lib/db/admin'
 import * as engineModule from '@/lib/services/pricing-engine.server'
 import * as rlModule from '@/lib/rate-limit'
+import { __resetMetricsForTests, snapshotMetrics, Metrics } from '@/lib/metrics'
 import { GET } from '@/app/api/pricing/preview/route'
+
+function findCounter(name: string, labelMatch: Record<string, string> = {}) {
+  return snapshotMetrics().counters.find((c) => {
+    if (c.name !== name) return false
+    for (const [k, v] of Object.entries(labelMatch)) {
+      if (c.labels[k] !== v) return false
+    }
+    return true
+  })
+}
 
 const PRODUCT_ID = '22222222-2222-2222-2222-222222222222'
 const CLINIC_ID = '33333333-3333-3333-3333-333333333333'
@@ -83,6 +94,7 @@ const HAPPY_BREAKDOWN = {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(rlModule.apiLimiter.check).mockResolvedValue({ ok: true, resetAt: 0 })
+  __resetMetricsForTests()
 })
 
 describe('/api/pricing/preview', () => {
@@ -199,5 +211,151 @@ describe('/api/pricing/preview', () => {
     const body = await r.json()
     expect(body.ok).toBe(false)
     expect(body.reason).toBe('rpc_unavailable')
+  })
+
+  // ── PR-E observability counters ────────────────────────────────────────
+  describe('observability', () => {
+    it('increments PRICING_PREVIEW_TOTAL with outcome=success on a happy preview', async () => {
+      vi.mocked(sessionModule.getCurrentUser).mockResolvedValue(SUPER_ADMIN_USER)
+      vi.mocked(engineModule.computeUnitPrice).mockResolvedValue({
+        data: HAPPY_BREAKDOWN,
+        error: undefined,
+      })
+      await GET(buildReq({ product_id: PRODUCT_ID, quantity: '1' }))
+      expect(findCounter(Metrics.PRICING_PREVIEW_TOTAL, { outcome: 'success' })?.value).toBe(1)
+    })
+
+    it('labels has_coupon=true when coupon_id is in the URL', async () => {
+      vi.mocked(sessionModule.getCurrentUser).mockResolvedValue(SUPER_ADMIN_USER)
+      vi.mocked(engineModule.computeUnitPrice).mockResolvedValue({
+        data: HAPPY_BREAKDOWN,
+        error: undefined,
+      })
+      await GET(buildReq({ product_id: PRODUCT_ID, quantity: '1', coupon_id: 'CPN-A' }))
+      expect(
+        findCounter(Metrics.PRICING_PREVIEW_TOTAL, {
+          outcome: 'success',
+          has_coupon: 'true',
+        })?.value
+      ).toBe(1)
+    })
+
+    it('labels actor=buyer for non-admin requests', async () => {
+      vi.mocked(sessionModule.getCurrentUser).mockResolvedValue(CLINIC_USER)
+      const eqMock = vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { clinic_id: 'clinic-x' },
+          error: null,
+        }),
+      })
+      vi.mocked(adminModule.createAdminClient).mockReturnValue({
+        from: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ eq: eqMock }) }),
+      } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+      vi.mocked(engineModule.computeUnitPrice).mockResolvedValue({
+        data: HAPPY_BREAKDOWN,
+        error: undefined,
+      })
+      await GET(buildReq({ product_id: PRODUCT_ID, quantity: '1' }))
+      expect(
+        findCounter(Metrics.PRICING_PREVIEW_TOTAL, {
+          outcome: 'success',
+          actor: 'buyer',
+        })?.value
+      ).toBe(1)
+    })
+
+    it('increments PRICING_INV2_CAP_TOTAL when breakdown.coupon_capped=true', async () => {
+      vi.mocked(sessionModule.getCurrentUser).mockResolvedValue(SUPER_ADMIN_USER)
+      vi.mocked(engineModule.computeUnitPrice).mockResolvedValue({
+        data: { ...HAPPY_BREAKDOWN, coupon_capped: true, consultant_capped: false },
+        error: undefined,
+      })
+      await GET(buildReq({ product_id: PRODUCT_ID, quantity: '1' }))
+      expect(findCounter(Metrics.PRICING_INV2_CAP_TOTAL, { product_id: PRODUCT_ID })?.value).toBe(1)
+      expect(
+        findCounter(Metrics.PRICING_INV4_CAP_TOTAL, { product_id: PRODUCT_ID })
+      ).toBeUndefined()
+    })
+
+    it('increments PRICING_INV4_CAP_TOTAL when breakdown.consultant_capped=true', async () => {
+      vi.mocked(sessionModule.getCurrentUser).mockResolvedValue(SUPER_ADMIN_USER)
+      vi.mocked(engineModule.computeUnitPrice).mockResolvedValue({
+        data: { ...HAPPY_BREAKDOWN, coupon_capped: false, consultant_capped: true },
+        error: undefined,
+      })
+      await GET(buildReq({ product_id: PRODUCT_ID, quantity: '1' }))
+      expect(findCounter(Metrics.PRICING_INV4_CAP_TOTAL, { product_id: PRODUCT_ID })?.value).toBe(1)
+    })
+
+    it('does NOT increment cap counters on uncapped previews', async () => {
+      vi.mocked(sessionModule.getCurrentUser).mockResolvedValue(SUPER_ADMIN_USER)
+      vi.mocked(engineModule.computeUnitPrice).mockResolvedValue({
+        data: HAPPY_BREAKDOWN, // both flags false
+        error: undefined,
+      })
+      await GET(buildReq({ product_id: PRODUCT_ID, quantity: '1' }))
+      expect(findCounter(Metrics.PRICING_INV2_CAP_TOTAL)).toBeUndefined()
+      expect(findCounter(Metrics.PRICING_INV4_CAP_TOTAL)).toBeUndefined()
+    })
+
+    it('increments PRICING_PROFILE_MISSING_TOTAL on no_active_profile', async () => {
+      vi.mocked(sessionModule.getCurrentUser).mockResolvedValue(SUPER_ADMIN_USER)
+      vi.mocked(engineModule.computeUnitPrice).mockResolvedValue({
+        data: undefined,
+        error: { reason: 'no_active_profile' },
+      })
+      await GET(buildReq({ product_id: PRODUCT_ID, quantity: '1' }))
+      expect(
+        findCounter(Metrics.PRICING_PROFILE_MISSING_TOTAL, { product_id: PRODUCT_ID })?.value
+      ).toBe(1)
+      expect(
+        findCounter(Metrics.PRICING_PREVIEW_TOTAL, { outcome: 'no_active_profile' })?.value
+      ).toBe(1)
+    })
+
+    it('does NOT count PRICING_PROFILE_MISSING_TOTAL on no_tier_for_quantity', async () => {
+      vi.mocked(sessionModule.getCurrentUser).mockResolvedValue(SUPER_ADMIN_USER)
+      vi.mocked(engineModule.computeUnitPrice).mockResolvedValue({
+        data: undefined,
+        error: { reason: 'no_tier_for_quantity' },
+      })
+      await GET(buildReq({ product_id: PRODUCT_ID, quantity: '999' }))
+      expect(findCounter(Metrics.PRICING_PROFILE_MISSING_TOTAL)).toBeUndefined()
+      expect(
+        findCounter(Metrics.PRICING_PREVIEW_TOTAL, { outcome: 'no_tier_for_quantity' })?.value
+      ).toBe(1)
+    })
+
+    it('records duration histogram for every terminal branch', async () => {
+      vi.mocked(sessionModule.getCurrentUser).mockResolvedValue(SUPER_ADMIN_USER)
+      vi.mocked(engineModule.computeUnitPrice).mockResolvedValue({
+        data: HAPPY_BREAKDOWN,
+        error: undefined,
+      })
+      await GET(buildReq({ product_id: PRODUCT_ID, quantity: '1' }))
+      const hist = snapshotMetrics().histograms.find(
+        (h) => h.name === Metrics.PRICING_PREVIEW_DURATION_MS
+      )
+      expect(hist).toBeDefined()
+      expect(hist!.count).toBe(1)
+    })
+
+    it('counts outcome=rate_limited when 429', async () => {
+      vi.mocked(rlModule.apiLimiter.check).mockResolvedValue({ ok: false, resetAt: 0 })
+      await GET(buildReq({ product_id: PRODUCT_ID, quantity: '1' }))
+      expect(findCounter(Metrics.PRICING_PREVIEW_TOTAL, { outcome: 'rate_limited' })?.value).toBe(1)
+    })
+
+    it('counts outcome=unauthorized when 401', async () => {
+      vi.mocked(sessionModule.getCurrentUser).mockResolvedValue(null)
+      await GET(buildReq({ product_id: PRODUCT_ID, quantity: '1' }))
+      expect(findCounter(Metrics.PRICING_PREVIEW_TOTAL, { outcome: 'unauthorized' })?.value).toBe(1)
+    })
+
+    it('counts outcome=bad_request when product_id missing', async () => {
+      vi.mocked(sessionModule.getCurrentUser).mockResolvedValue(SUPER_ADMIN_USER)
+      await GET(buildReq({ quantity: '1' }))
+      expect(findCounter(Metrics.PRICING_PREVIEW_TOTAL, { outcome: 'bad_request' })?.value).toBe(1)
+    })
   })
 })

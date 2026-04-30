@@ -88,6 +88,10 @@
     {
       "path": "/api/cron/reconcile-platform-revenue",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/pricing-health-check",
+      "schedule": "35 7 * * *"
     }
   ]
 }
