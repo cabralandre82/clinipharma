@@ -7,6 +7,7 @@ import {
   createConsultant,
   updateConsultantStatus,
   assignConsultantToClinic,
+  assignConsultantToDoctor,
   registerConsultantTransfer,
   deleteConsultant,
 } from '@/services/consultants'
@@ -21,7 +22,12 @@ vi.mock('@/lib/audit', () => ({
     DELETE: 'DELETE',
     TRANSFER_REGISTERED: 'TRANSFER_REGISTERED',
   },
-  AuditEntity: { PROFILE: 'PROFILE', CLINIC: 'CLINIC', TRANSFER: 'TRANSFER' },
+  AuditEntity: {
+    PROFILE: 'PROFILE',
+    CLINIC: 'CLINIC',
+    DOCTOR: 'DOCTOR',
+    TRANSFER: 'TRANSFER',
+  },
 }))
 vi.mock('@/lib/validators', () => ({
   salesConsultantSchema: {
@@ -460,6 +466,161 @@ describe('assignConsultantToClinic', () => {
 
     const result = await assignConsultantToClinic('clinic-1', null)
     expect(result.error).toBeUndefined()
+  })
+})
+
+// PR-0 — regression fix.
+//
+// Pedidos com `buyer_type='DOCTOR'` (clinic_id NULL) NUNCA geravam
+// `consultant_commissions` antes desta task: o `confirm_payment_atomic`
+// resolvia consultor SOMENTE via `clinics.consultant_id`, e a tabela
+// `doctors` não tinha coluna `consultant_id` para começo de conversa.
+//
+// Migrations 068 + 069 fecharam o ramo SQL. Este describe cobre o
+// ramo TS/UI: o server action que escreve `doctors.consultant_id` e
+// audita a mudança.
+describe('assignConsultantToDoctor', () => {
+  it('assigns consultant successfully (writes doctors.consultant_id, no email needed when only update)', async () => {
+    const emailModule = await import('@/lib/email')
+    vi.mocked(emailModule.sendEmail).mockResolvedValue(undefined)
+
+    const doctorsUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+    })
+    const consultantSingle = vi.fn().mockResolvedValue({
+      data: { email: 'c@test.com', full_name: 'Consultor C' },
+      error: null,
+    })
+    const doctorSingle = vi.fn().mockResolvedValue({
+      data: { full_name: 'Dr. House' },
+      error: null,
+    })
+
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'sales_consultants') {
+        return {
+          select: vi
+            .fn()
+            .mockReturnValue({ eq: vi.fn().mockReturnValue({ single: consultantSingle }) }),
+        }
+      }
+      if (table === 'doctors') {
+        return {
+          update: doctorsUpdate,
+          select: vi
+            .fn()
+            .mockReturnValue({ eq: vi.fn().mockReturnValue({ single: doctorSingle }) }),
+        }
+      }
+      if (table === 'app_settings') {
+        const qb = makeQueryBuilder({ value_json: 5 }, null)
+        qb.single = vi.fn().mockResolvedValue({ data: { value_json: 5 }, error: null })
+        return qb
+      }
+      return makeQueryBuilder(null, null)
+    })
+
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: fromMock,
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await assignConsultantToDoctor('doc-1', 'cons-1')
+    expect(result.error).toBeUndefined()
+    expect(doctorsUpdate).toHaveBeenCalledOnce()
+    const updateCall = doctorsUpdate.mock.calls[0]?.[0] as { consultant_id?: string | null }
+    expect(updateCall?.consultant_id).toBe('cons-1')
+  })
+
+  it('sends consultantClinicLinked email when assigning consultant to a doctor (regression coverage)', async () => {
+    const emailModule = await import('@/lib/email')
+    vi.mocked(emailModule.sendEmail).mockResolvedValue(undefined)
+
+    const doctorsUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+    })
+    const consultantSingle = vi.fn().mockResolvedValue({
+      data: { email: 'consultor@test.com', full_name: 'Consultor C' },
+      error: null,
+    })
+    const doctorSingle = vi.fn().mockResolvedValue({
+      data: { full_name: 'House' },
+      error: null,
+    })
+
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'sales_consultants') {
+        return {
+          select: vi
+            .fn()
+            .mockReturnValue({ eq: vi.fn().mockReturnValue({ single: consultantSingle }) }),
+        }
+      }
+      if (table === 'doctors') {
+        return {
+          update: doctorsUpdate,
+          select: vi
+            .fn()
+            .mockReturnValue({ eq: vi.fn().mockReturnValue({ single: doctorSingle }) }),
+        }
+      }
+      if (table === 'app_settings') {
+        const qb = makeQueryBuilder({ value_json: 5 }, null)
+        qb.single = vi.fn().mockResolvedValue({ data: { value_json: 5 }, error: null })
+        return qb
+      }
+      return makeQueryBuilder(null, null)
+    })
+
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: fromMock,
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await assignConsultantToDoctor('doc-1', 'cons-1')
+    expect(result.error).toBeUndefined()
+    expect(emailModule.sendEmail).toHaveBeenCalledOnce()
+    const emailArg = vi.mocked(emailModule.sendEmail).mock.calls[0]?.[0]
+    expect(emailArg?.to).toBe('consultor@test.com')
+    // Body re-uses the clinic-link template; the buyer label is just
+    // substituted ("Dr(a). House").
+    expect(emailArg?.html).toContain('House')
+  })
+
+  it('allows unassigning (null consultantId) without sending email', async () => {
+    const emailModule = await import('@/lib/email')
+    vi.mocked(emailModule.sendEmail).mockResolvedValue(undefined)
+
+    const qb = makeQueryBuilder(null, null)
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(qb),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await assignConsultantToDoctor('doc-1', null)
+    expect(result.error).toBeUndefined()
+    expect(emailModule.sendEmail).not.toHaveBeenCalled()
+  })
+
+  it('returns user-visible error when doctors.update fails (db error path)', async () => {
+    const doctorsUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: '23503', message: 'consultant_id fk violation' },
+      }),
+    })
+    vi.mocked(adminModule.createAdminClient).mockReturnValue({
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'doctors') return { update: doctorsUpdate }
+        return makeQueryBuilder(null, null)
+      }),
+    } as unknown as ReturnType<typeof adminModule.createAdminClient>)
+
+    const result = await assignConsultantToDoctor('doc-1', 'cons-1')
+    expect(result.error).toBe('Erro ao vincular consultor ao médico')
+  })
+
+  it('returns Sem permissão when caller is not SUPER_ADMIN', async () => {
+    vi.mocked(rbacModule.requireRole).mockRejectedValueOnce(new Error('FORBIDDEN'))
+    const result = await assignConsultantToDoctor('doc-1', 'cons-1')
+    expect(result.error).toBe('Sem permissão')
   })
 })
 

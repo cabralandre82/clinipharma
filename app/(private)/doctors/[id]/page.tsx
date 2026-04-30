@@ -6,8 +6,10 @@ import { formatPhone, formatDate } from '@/lib/utils'
 import { EntityStatusBadge } from '@/components/shared/status-badge'
 import { ButtonLink } from '@/components/ui/button-link'
 import { DoctorStatusActions } from '@/components/doctors/doctor-status-actions'
+import { AssignConsultantToDoctorDialog } from '@/components/consultants/assign-consultant-to-doctor-dialog'
 import { BackButton } from '@/components/ui/back-button'
-import type { Doctor, EntityStatus } from '@/types'
+import { logger } from '@/lib/logger'
+import type { Doctor, EntityStatus, SalesConsultant } from '@/types'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Detalhe do Médico | Clinipharma' }
@@ -19,6 +21,7 @@ interface PageProps {
 export default async function DoctorDetailPage({ params }: PageProps) {
   const { id } = await params
   const currentUser = await requireRolePage(['SUPER_ADMIN', 'PLATFORM_ADMIN', 'CLINIC_ADMIN'])
+  const isSuperAdmin = currentUser.roles.includes('SUPER_ADMIN')
 
   const supabase = createAdminClient()
   const { data: doctor } = await supabase.from('doctors').select('*').eq('id', id).single()
@@ -57,6 +60,38 @@ export default async function DoctorDetailPage({ params }: PageProps) {
     is_primary: boolean
     clinics: { id: string; trade_name: string } | null
   }>
+
+  // Consultant assignment is super-admin only. Loaded eagerly so the
+  // section renders both the current state ("linked to X") and the
+  // dialog (with the picker populated). Errors are logged but do not
+  // block the rest of the page — same defensive pattern used in
+  // /clinics/[id] after the 2026-04-29 silent-empty-state regression.
+  type ConsultantRow = Pick<SalesConsultant, 'id' | 'full_name' | 'status'>
+  let linkedConsultant: ConsultantRow | null = null
+  let allConsultants: ConsultantRow[] = []
+  if (isSuperAdmin) {
+    if (typedDoctor.consultant_id) {
+      const { data: linked } = await supabase
+        .from('sales_consultants')
+        .select('id, full_name, status')
+        .eq('id', typedDoctor.consultant_id)
+        .single()
+      linkedConsultant = (linked ?? null) as unknown as ConsultantRow | null
+    }
+
+    const { data: consultantsList, error: consultantsErr } = await supabase
+      .from('sales_consultants')
+      .select('id, full_name, status')
+      .order('full_name')
+    if (consultantsErr) {
+      logger.error('[doctors/:id] failed to load consultants list', {
+        doctorId: id,
+        code: consultantsErr.code,
+        message: consultantsErr.message,
+      })
+    }
+    allConsultants = (consultantsList ?? []) as unknown as ConsultantRow[]
+  }
 
   return (
     <div className="space-y-6">
@@ -135,6 +170,37 @@ export default async function DoctorDetailPage({ params }: PageProps) {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {isSuperAdmin && (
+          <div className="space-y-3 rounded-lg border bg-white p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900">Consultor de vendas</h2>
+              <AssignConsultantToDoctorDialog
+                doctorId={id}
+                currentConsultantId={typedDoctor.consultant_id}
+                consultants={allConsultants as unknown as SalesConsultant[]}
+              />
+            </div>
+            {linkedConsultant ? (
+              <div className="flex items-center justify-between rounded-lg bg-blue-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-blue-900">{linkedConsultant.full_name}</p>
+                  <p className="text-xs text-blue-700">Taxa global configurada em Configurações</p>
+                </div>
+                <Link
+                  href={`/consultants/${linkedConsultant.id}`}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Ver perfil
+                </Link>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">
+                Nenhum consultor vinculado — comissão integral para a plataforma.
+              </p>
+            )}
           </div>
         )}
       </div>

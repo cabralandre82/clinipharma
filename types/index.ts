@@ -149,6 +149,7 @@ export interface Doctor {
   cpf?: string | null
   user_id?: string | null
   crm_validated_at?: string | null
+  consultant_id?: string | null
   status: EntityStatus
   created_at: string
   updated_at: string

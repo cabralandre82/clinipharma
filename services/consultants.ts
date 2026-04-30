@@ -717,6 +717,95 @@ export async function assignConsultantToClinic(
   }
 }
 
+// ─── Assign consultant to doctor ───────────────────────────────────────────
+//
+// Mirror of `assignConsultantToClinic` for the DOCTOR buyer type. The
+// pre-existing regression — `confirm_payment_atomic` only resolved
+// consultant via `clinics.consultant_id`, and `doctors` had no such
+// column — was fixed by migrations 068 (column + index) and 069 (RPC
+// branch). This server action is the UI side of the same fix: it lets
+// SUPER_ADMIN attach (or detach) a consultant to a doctor, exactly the
+// way the same button works for clinics today.
+//
+// Audit, RLS, email notification and revalidation paths are
+// intentionally identical to the clinic version — the consultant on
+// the receiving end of a doctor link sees the same welcome email
+// ("agora você é consultor de Dr. X") as for a clinic link.
+
+export async function assignConsultantToDoctor(
+  doctorId: string,
+  consultantId: string | null
+): Promise<{ error?: string }> {
+  try {
+    const actor = await requireRole(['SUPER_ADMIN'])
+    const adminClient = createAdminClient()
+
+    const { error } = await adminClient
+      .from('doctors')
+      .update({ consultant_id: consultantId, updated_at: new Date().toISOString() })
+      .eq('id', doctorId)
+
+    if (error) {
+      logger.error('[assignConsultantToDoctor] update failed', {
+        doctorId,
+        consultantId,
+        code: error.code,
+        message: error.message,
+      })
+      return { error: 'Erro ao vincular consultor ao médico' }
+    }
+
+    await createAuditLog({
+      actorUserId: actor.id,
+      actorRole: actor.roles[0],
+      entityType: AuditEntity.DOCTOR,
+      entityId: doctorId,
+      action: AuditAction.UPDATE,
+      newValues: { consultant_id: consultantId },
+    })
+
+    if (consultantId) {
+      try {
+        const [{ data: consultant }, { data: doctor }, globalRate] = await Promise.all([
+          adminClient
+            .from('sales_consultants')
+            .select('email, full_name')
+            .eq('id', consultantId)
+            .single(),
+          adminClient.from('doctors').select('full_name').eq('id', doctorId).single(),
+          getGlobalConsultantRate(adminClient),
+        ])
+
+        if (consultant?.email && doctor?.full_name) {
+          const tmpl = consultantClinicLinkedEmail({
+            consultantName: consultant.full_name,
+            // The email template is named for clinics historically but
+            // works equally for doctors — the buyer name is just a
+            // label substituted into the body.
+            clinicName: `Dr(a). ${doctor.full_name}`,
+            commissionRate: String(globalRate),
+          })
+          await sendEmail({ to: consultant.email, ...tmpl })
+        }
+      } catch (emailErr) {
+        logger.warn('[assignConsultantToDoctor] notification email failed', {
+          consultantId,
+          doctorId,
+          error: emailErr,
+        })
+      }
+    }
+
+    revalidatePath(`/doctors/${doctorId}`)
+    revalidatePath('/doctors')
+    return {}
+  } catch (err) {
+    if (err instanceof Error && err.message === 'FORBIDDEN') return { error: 'Sem permissão' }
+    logger.error('[assignConsultantToDoctor] unexpected', { doctorId, consultantId, error: err })
+    return { error: 'Erro interno' }
+  }
+}
+
 // ─── Register consultant transfer (batch) ──────────────────────────────────
 
 export async function registerConsultantTransfer(
