@@ -281,6 +281,38 @@ export interface PricingProfileTier {
 }
 
 /**
+ * Buyer-specific override of the platform-revenue floor for a product.
+ * Migration 074 (PR-B). Polymorphism through "two-column nullable"
+ * (clinic_id XOR doctor_id) — same shape `coupons` already uses, so
+ * super-admin tooling treats both objects identically.
+ *
+ * The override does NOT touch tier prices nor pharmacy_cost — it only
+ * substitutes the floor. The "absolute OR pct, whichever is greater"
+ * algorithm is the same as the profile-level floor.
+ *
+ * INV-1 (final >= pharmacy_cost) is still enforced inside
+ * compute_unit_price by raising any floor below pharmacy_cost back up
+ * to it. So an aggressive override negotiated below cost still cannot
+ * make the platform pay the pharmacy out of pocket.
+ */
+export interface BuyerPricingOverride {
+  id: string
+  product_id: string
+  clinic_id: string | null
+  doctor_id: string | null
+  platform_min_unit_cents: number | null
+  platform_min_unit_pct: number | null
+  effective_from: string
+  effective_until: string | null
+  created_by_user_id: string
+  change_reason: string
+  created_at: string
+}
+
+/** Discriminator for `PricingBreakdown.floor_breakdown.source`. */
+export type FloorSource = 'product' | 'buyer_override' | 'no_profile'
+
+/**
  * The "ficha" returned by `compute_unit_price`, used by the freeze
  * trigger and (PR-C/D) the simulator UI. Numbers are integer cents
  * unless suffix says otherwise.
@@ -293,8 +325,11 @@ export interface PricingBreakdown {
   effective_floor_cents: number
   floor_breakdown: {
     floor_cents: number
-    source: 'product' | 'buyer_override' | 'no_profile'
+    source: FloorSource
+    /** Set when source='product'. */
     profile_id?: string
+    /** Set when source='buyer_override' (PR-B). */
+    override_id?: string
     floor_abs_cents: number | null
     floor_pct_cents: number | null
   }
