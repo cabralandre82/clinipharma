@@ -231,3 +231,121 @@ export const consultantTransferSchema = z.object({
   transfer_reference: z.string().min(1, 'Referência da transferência é obrigatória'),
   notes: z.string().optional(),
 })
+
+// --- Pricing profiles (PR-A/C of ADR-001) ---
+//
+// Profile = SCD-2 row with the pharmacy cost + platform-revenue floor +
+// consultant commission policy. Tier list lives in a sibling table but
+// the form normally edits both atomically (super-admin saves "version 2"
+// → backend wraps profile + tiers in a transaction).
+
+const consultantBasis = z.enum(['TOTAL_PRICE', 'PHARMACY_TRANSFER', 'FIXED_PER_UNIT'])
+
+export const pricingProfileTierSchema = z
+  .object({
+    min_quantity: z.number().int().positive(),
+    max_quantity: z.number().int().positive(),
+    unit_price_cents: z.number().int().positive(),
+  })
+  .refine((t) => t.max_quantity >= t.min_quantity, {
+    message: 'Quantidade máxima deve ser ≥ mínima',
+    path: ['max_quantity'],
+  })
+
+export const pricingProfileSchema = z
+  .object({
+    pharmacy_cost_unit_cents: z.number().int().positive(),
+    platform_min_unit_cents: z.number().int().positive().optional().nullable(),
+    platform_min_unit_pct: z.number().min(0).max(100).optional().nullable(),
+    consultant_commission_basis: consultantBasis.default('TOTAL_PRICE'),
+    consultant_commission_fixed_per_unit_cents: z
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .nullable(),
+    change_reason: z.string().min(1, 'Motivo da mudança é obrigatório').max(500),
+    tiers: z.array(pricingProfileTierSchema).min(1, 'Pelo menos 1 tier é obrigatório'),
+  })
+  .refine(
+    (p) =>
+      (p.platform_min_unit_cents !== undefined && p.platform_min_unit_cents !== null) ||
+      (p.platform_min_unit_pct !== undefined && p.platform_min_unit_pct !== null),
+    {
+      message: 'Defina pelo menos um piso (absoluto ou percentual)',
+      path: ['platform_min_unit_cents'],
+    }
+  )
+  .refine(
+    (p) =>
+      p.consultant_commission_basis !== 'FIXED_PER_UNIT' ||
+      (p.consultant_commission_fixed_per_unit_cents !== undefined &&
+        p.consultant_commission_fixed_per_unit_cents !== null),
+    {
+      message: 'Comissão fixa por unidade obrigatória quando o critério é FIXED_PER_UNIT',
+      path: ['consultant_commission_fixed_per_unit_cents'],
+    }
+  )
+  .refine(
+    (p) => {
+      // INV-4 ex-ante: se basis=FIXED_PER_UNIT e há piso absoluto, o
+      // fixo não pode exceder o piso (caso contrário a invariante
+      // "consultant ≤ platform" é matematicamente impossível no preço-
+      // piso).
+      if (p.consultant_commission_basis !== 'FIXED_PER_UNIT') return true
+      if (p.platform_min_unit_cents == null) return true
+      if (p.consultant_commission_fixed_per_unit_cents == null) return true
+      return p.consultant_commission_fixed_per_unit_cents <= p.platform_min_unit_cents
+    },
+    {
+      message: 'Comissão fixa por unidade não pode exceder o piso absoluto da plataforma',
+      path: ['consultant_commission_fixed_per_unit_cents'],
+    }
+  )
+  // Tiers must be non-overlapping. Overlap is also enforced in DB via
+  // EXCLUDE constraint, but catching it client-side gives a friendlier
+  // error than the SQL traceback.
+  .refine(
+    (p) => {
+      const sorted = [...p.tiers].sort((a, b) => a.min_quantity - b.min_quantity)
+      for (let i = 0; i < sorted.length - 1; i += 1) {
+        const a = sorted[i]
+        const b = sorted[i + 1]
+        if (!a || !b) continue
+        if (a.max_quantity >= b.min_quantity) return false
+      }
+      return true
+    },
+    {
+      message: 'Os tiers não podem ter faixas de quantidade sobrepostas',
+      path: ['tiers'],
+    }
+  )
+
+export type PricingProfileFormData = z.infer<typeof pricingProfileSchema>
+
+// --- Buyer pricing override (PR-B/C of ADR-001) ---
+//
+// Polymorphism via two-column nullable (clinic_id XOR doctor_id), same
+// shape `coupons` uses. The XOR is enforced both client-side (refine)
+// and at the DB (CHECK).
+
+export const buyerPricingOverrideSchema = z
+  .object({
+    product_id: uuidLoose,
+    clinic_id: uuidLoose.optional().nullable(),
+    doctor_id: uuidLoose.optional().nullable(),
+    platform_min_unit_cents: z.number().int().positive().optional().nullable(),
+    platform_min_unit_pct: z.number().min(0).max(100).optional().nullable(),
+    change_reason: z.string().min(1, 'Motivo é obrigatório').max(500),
+  })
+  .refine((o) => Boolean(o.clinic_id) !== Boolean(o.doctor_id), {
+    message: 'Informe exatamente um destinatário (clínica OU médico)',
+    path: ['clinic_id'],
+  })
+  .refine((o) => o.platform_min_unit_cents != null || o.platform_min_unit_pct != null, {
+    message: 'Defina pelo menos um piso (absoluto ou percentual)',
+    path: ['platform_min_unit_cents'],
+  })
+
+export type BuyerPricingOverrideFormData = z.infer<typeof buyerPricingOverrideSchema>
