@@ -39,7 +39,11 @@ export const reorderAlertsJob = inngest.createFunction(
       })
 
       if (error) {
-        logger.warn('[reorder] RPC not available — using inline query')
+        // The RPC is intentionally unmigrated (`@rpc-speculative` above).
+        // Fall back to the inline query — that IS the canonical path.
+        // Logged at debug so the operational signal stays visible without
+        // polluting the warn channel.
+        logger.debug('[reorder] using inline query (RPC speculative)')
 
         const { data: rawOrders, error: ordErr } = await admin
           .from('order_items')

@@ -42,7 +42,11 @@ export const churnDetectionJob = inngest.createFunction(
       const { error: cycleErr } = await admin.rpc('compute_clinic_order_cycles')
 
       if (cycleErr) {
-        logger.warn('[churn] RPC not available, using inline query')
+        // The RPC is intentionally unmigrated (`@rpc-speculative` above).
+        // Fall back to the inline query — that IS the canonical path.
+        // Logged at debug so the operational signal stays visible without
+        // polluting the warn channel.
+        logger.debug('[churn] using inline query (RPC speculative)')
       }
 
       // Direct query approach (works without RPC)
