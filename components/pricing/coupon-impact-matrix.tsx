@@ -114,6 +114,8 @@ export function CouponImpactMatrix({ cells, variants, quantities, monthlyVolumeB
         </table>
       </div>
 
+      <Legend />
+
       {monthlyVolumeByQty && (
         <CampaignCostSummary
           variants={variants}
@@ -121,6 +123,46 @@ export function CouponImpactMatrix({ cells, variants, quantities, monthlyVolumeB
           monthlyVolumeByQty={monthlyVolumeByQty}
         />
       )}
+    </div>
+  )
+}
+
+function Legend() {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+      <p className="mb-2 font-medium text-slate-700">Como ler a matriz</p>
+      <div className="grid gap-1.5 sm:grid-cols-2">
+        <LegendItem
+          swatch="bg-emerald-100 border-emerald-300"
+          label="Líquido da plataforma ≥ R$ 50/u — saudável"
+        />
+        <LegendItem
+          swatch="bg-amber-100 border-amber-300"
+          label="Líquido < R$ 50/u — margem apertada"
+        />
+        <LegendItem
+          swatch="bg-orange-100 border-orange-300"
+          label="Consultor > líquido — você paga mais a ele do que ganha"
+        />
+        <LegendItem
+          swatch="bg-red-100 border-red-300"
+          label="Líquido ≤ 0 — campanha destrói margem"
+        />
+      </div>
+      <p className="mt-2 text-[11px] text-slate-500">
+        <strong>cap INV-4</strong>: comissão do consultor foi capada para não exceder a receita
+        bruta da plataforma. <strong>cupom capado (INV-2)</strong>: o desconto bateu no piso e foi
+        truncado (a plataforma não absorve mais que o piso permite).
+      </p>
+    </div>
+  )
+}
+
+function LegendItem({ swatch, label }: { swatch: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`inline-block h-3 w-3 rounded border ${swatch}`} />
+      <span>{label}</span>
     </div>
   )
 }
@@ -158,9 +200,17 @@ function Cell({
   const delta = !isBaseline && baselineCents != null ? b.final_unit_price_cents - baselineCents : 0
   const showDelta = !isBaseline && delta < 0
 
+  // Sinaliza quando o consultor leva mais que o líquido da plataforma.
+  // Não viola INV-4 (que garante consultor ≤ bruto), mas é uma red flag
+  // operacional: você está pagando o consultor mais que ganhando líquido.
+  // Threshold: quando consultor representa > 50% da receita bruta da
+  // plataforma (i.e. consultor > líquido).
+  const consultantOverNet = consultantCents > 0 && consultantCents > platformNetCents
+
   // Cor de fundo conforme receita LÍQUIDA da plataforma (descontado consultor).
   let bgClass = ''
   if (platformNetCents <= 0) bgClass = 'bg-red-50 border-red-200'
+  else if (consultantOverNet) bgClass = 'bg-orange-50 border-orange-200'
   else if (platformNetCents < 5000)
     bgClass = 'bg-amber-50 border-amber-200' // < R$ 50/u
   else bgClass = 'bg-emerald-50 border-emerald-200'
@@ -198,6 +248,15 @@ function Cell({
           tone={platformNetCents <= 0 ? 'warn' : 'ok'}
           bold
         />
+        {consultantOverNet && (
+          <div
+            className="mt-1 inline-flex items-center gap-1 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-800"
+            title={`Consultor R$ ${(consultantCents / 100).toFixed(2)} > líquido R$ ${(platformNetCents / 100).toFixed(2)}`}
+          >
+            <AlertTriangle className="h-2.5 w-2.5" />
+            consultor &gt; líquido
+          </div>
+        )}
         {b.coupon_capped && (
           <div className="mt-1 inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
             <AlertTriangle className="h-2.5 w-2.5" />

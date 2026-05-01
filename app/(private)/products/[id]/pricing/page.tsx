@@ -173,7 +173,7 @@ export default async function ProductPricingPage({ params }: PageProps) {
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-gray-900">Pricing profile vigente</h2>
           {isSuperAdmin && (
-            <ButtonLink href={`/products/${id}/pricing/edit`} variant="outline" size="sm">
+            <ButtonLink href={`/products/${id}/pricing/edit`} variant="default" size="sm">
               {profile ? 'Editar (criar nova versão)' : 'Cadastrar profile'}
             </ButtonLink>
           )}

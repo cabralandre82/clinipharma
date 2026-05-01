@@ -212,6 +212,20 @@ export default async function CouponMatrixPage({ params, searchParams }: PagePro
         </div>
       )}
 
+      <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+        <p className="font-medium text-slate-700">Tipos de cupom suportados</p>
+        <p className="mt-1">
+          A matriz hoje simula apenas <strong>desconto percentual</strong> e{' '}
+          <strong>desconto fixo por unidade</strong> — os mesmos tipos que a plataforma cria em{' '}
+          <Link href="/coupons" className="underline">
+            /coupons
+          </Link>
+          . Outros formatos (upgrade de tier, desconto só na 1ª unidade, % condicionado a quantidade
+          mínima) estão no roadmap como ADR-002 e ainda não estão implementados — não é possível
+          criá-los e portanto não aparecem aqui.
+        </p>
+      </div>
+
       <CouponMatrixFilters
         productId={id}
         clinics={clinics}

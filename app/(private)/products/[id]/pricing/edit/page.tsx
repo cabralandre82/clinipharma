@@ -4,7 +4,7 @@
  * SCD-2: edits never overwrite — they create a new version. The form
  * starts pre-filled with the live profile (if any), the operator
  * tweaks pharmacy_cost / floors / consultant basis / tiers, fills a
- * change_reason, and clicks "Publicar nova versão". Server action
+ * change_reason, and clicks "Salvar e publicar nova versão". Server action
  * `savePricingProfile` calls the atomic RPC (mig-076) to expire the
  * old + insert the new + insert tiers in a single transaction.
  *

@@ -286,9 +286,12 @@ export function PricingProfileForm({ productId, currentProfile, currentTiers, ca
             value={floorPctStr}
             onChange={(e) => setFloorPctStr(e.target.value)}
           />
-          <p className="text-xs text-slate-500">
-            Aplicado por tier. O piso efetivo é o MAIOR entre absoluto e percentual.
-          </p>
+          <FloorPctHelp
+            floorAbsBrl={floorAbsBrl}
+            floorPctStr={floorPctStr}
+            tiers={tiers}
+            brlToCents={brlToCents}
+          />
         </div>
       </div>
 
@@ -296,7 +299,7 @@ export function PricingProfileForm({ productId, currentProfile, currentTiers, ca
         <div className="space-y-2">
           <Label htmlFor="basis">Critério de comissão do consultor *</Label>
           <Select value={basis} onValueChange={(v) => setBasis(v as ConsultantCommissionBasis)}>
-            <SelectTrigger id="basis">
+            <SelectTrigger id="basis" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -305,6 +308,11 @@ export function PricingProfileForm({ productId, currentProfile, currentTiers, ca
               <SelectItem value="FIXED_PER_UNIT">Valor fixo por unidade</SelectItem>
             </SelectContent>
           </Select>
+          <p className="text-xs text-slate-500">
+            % sobre o preço total ao cliente é o critério mais comum (consultor ganha sobre a
+            receita gerada). Repasse à farmácia desconecta do desconto. Fixo por unidade independe
+            de tier ou cupom.
+          </p>
         </div>
 
         {basis === 'FIXED_PER_UNIT' && (
@@ -408,19 +416,97 @@ export function PricingProfileForm({ productId, currentProfile, currentTiers, ca
         />
       </div>
 
-      <div className="flex gap-3 border-t pt-4">
-        <Button type="submit" disabled={pending}>
-          {pending ? 'Salvando...' : 'Publicar nova versão'}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.push(cancelHref)}
-          disabled={pending}
-        >
-          Cancelar
-        </Button>
+      {/* Sticky action bar — sempre visível no fim do viewport para que
+          o operador nunca precise rolar até o fim do form pra encontrar
+          o botão de salvar. */}
+      <div className="sticky bottom-0 -mx-6 flex items-center justify-between gap-3 border-t bg-white/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <p className="hidden text-xs text-slate-500 sm:block">
+          Salvar publica uma <strong>nova versão</strong> deste profile. A versão atual fica
+          preservada como histórico (SCD-2).
+        </p>
+        <div className="flex gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push(cancelHref)}
+            disabled={pending}
+          >
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={pending}>
+            {pending ? 'Salvando...' : 'Salvar e publicar nova versão'}
+          </Button>
+        </div>
       </div>
     </form>
+  )
+}
+
+/**
+ * Helper inline didático para o piso percentual.
+ * Mostra o cálculo `pct × tier` para até 3 tiers e o piso efetivo
+ * `GREATEST(abs, pct)` em cada um — replicando o comportamento real do
+ * SQL `resolve_effective_floor` (mig-071/075). Some quando os campos
+ * estão vazios pra não poluir.
+ */
+function FloorPctHelp({
+  floorAbsBrl,
+  floorPctStr,
+  tiers,
+  brlToCents,
+}: {
+  floorAbsBrl: string
+  floorPctStr: string
+  tiers: TierRow[]
+  brlToCents: (brl: string) => number | null
+}) {
+  const pct = floorPctStr.trim() ? Number(floorPctStr.replace(',', '.')) : null
+  const absCents = floorAbsBrl.trim() ? brlToCents(floorAbsBrl) : null
+
+  if (!floorPctStr.trim() || pct === null || !Number.isFinite(pct) || pct <= 0 || pct > 100) {
+    return (
+      <p className="text-xs text-slate-500">
+        Aplicado por tier. O piso efetivo é o <strong>maior</strong> entre absoluto e percentual.
+      </p>
+    )
+  }
+
+  const sample = tiers
+    .map((row) => ({ minQ: Number(row.min_quantity), priceCents: brlToCents(row.unit_price_brl) }))
+    .filter(
+      (r) => Number.isInteger(r.minQ) && r.minQ > 0 && r.priceCents != null && r.priceCents > 0
+    )
+    .slice(0, 3)
+
+  if (sample.length === 0) {
+    return (
+      <p className="text-xs text-slate-500">
+        Aplicado por tier. O piso efetivo é o <strong>maior</strong> entre absoluto e percentual.
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
+      <p>
+        Em cada tier, piso = <code className="rounded bg-white px-1">MAIOR(abs, pct × preço)</code>:
+      </p>
+      <ul className="space-y-0.5 font-mono text-[11px]">
+        {sample.map((s) => {
+          const pctCents = Math.round(((s.priceCents ?? 0) * pct) / 100)
+          const effective = Math.max(absCents ?? 0, pctCents)
+          const winner = (absCents ?? 0) >= pctCents ? 'abs' : 'pct'
+          return (
+            <li key={s.minQ}>
+              {s.minQ}u (R$ {((s.priceCents ?? 0) / 100).toFixed(2).replace('.', ',')}) →{' pct '}
+              {(pctCents / 100).toFixed(2).replace('.', ',')} ·{' '}
+              {absCents != null ? `abs ${(absCents / 100).toFixed(2).replace('.', ',')} · ` : ''}
+              <strong>piso {(effective / 100).toFixed(2).replace('.', ',')}</strong>{' '}
+              <span className="text-slate-400">({winner} venceu)</span>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
