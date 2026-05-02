@@ -3149,3 +3149,47 @@ prod e repo). Excepção justificada aqui porque:
 **Follow-ups criados:**
 
 - Nenhum. Pendência operacional encerrada.
+
+---
+
+### Hotfix — neutralização dos crons do projeto Vercel quarentenado — 2026-05-02 09:25 BRT
+
+**Status:** 🟢 concluído
+**Commits:** _este commit_
+**Migrations aplicadas:** nenhuma
+**Env vars alteradas:** `CRON_SECRET` REMOVIDO do projeto `b2b-med-platform` (quarentena). `clinipharma` (ATIVO) intocado.
+**Deploy alterado:** `dpl_5LvB7ChCyFNJUb2sJt1ptKYRG4sY` (production warm do quarentenado, criado 2026-04-30) DELETADO via API. Vercel auto-promoveu `dpl_BKF9w5ekR7wt9g9NSosSFvitRBLd` (de 2026-04-19, cold) — sem efeito porque sem `CRON_SECRET` o cold start retorna 401.
+**Testes:** smoke empírico — 2 ciclos consecutivos do `synthetic-probe` (cada 5min) pós-fix mostraram apenas `clinipharma` (Δ=300s exatos). Antes do fix: par determinístico Δ=38s 100% do tempo.
+
+**Sintoma observado:**
+
+Operador notou no `/server-logs` o par recorrente toda madrugada às 07:40 UTC:
+
+- `error [cron/rls-canary] canary failed to start` com `errorRaw="[rls-canary] SUPABASE_JWT_SECRET is required"`
+- `warn alert triggered` (RLS canary did not run, severity=critical)
+
+Padrão presente há ≥13 dias (desde 22/04). O alerta foi inicialmente investigado como problema de env var faltando — mas a env existia no projeto certo (`clinipharma`) com valor correto. Investigação mais profunda revelou que a cada execução de QUALQUER cron, o `cron_runs` ledger gravava 2 entradas `status=success` separadas por 30-40s, com `locked_by` apontando para deployments distintos.
+
+**Diagnóstico final:**
+
+Existem dois projetos Vercel configurados (`clinipharma` ATIVO + `b2b-med-platform` em QUARENTENA desde 2026-04-19, sem Git mas com último deploy READY mantido como backup). Ambos têm o mesmo `vercel.json` listando 22 crons idênticos. **O scheduler do Vercel respeita o manifest do último deploy READY mesmo sem Git e sem domain público apontado** — então o quarentenado disparou os 22 crons em paralelo ao ativo por ~13 dias. Para a maioria dos crons (que têm `withCronGuard`), ambas execuções terminaram em `status=success` porque o `cron_try_lock` da migração 045 só protege contra OVERLAPPING (acquire-while-held), e os 30-40s de gap entre as duas execuções acquire/release sem se sobrepor. Para o `rls-canary`, o quarentenado falhava com erro visível porque ele NÃO tem `SUPABASE_JWT_SECRET` (foi adicionado só no clinipharma em 2026-04-30) — esse erro foi a única pista visível do problema; os outros 21 crons rodavam silenciosamente em duplicata, incluindo `verify-audit-chain`, `enforce-retention`, `money-reconcile`, `dsar-sla-check`. **Nenhuma corrupção observada na chain de audit ou no money_drift_view**, mas era questão de tempo.
+
+**Plano executado (cirúrgico, reversível):**
+
+1. **Backup** do valor de `CRON_SECRET` do quarentenado (1172 chars, encriptado v2) salvo em `~/.config/agent/backups/cron_secret_b2b-med-platform_20260502.txt` (chmod 600).
+2. **DELETE** `CRON_SECRET` (id=`Npem6Gd9JYzLmW5P`) do projeto `b2b-med-platform` via `DELETE /v10/projects/.../env/{id}`. Confirmado HTTP 200, env removida, clinipharma intocado.
+3. **Aguardado 7 minutos** observando `synthetic-probe` (5min cycle): duplo-fire CONTINUOU. Diagnose: lambda warm tem secret cacheado em memória do boot; cron de 5min nunca esfria.
+4. **DELETE** `dpl_5LvB7ChCyFNJUb2sJt1ptKYRG4sY` (deployment warm) via `DELETE /v13/deployments/{id}`. Vercel auto-promoveu o próximo READY (`dpl_BKF9w5...` de 19/04, cold). Restam 36 deploys READY no quarentenado como backup.
+5. **Aguardado 6 minutos**, observado: synthetic-probe rodou apenas no clinipharma às 12:25:40 e 12:30:40 UTC, Δ=300s exatos, zero novos `server_logs`.
+
+**Observações estruturais:**
+
+- A doc `docs/infra/vercel-projects-topology.md` afirmava por semanas: "Crons: ainda agendados (mas dedup via Upstash lock — sem double execution)". **Falso.** Doc corrigida no mesmo commit.
+- O `cron_try_lock` (migração 045) NÃO previne dois projetos rodando o mesmo cron com gap >0. Para isso seria preciso "minimum interval between runs" (ex.: rejeitar qualquer acquire dentro de N segundos do último release), mas o caso de uso correto é não ter dois projetos rodando o mesmo cron.
+- Quarentena de projeto Vercel só é segura se: (a) sem Git conectado, (b) sem `CRON_SECRET`, (c) sem deployments READY com `vercel.json` listando crons. As duas primeiras condições agora estão aplicadas. A terceira é resolvida pela quarentena expirar em 24h (data planejada: 2026-05-03 — projeto será deletado).
+- O `rls-canary` em si está saudável: `rls_canary_log` mais recente registra 40 tabelas verificadas com 0 violações. O alerta era exclusivamente sobre o cron NÃO ter rodado no projeto quarentenado — não sobre vazamento real.
+
+**Follow-ups criados:**
+
+- 2026-05-03: deletar projeto `b2b-med-platform` da Vercel após confirmação de que nenhum incidente forçou rollback (= a quarentena cumpriu seu propósito de janela de espera).
+- Considerar adicionar regra ao `withCronGuard`: rejeitar acquire se `last_release_at > now() - p_min_interval_seconds`. Não-bloqueador — só relevante se voltarmos a ter dois projetos rodando crons simultâneos. Provavelmente nunca.

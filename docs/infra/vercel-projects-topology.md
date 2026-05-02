@@ -31,16 +31,33 @@ Existe **um único projeto Vercel ativo**: `clinipharma`. Ele serve:
                                  │ Supabase staging (ghjexiy…)             │
                                  └─────────────────────────────────────────┘
 
-   Em quarentena (sem Git, congelado, mantido como backup até 2026-05-03):
+   Em quarentena (sem Git, neutralizado, mantido como backup até 2026-05-03):
                                  ┌─────────────────────────────────────────┐
                                  │ Vercel project: b2b-med-platform        │
                                  │ Domain: b2b-med-platform.vercel.app     │
                                  │ Git link: REMOVIDO                      │
                                  │ Secrets Zenvia: REMOVIDOS (2026-04-18)  │
-                                 │ Crons: ainda agendados (mas dedup via   │
-                                 │ Upstash lock — sem double execution)    │
+                                 │ CRON_SECRET: REMOVIDO (2026-05-02)      │
+                                 │ Deployment warm: DELETADO (2026-05-02)  │
+                                 │ Crons: ainda agendados, mas todas as    │
+                                 │ invocações batem em 401 (auth gate sem  │
+                                 │ secret) → não tocam no DB.              │
                                  └─────────────────────────────────────────┘
 ```
+
+> **Aviso histórico — premissa errada (corrigida em 2026-05-02):** este
+> diagrama afirmava por semanas que "Crons: ainda agendados (mas dedup via
+> Upstash lock — sem double execution)". **Falso.** O `cron_try_lock` da
+> migração 045 só protege contra execuções OVERLAPPING — duas invocações
+> sequenciais separadas por 30-40s (que era o padrão real entre os dois
+> projetos) acquire/release sem conflito, ambas como `status=success`. O
+> bug ficou invisível porque os dois projetos usam o mesmo banco e o mesmo
+> `cron_runs` ledger; ler "2 success" parecia normal. Diagnóstico final
+> em 2026-05-02 mostrou que `b2b-med-platform` rodou 22 crons em paralelo
+> ao `clinipharma` por ~13 dias, incluindo `verify-audit-chain`,
+> `enforce-retention`, `money-reconcile` e `dsar-sla-check` — todos contra
+> o mesmo banco de produção. Nenhuma corrupção observada (a chain está
+> íntegra), mas era questão de tempo. Veja item 9 do histórico.
 
 ## Como chegamos aqui (histórico)
 
@@ -148,6 +165,52 @@ Zenvia"`. Causa diagnosticada via ticket Zenvia: o plano contratado
      no "De" do SMS e pode achar estranho ou marcar como spam.
      Mitigação: primeira linha de todo template SMS começa com
      "[Clinipharma]" para ancorar a identidade da marca.
+9. **2026-05-02 (manhã, BRT):** **neutralização dos crons fantasmas do
+   quarentenado.** Operador notou no dashboard de logs (`/server-logs`)
+   o par recorrente `[cron/rls-canary] canary failed to start` (error,
+   `SUPABASE_JWT_SECRET is required`) + `RLS canary did not run` (warn,
+   crítico) toda madrugada às 07:40 UTC. Investigação revelou padrão
+   100% determinístico há ≥13 dias: para CADA cron rodando, o
+   `cron_runs` ledger gravava 2 execuções `status=success` separadas
+   por ~30-40s, com `locked_by` apontando para deployments distintos:
+   `dpl_Df5n9H...` (clinipharma) e `dpl_5LvB7Ch...` (b2b-med-platform
+   quarentenado). Diagnóstico final: o `vercel.json` do último deploy
+   READY do projeto em quarentena lista os mesmos 22 crons, e o
+   scheduler do Vercel respeita esse manifest mesmo sem Git conectado
+   e sem `clinipharma.com.br` apontado. `cron_try_lock` (migração 045)
+   NÃO previne isso porque execuções sequenciais com gap de 30s
+   acquire/release sem se sobrepor. Plano executado:
+   - **Verificação inicial**: confirmado via Vercel API que ambos
+     projetos têm 22 crons no manifest, e ambos disparam o handler
+     com `CRON_SECRET` válido. `rls_canary_log` íntegro (40 tabelas,
+     0 violações no run mais recente — sistema RLS em si está OK).
+   - **Mitigação 1 — `CRON_SECRET` removido do quarentenado**
+     (`DELETE /v10/projects/.../env/Npem6Gd9JYzLmW5P`). Backup do
+     valor salvo em `~/.config/agent/backups/`. Efeito esperado:
+     próxima execução cold-start lê `process.env.CRON_SECRET=undefined`
+     → `withCronGuard` retorna 401 antes de qualquer trabalho. Mas
+     observou-se 12:14→12:20 UTC que `synthetic-probe` (5min cycle)
+     CONTINUOU disparando duplo — o lambda warm tinha o secret
+     cacheado em memória do boot original, e nunca esfriou.
+   - **Mitigação 2 — deployment warm deletado**
+     (`DELETE /v13/deployments/dpl_5LvB7ChCyFNJUb2sJt1ptKYRG4sY`).
+     Vercel auto-promoveu `dpl_BKF9w5...` (de 19/04) como nova
+     production do quarentenado — lambda **cold**. Próxima invocação
+     do `synthetic-probe` (12:25:40 UTC) e a seguinte (12:30:40)
+     mostraram apenas o clinipharma rodando, com Δ=300s (= 5min
+     limpos, sem duplicata). Zero novos `server_logs` desde o fix.
+   - **Sanity check**: `clinipharma` 100% intocado durante toda a
+     operação. `CRON_SECRET` do projeto ativo continua presente
+     (id=`Q3FfvlacuwQfRJUc`, target=production+preview+development).
+     Os 36 outros deploys READY do quarentenado permanecem como
+     backup forense até 2026-05-03 (data de expiração da quarentena).
+   - **Lição estrutural**: nunca confiar em "dois projetos não dão
+     problema porque o lock dedupa" — o lock só protege overlaps.
+     Quarentena de projeto Vercel só é segura se: (a) sem Git,
+     (b) sem `CRON_SECRET`, (c) sem deployments READY com
+     `vercel.json` listando crons. As duas primeiras condições
+     foram aplicadas; a terceira é resolvida pela quarentena
+     expirar em 24h (deletar o projeto).
 
 ## Por que `b2b-med-platform` ficou em quarentena (não deletado)
 
