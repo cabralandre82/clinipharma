@@ -1,14 +1,53 @@
 import { withCircuitBreaker } from '@/lib/circuit-breaker'
 
-const BASE_URL = process.env.ASAAS_API_URL ?? 'https://sandbox.asaas.com/api/v3'
-const API_KEY = process.env.ASAAS_API_KEY ?? ''
+/**
+ * Resolve a URL base da API Asaas em runtime (não em load time).
+ *
+ * Bug original (2026-05-02): `process.env.ASAAS_API_URL ?? 'fallback'`
+ * deixa string vazia (`""`) passar — porque `??` só aplica em
+ * null/undefined. Quando o Vercel tinha a env presente mas com value
+ * vazio (consequência de um pipeline de setup que falhou em pipear o
+ * valor pra stdin), `BASE_URL` virava `""`, e `fetch(\`${BASE_URL}/payments\`)`
+ * recebia literalmente `/payments` → "Failed to parse URL from /payments"
+ * só na hora de cobrar o cliente, quando o estrago já estava feito.
+ *
+ * Resolvemos em runtime (não em load time / module-top-level) para que
+ * uma env mal-configurada em dev/preview NÃO impeça o build. Em prod,
+ * a primeira call ao Asaas falha rápido com mensagem clara.
+ *
+ * Fallback é deliberadamente sandbox: nunca produção. Se a env de prod
+ * sumir, queremos auth-fail visível, não cobrança real silenciosa.
+ */
+function resolveBaseUrl(): string {
+  const v = process.env.ASAAS_API_URL
+  if (typeof v === 'string' && v.trim() !== '') {
+    const trimmed = v.trim()
+    if (!/^https?:\/\//i.test(trimmed)) {
+      throw new Error(
+        `[asaas] env ASAAS_API_URL não começa com http(s):// (recebido: "${trimmed.slice(0, 40)}") — verifique no Vercel`
+      )
+    }
+    return trimmed
+  }
+  return 'https://sandbox.asaas.com/api/v3'
+}
+
+function resolveApiKey(): string {
+  const v = process.env.ASAAS_API_KEY
+  if (!v || v.trim() === '') {
+    throw new Error('[asaas] env ASAAS_API_KEY ausente ou vazia — verifique no Vercel')
+  }
+  return v.trim()
+}
 
 async function asaasFetchRaw<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const baseUrl = resolveBaseUrl()
+  const apiKey = resolveApiKey()
+  const res = await fetch(`${baseUrl}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      access_token: API_KEY,
+      access_token: apiKey,
       ...options?.headers,
     },
   })
