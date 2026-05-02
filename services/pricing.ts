@@ -253,6 +253,14 @@ export async function savePricingProfile(
 
     revalidatePath(`/products/${productId}`)
     revalidatePath(`/products/${productId}/pricing`)
+    // mig-082 — RPC agora sincroniza products.price_current/pharmacy_cost
+    // toda vez que um profile é publicado. Páginas que listam vários
+    // produtos (catálogo, busca, dashboard, listagem, relatórios) dependem
+    // desses campos legados. `force-dynamic` cobre /products mas
+    // /catalog é cache-friendly em alguns paths — invalidar cobre os
+    // dois cenários sem custo extra.
+    revalidatePath('/products')
+    revalidatePath('/catalog')
 
     return {
       profileId: result.profile_id,
