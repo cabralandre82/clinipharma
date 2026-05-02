@@ -447,6 +447,108 @@ describe('TC-COUP-REPLACE-01 — replace_existing em createCoupon', () => {
     expect(insertQB.insert).toHaveBeenCalled()
   })
 
+  it('replace TIER_UPGRADE com discount_value=0 (regressão mig-083)', async () => {
+    // Reproduz o cenário exato do incidente 2026-05-02 17:13 UTC:
+    // operador clicou "substituir" um cupom PERCENT existente por um
+    // TIER_UPGRADE (discount_value=0, tier_promotion_steps=2). O Zod
+    // aceita, o RPC `replace_active_coupon` é chamado, mas o INSERT
+    // dentro do RPC batia em `coupons_discount_value_check > 0` da
+    // migração 027. A migração 083 substituiu o constraint por uma
+    // versão type-aware que aceita 0 para TIER_UPGRADE.
+    //
+    // Este TC valida que o caminho do app (Zod + payload pro RPC)
+    // continua passando 0 corretamente — se o constraint do banco
+    // estiver mesmo relaxado, o cupom é criado.
+    const existingQB = makeQB({
+      data: {
+        id: 'old-percent-id',
+        code: 'OLDPCT',
+        discount_type: 'PERCENT',
+        discount_value: 10,
+        min_quantity: 1,
+        tier_promotion_steps: 0,
+        valid_until: null,
+      },
+      error: null,
+    })
+    const productNameQB = makeQB({ data: { name: 'Tirzepatida 60mg' }, error: null })
+    const clinicMembersQB: Record<string, unknown> = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }
+    const clinicTradeQB = makeQB({ data: { trade_name: 'Clínica X' }, error: null })
+
+    // Guard de pricing_mode: TIER_UPGRADE só roda em TIERED_PROFILE.
+    const productsGuardQB = makeQB({
+      data: { pricing_mode: 'TIERED_PROFILE', name: 'Tirzepatida 60mg' },
+      error: null,
+    })
+
+    let productsCallIndex = 0
+    adminFromMock.mockImplementation((table: string) => {
+      if (table === 'coupons') return existingQB
+      if (table === 'products') {
+        productsCallIndex += 1
+        return productsCallIndex === 1 ? productsGuardQB : productNameQB
+      }
+      if (table === 'clinic_members') return clinicMembersQB
+      if (table === 'clinics') return clinicTradeQB
+      throw new Error(`unexpected table: ${table}`)
+    })
+
+    adminRpcMock.mockResolvedValue({
+      data: {
+        new_coupon: {
+          id: 'new-tu-id',
+          code: 'NEW-TU',
+          product_id: PROD_ID,
+          clinic_id: CLINIC_ID,
+          doctor_id: null,
+          discount_type: 'TIER_UPGRADE',
+          discount_value: 0,
+          max_discount_amount: null,
+          valid_from: new Date().toISOString(),
+          valid_until: null,
+          activated_at: null,
+          active: true,
+          created_by_user_id: 'actor-id',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          used_count: 0,
+          min_quantity: 1,
+          tier_promotion_steps: 2,
+        },
+        replaced_ids: ['old-percent-id'],
+        replaced_codes: ['OLDPCT'],
+      },
+      error: null,
+    })
+
+    const { createCoupon } = await import('@/services/coupons')
+    const result = await createCoupon({
+      product_id: PROD_ID,
+      clinic_id: CLINIC_ID,
+      discount_type: 'TIER_UPGRADE',
+      discount_value: 0,
+      tier_promotion_steps: 2,
+      replace_existing: true,
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(result.coupon?.id).toBe('new-tu-id')
+    expect(result.replaced_coupon_ids).toEqual(['old-percent-id'])
+    // O payload pro RPC tem que carregar discount_value=0 (não default-ar
+    // pra outro valor) — o constraint type-aware do banco depende disso.
+    expect(adminRpcMock).toHaveBeenCalledWith(
+      'replace_active_coupon',
+      expect.objectContaining({
+        p_discount_type: 'TIER_UPGRADE',
+        p_discount_value: 0,
+        p_tier_promotion_steps: 2,
+      })
+    )
+  })
+
   it('RPC retorna erro: createCoupon devolve mensagem de erro amigável', async () => {
     const existingQB = makeQB({
       data: {
