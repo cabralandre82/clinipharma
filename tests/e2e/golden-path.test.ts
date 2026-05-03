@@ -24,8 +24,12 @@
  * em modo `test.skip()` por step — nunca falha por ausência de credencial.
  */
 import { test, expect, type APIResponse } from '@playwright/test'
+import { hasAuthSession } from './_helpers/auth-status'
 
-const HAS_AUTH = !!process.env.E2E_SUPER_ADMIN_PASSWORD
+// Lido uma vez no boot do worker. O flag é escrito por auth.setup.ts
+// quando a senha está ausente OU quando o login falha (credencial
+// inválida pro target — ex: senha de prod em CI contra staging).
+const HAS_AUTH = hasAuthSession()
 
 test.describe('Golden Path — health (sem auth)', () => {
   test.use({ storageState: { cookies: [], origins: [] } })
@@ -65,7 +69,7 @@ test.describe('Golden Path — health (sem auth)', () => {
 })
 
 test.describe('Golden Path — catálogo (com auth)', () => {
-  test.skip(!HAS_AUTH, 'E2E_SUPER_ADMIN_PASSWORD ausente — pulando steps autenticados')
+  test.skip(!HAS_AUTH, 'sessão autenticada indisponível (sem credencial OU login falhou)')
 
   test('GP-2.1: catalog list renderiza com produtos (h1 + pelo menos 1 link de detalhe)', async ({
     page,
@@ -147,7 +151,7 @@ test.describe('Golden Path — catálogo (com auth)', () => {
 })
 
 test.describe('Golden Path — admin pricing & cupons', () => {
-  test.skip(!HAS_AUTH, 'E2E_SUPER_ADMIN_PASSWORD ausente — pulando steps autenticados')
+  test.skip(!HAS_AUTH, 'sessão autenticada indisponível (sem credencial OU login falhou)')
 
   test('GP-3.1: /products renderiza com tabela ou estado vazio (sem crash)', async ({ page }) => {
     await page.goto('/products')
@@ -200,7 +204,7 @@ test.describe('Golden Path — admin pricing & cupons', () => {
 })
 
 test.describe('Golden Path — pricing engine API', () => {
-  test.skip(!HAS_AUTH, 'E2E_SUPER_ADMIN_PASSWORD ausente — preview exige sessão autenticada')
+  test.skip(!HAS_AUTH, 'preview exige sessão autenticada — pulando')
 
   test('GP-4.1: /api/pricing/preview retorna payload válido para o primeiro produto admin', async ({
     page,
