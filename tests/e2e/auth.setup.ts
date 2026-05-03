@@ -21,12 +21,15 @@ setup('authenticate as super admin', async ({ page }) => {
   }
 
   await page.goto('/login')
-  await page.getByLabel(/e-?mail/i).fill(SUPER_ADMIN_EMAIL)
-  await page.getByLabel(/senha/i).fill(SUPER_ADMIN_PASSWORD)
-  await page.getByRole('button', { name: /entrar/i }).click()
+  // Seletores via id para evitar ambiguidade do strict-mode do Playwright:
+  // /senha/i casaria "Senha" (label), "Mostrar senha" (botão toggle) e
+  // "Esqueci minha senha" (link), gerando erro de "multiple matches".
+  await page.locator('#email').fill(SUPER_ADMIN_EMAIL)
+  await page.locator('#password').fill(SUPER_ADMIN_PASSWORD)
+  await page.getByRole('button', { name: /^entrar$/i }).click()
 
   // Wait for redirect to dashboard
-  await expect(page).toHaveURL(/\/dashboard|\/admin/, { timeout: 10_000 })
+  await expect(page).toHaveURL(/\/dashboard|\/admin/, { timeout: 15_000 })
 
   // Save session
   await page.context().storageState({ path: SUPER_ADMIN_FILE })
