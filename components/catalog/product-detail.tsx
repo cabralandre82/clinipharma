@@ -147,6 +147,21 @@ export function ProductDetail({ product, coupon = null, tiers = null }: ProductD
               ))}
             </div>
           )}
+
+          {/* Descrição completa — fica imediatamente abaixo da foto/thumbs
+              (mesma coluna da galeria), de modo que o leitor associa o
+              texto descritivo ao produto que está olhando. Antes ficava
+              num bloco "Detalhes" separado no fim da página, longe da
+              imagem, e ninguém entendia que aquele texto descrevia o que
+              estava na foto. (correção UX 2026-05-02) */}
+          {product.long_description && (
+            <div className="rounded-xl border border-gray-200 bg-white p-6">
+              <h2 className="mb-3 text-base font-semibold text-gray-900">Descrição completa</h2>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-600">
+                {product.long_description}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Product Info */}
@@ -311,33 +326,24 @@ export function ProductDetail({ product, coupon = null, tiers = null }: ProductD
         </div>
       </div>
 
-      {/* Details section */}
-      <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Description */}
-        {product.long_description && (
-          <div className="rounded-xl border border-gray-200 bg-white p-6 lg:col-span-2">
-            <h2 className="mb-3 text-base font-semibold text-gray-900">Descrição completa</h2>
-            <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-600">
-              {product.long_description}
-            </p>
-          </div>
-        )}
-
-        {/* Characteristics */}
-        {Object.keys(characteristics).length > 0 && (
-          <div className="rounded-xl border border-gray-200 bg-white p-6">
-            <h2 className="mb-3 text-base font-semibold text-gray-900">Características</h2>
-            <dl className="space-y-2">
-              {Object.entries(characteristics).map(([key, value]) => (
-                <div key={key}>
-                  <dt className="text-xs tracking-wide text-gray-500 uppercase">{key}</dt>
-                  <dd className="text-sm font-medium text-gray-800">{String(value)}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        )}
-      </div>
+      {/* Características — full-width abaixo do grid principal.
+          Antes vivia num grid 1/3 ao lado da Descrição completa, mas
+          como essa migrou pra coluna da galeria, este card ficou
+          sozinho. Layout em colunas auto-fit pra aproveitar bem a
+          largura sem ficar uma lista esticada de uma propriedade só. */}
+      {Object.keys(characteristics).length > 0 && (
+        <div className="mt-10 rounded-xl border border-gray-200 bg-white p-6">
+          <h2 className="mb-3 text-base font-semibold text-gray-900">Características</h2>
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Object.entries(characteristics).map(([key, value]) => (
+              <div key={key}>
+                <dt className="text-xs tracking-wide text-gray-500 uppercase">{key}</dt>
+                <dd className="text-sm font-medium text-gray-800">{String(value)}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
     </div>
   )
 }
